@@ -7,6 +7,8 @@ Pure TypeScript, no Phaser. M0.1 scope: no HP or damage, the fight repeats forev
 - `createEncounterConfig(input)` – builds a validated config from design seconds (`data/*.json`).
 - `createEncounter()` – new state in phase `idle`.
 - `startSearch(state)` – player pressed **Find enemy** (only from `idle`).
+- `makePeace(state)` – player pressed **Peace!**: from `searching` or `fighting` straight back to `idle`
+  (event `peaceMade { from }`; the enemy leaves, no XP/loot). Does nothing while `idle`.
 - `tick(state, config)` – advances one 100 ms step, returns new state + events
   (`searchStarted`, `enemyFound`, `attack { attacker }`).
 - `searchProgress(...)`, `attackProgress(...)` – 0..1 values for UI bars.

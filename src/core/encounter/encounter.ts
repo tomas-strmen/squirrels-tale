@@ -40,6 +40,8 @@ export interface EncounterState {
 export type EncounterEvent =
   | { readonly type: 'searchStarted' }
   | { readonly type: 'enemyFound' }
+  /** Player pressed "Peace!": search or fight ended at once (no XP, no loot). */
+  | { readonly type: 'peaceMade'; readonly from: 'searching' | 'fighting' }
   | { readonly type: 'attack'; readonly attacker: Combatant };
 
 export interface EncounterStep {
@@ -81,6 +83,21 @@ export function startSearch(state: EncounterState): EncounterStep {
   return {
     state: { ...state, phase: 'searching', searchElapsedMs: 0 },
     events: [{ type: 'searchStarted' }],
+  };
+}
+
+/**
+ * Player pressed "Peace!" (GDD 7.1). Stops the search, or ends the fight at once:
+ * the enemy leaves, no XP and no loot. Back to `idle` until "Find enemy" is pressed again.
+ * Does nothing while idle.
+ */
+export function makePeace(state: EncounterState): EncounterStep {
+  if (state.phase === 'idle') {
+    return { state, events: [] };
+  }
+  return {
+    state: createEncounter(),
+    events: [{ type: 'peaceMade', from: state.phase }],
   };
 }
 

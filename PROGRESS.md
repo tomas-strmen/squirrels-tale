@@ -2,11 +2,16 @@
 
 ## Aktuálne
 - **Etapa:** M0 Kostra (GDD kap. 22)
-- **Posledný krok:** M0.1b – tlačidlo Peace! – **schválené** Tomasom (2026-09-26), zlúčené do `main`
-- **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). AI spúšťa npm/git sama.
-- **Git:** lokálny repozitár, vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>` (nastavené len pre projekt). GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). Remote zatiaľ nie je.
+- **Posledný krok:** M0.2 – GitHub repozitár + CI – hotové, čaká na test Tomasa
+- **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model Claude Sonnet 5 (Opus 5.5 len pre náročnejšie etapy – povie sa vopred). AI spúšťa npm/git sama.
+- **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené.
 
 ## Hotové
+### M0.2 – GitHub repozitár + CI (2026-09-26)
+- Repozitár `squirrels-tale` založený a nahraný (`git push`), zatiaľ priamo do `main` (PR workflow začne od ďalšieho kroku).
+- `.github/workflows/ci.yml`: `npm ci` + `npm run check` pri push na `main` a pri každom PR. Prvý beh (#1) je zelený.
+- GitHub Pages a Playwright smoke test sú v M0.3.
+
 ### M0.1b – tlačidlo Peace! (2026-09-26) – schválené
 - `core/encounter`: `makePeace()` – z hľadania aj boja hneď späť do `idle` (udalosť `peaceMade`), v `idle` nič nerobí.
 - `FightScene`: tlačidlo Peace! vpravo dole, viditeľné len počas hľadania a boja; text `fight.peace` v `en.json`.
@@ -25,8 +30,7 @@
 - GDD v1.1 a v1.2 zapísané v `docs/GDD.md` aj v projekte (`claude/GDD.md`).
 
 ## Ďalší krok
-1. **M0.2:** GitHub repozitár (odporúčanie: verejný kvôli bezplatným GitHub Pages – potvrdiť), `git push`, GitHub Actions CI (`npm run check` pri každom pushi/PR). Od M0.2 zmeny cez Pull Request.
-2. **M0.3:** Playwright smoke test + GitHub Pages → test na mobile na šírku.
+1. **M0.3:** Playwright smoke test + GitHub Pages → test na mobile na šírku. Od tohto kroku zmeny cez Pull Request (nie priamo do `main`).
 
 ## Rozhodnutia (2026-09-26)
 - Find enemy po príchode na políčko, potom automatické hľadanie po každom zabití; Peace! zastaví a ukončí boj hneď (bez XP/lootu).

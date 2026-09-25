@@ -2,25 +2,31 @@
 
 ## Aktuálne
 - **Etapa:** M0 Kostra (GDD kap. 22)
-- **Posledný krok:** M0.1 – **schválené** Tomasom (2026-09-26)
-- **Pracovný režim:** od ďalšieho sedenia Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). AI spúšťa npm/git sama.
+- **Posledný krok:** M0.1b – tlačidlo Peace! – **schválené** Tomasom (2026-09-26), zlúčené do `main`
+- **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). AI spúšťa npm/git sama.
+- **Git:** lokálny repozitár, vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>` (nastavené len pre projekt). GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). Remote zatiaľ nie je.
 
 ## Hotové
+### M0.1b – tlačidlo Peace! (2026-09-26) – schválené
+- `core/encounter`: `makePeace()` – z hľadania aj boja hneď späť do `idle` (udalosť `peaceMade`), v `idle` nič nerobí.
+- `FightScene`: tlačidlo Peace! vpravo dole, viditeľné len počas hľadania a boja; text `fight.peace` v `en.json`.
+- 31 testov zelených; overené v prehliadači (AI) aj Tomasom.
+- `.claude/launch.json` – konfigurácia dev servera pre náhľad v Claude.
+
+### Git (2026-09-26)
+- `git init -b main`, prvý commit M0.1 (`caa0caf`).
+
 ### M0.1 – lokálna kostra + ukážka boja (2026-09-26) – schválené
 - Vite + TypeScript + Phaser 4, Vitest, ESLint (`src/core` nesmie importovať Phaser).
 - `src/core/time` – pevný krok 100 ms, prevod sekúnd na ms s kontrolou 1 desatinného miesta.
 - `src/core/encounter` – stavy idle → searching → fighting, časovače útoku, bez HP a poškodenia.
 - `src/game/scenes/FightScene` – sivé štvorce, tlačidlo Find enemy, bar hľadania (1.0 s), bary útoku, „skok“ pri útoku.
 - Dáta: `data/balance.json` (veverička bez zbrane 3.0 s), `data/enemies.json` (Worker Ant 2.0 s); texty: `strings/en.json`.
-- 26 testov zelených (overené aj u Tomasa).
 - GDD v1.1 a v1.2 zapísané v `docs/GDD.md` aj v projekte (`claude/GDD.md`).
-- **Pozor:** Git ešte nie je inicializovaný – nič nie je commitnuté.
 
-## Ďalší krok (prvé sedenie v Code)
-1. **Git:** `git config` (meno + e-mail Tomasa, e-mail až keď bude GitHub účet → noreply), `git init -b main`, prvý commit M0.1.
-2. **M0.1b – tlačidlo Peace!** (GDD 7.1 v1.2): viditeľné počas hľadania aj boja; stlačenie hneď ukončí hľadanie/boj
-   (nepriateľ zmizne, bez XP a lootu) → späť stav idle s tlačidlom Find enemy. Logika v `core/encounter` + testy, text v `en.json`.
-3. Potom **M0.2:** GitHub účet + repozitár, push, GitHub Actions CI. **M0.3:** Playwright smoke + GitHub Pages → test na mobile.
+## Ďalší krok
+1. **M0.2:** GitHub repozitár (odporúčanie: verejný kvôli bezplatným GitHub Pages – potvrdiť), `git push`, GitHub Actions CI (`npm run check` pri každom pushi/PR). Od M0.2 zmeny cez Pull Request.
+2. **M0.3:** Playwright smoke test + GitHub Pages → test na mobile na šírku.
 
 ## Rozhodnutia (2026-09-26)
 - Find enemy po príchode na políčko, potom automatické hľadanie po každom zabití; Peace! zastaví a ukončí boj hneď (bez XP/lootu).

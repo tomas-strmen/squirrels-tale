@@ -1,0 +1,8 @@
+{
+  "encounter": {
+    "searchDurationS": 1.0
+  },
+  "player": {
+    "unarmedAttackIntervalS": 3.0
+  }
+}

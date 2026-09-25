@@ -5,6 +5,7 @@ import {
   attackProgress,
   createEncounter,
   createEncounterConfig,
+  makePeace,
   searchProgress,
   startSearch,
   tick,
@@ -25,8 +26,13 @@ const ENEMY_X = 900;
 const FIGHTER_Y = 330;
 const FIGHTER_SIZE = 120;
 const LUNGE_PX = 40;
+const PEACE_X = 1080;
+const BUTTON_Y = 620;
 
-/** M0.1: squirrel waits, "Find enemy" → search bar → enemy appears → attack bars loop. */
+/**
+ * M0.1: squirrel waits, "Find enemy" → search bar → enemy appears → attack bars loop.
+ * M0.1b: "Peace!" (while searching or fighting) → back to waiting.
+ */
 export class FightScene extends Phaser.Scene {
   private config!: EncounterConfig;
   private state!: EncounterState;
@@ -41,6 +47,7 @@ export class FightScene extends Phaser.Scene {
   private searchGroup!: Phaser.GameObjects.Container;
   private searchBar!: ProgressBar;
   private findButton!: Button;
+  private peaceButton!: Button;
 
   constructor() {
     super('FightScene');
@@ -101,13 +108,17 @@ export class FightScene extends Phaser.Scene {
     this.enemyGroup.setVisible(false);
 
     // Find enemy button + search bar (same spot, one visible at a time)
-    this.findButton = new Button(this, W / 2, 620, t('fight.findEnemy'), () => this.onFindEnemy());
+    this.findButton = new Button(this, W / 2, BUTTON_Y, t('fight.findEnemy'), () => this.onFindEnemy());
     const searchLabel = this.add
       .text(0, -30, t('fight.searching'), { ...textStyle, fontSize: '22px' })
       .setOrigin(0.5);
     this.searchBar = new ProgressBar(this, 0, 5, { width: 320, height: 24, fillColor: 0xbbbbbb });
-    this.searchGroup = this.add.container(W / 2, 620, [searchLabel, this.searchBar]);
+    this.searchGroup = this.add.container(W / 2, BUTTON_Y, [searchLabel, this.searchBar]);
     this.searchGroup.setVisible(false);
+
+    // Peace! button (visible while searching or fighting)
+    this.peaceButton = new Button(this, PEACE_X, BUTTON_Y, t('fight.peace'), () => this.onPeace());
+    this.peaceButton.setVisible(false);
   }
 
   override update(_time: number, delta: number): void {
@@ -129,11 +140,18 @@ export class FightScene extends Phaser.Scene {
     step.events.forEach((e) => this.onEvent(e));
   }
 
+  private onPeace(): void {
+    const step = makePeace(this.state);
+    this.state = step.state;
+    step.events.forEach((e) => this.onEvent(e));
+  }
+
   private onEvent(event: EncounterEvent): void {
     switch (event.type) {
       case 'searchStarted':
         this.findButton.setVisible(false);
         this.searchGroup.setVisible(true);
+        this.peaceButton.setVisible(true);
         break;
       case 'enemyFound':
         this.searchGroup.setVisible(false);
@@ -144,7 +162,27 @@ export class FightScene extends Phaser.Scene {
       case 'attack':
         this.lunge(event.attacker);
         break;
+      case 'peaceMade':
+        this.resetToIdle();
+        break;
     }
+  }
+
+  /** Enemy leaves at once, bars hide, "Find enemy" is back. */
+  private resetToIdle(): void {
+    for (const [shape, baseX] of [
+      [this.player, PLAYER_X],
+      [this.enemy, ENEMY_X],
+    ] as const) {
+      this.tweens.killTweensOf(shape);
+      shape.setPosition(baseX, FIGHTER_Y).setAlpha(1);
+    }
+    this.tweens.killTweensOf(this.enemyGroup);
+    this.enemyGroup.setVisible(false).setAlpha(1);
+    this.playerAttackGroup.setVisible(false);
+    this.searchGroup.setVisible(false);
+    this.peaceButton.setVisible(false);
+    this.findButton.setVisible(true);
   }
 
   /** Short hop towards the opponent + flash of the target (visual only). */

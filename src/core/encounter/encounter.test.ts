@@ -3,6 +3,7 @@ import {
   attackProgress,
   createEncounter,
   createEncounterConfig,
+  makePeace,
   searchProgress,
   startSearch,
   tick,
@@ -123,7 +124,46 @@ describe('encounter', () => {
     const copy = structuredClone(s);
     tick(s, config);
     startSearch(s);
+    makePeace(s);
     expect(s).toEqual(copy);
+  });
+});
+
+describe('makePeace (GDD 7.1)', () => {
+  it('does nothing while idle', () => {
+    const idle = createEncounter();
+    const r = makePeace(idle);
+    expect(r.state).toBe(idle);
+    expect(r.events).toEqual([]);
+  });
+
+  it('stops the search and goes back to idle', () => {
+    const searching = run(startSearch(createEncounter()).state, 5).state;
+    const r = makePeace(searching);
+    expect(r.state).toEqual(createEncounter());
+    expect(r.events).toEqual([{ type: 'peaceMade', from: 'searching' }]);
+  });
+
+  it('ends the fight at once and goes back to idle', () => {
+    const midFight = run(fighting(), 7).state;
+    const r = makePeace(midFight);
+    expect(r.state).toEqual(createEncounter());
+    expect(r.events).toEqual([{ type: 'peaceMade', from: 'fighting' }]);
+  });
+
+  it('stays idle afterwards: no enemy found, no attacks', () => {
+    const peaceful = makePeace(fighting()).state;
+    const { state, log } = run(peaceful, 100);
+    expect(state.phase).toBe('idle');
+    expect(log).toEqual([]);
+  });
+
+  it('a new Find enemy after Peace! starts a fresh search of 1.0 s', () => {
+    const peaceful = makePeace(run(startSearch(createEncounter()).state, 8).state).state;
+    const searching = startSearch(peaceful).state;
+    expect(searchProgress(searching, config)).toBe(0);
+    const { log } = run(searching, 10);
+    expect(log).toEqual([{ tick: 10, event: { type: 'enemyFound' } }]);
   });
 });
 

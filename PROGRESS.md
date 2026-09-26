@@ -2,12 +2,23 @@
 
 ## Aktuálne
 - **Etapa:** M1 Základy core (GDD kap. 22)
-- **Posledný krok:** M1.1 – `core/numbers` + zod validácia dát – **schválené**, zlúčené do `main` cez PR #3
+- **Posledný krok:** M1.2 – `core/rng`, `core/clock`, `core/events` – hotové (Tomas dal voľnú ruku na hodinu práce, priebežne mergujem sám)
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model Claude Sonnet 5 (Opus 5.5 len pre náročnejšie etapy – povie sa vopred). AI spúšťa npm/git sama.
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.
 
 ## Hotové
+### M1.2 – core/rng, core/clock, core/events (2026-09-26)
+- `src/core/rng`: seedovaný deterministický RNG (mulberry32) – `createRng`, `next`, `nextInt`,
+  `nextBool`, `branch` (nezávislý vetvený stream zo seedu + labelu, napr. pre loot alebo
+  vrátenie v čase M17). Zatiaľ sa nikde nepoužíva (boj ešte nemá hit/miss/crit – príde v M2).
+- `src/core/clock`: reálny čas oddelený od simulačných krokov – `now()` (jediné miesto s
+  `Date.now()`), `guardAgainstClockRewind` (ochrana proti posúvaniu hodín, GDD 17.3),
+  `utcDaysBetween`/`isNewUtcDay` (denné resety questov/login odmeny podľa UTC polnoci).
+- `src/core/events`: malý typovaný event bus (`createEventBus`) na komunikáciu medzi
+  modulmi bez vzájomných importov (ROADMAP kap. 20). Zatiaľ nezapojený do `FightScene`.
+- 84 testov zelených (bolo 52 → +32). Žiadna zmena v `core/encounter` ani `FightScene`.
+
 ### M1.1 – core/numbers + zod validácia dát (2026-09-26)
 - Nový modul `src/core/numbers`: `toHundredths`/`fromHundredths`/`formatHundredths` – design
   čísla (max 1 desatinné miesto) ↔ interné celé stotiny ↔ zobrazenie na 0.1 (GDD 5). Zatiaľ sa

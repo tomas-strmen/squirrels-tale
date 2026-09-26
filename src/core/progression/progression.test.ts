@@ -35,19 +35,20 @@ describe('cumulativeLevelBonuses', () => {
     expect(cumulativeLevelBonuses(6).hpBonus).toBe(500);
   });
 
-  it('adds +0.1 max damage every 2nd level', () => {
+  it('adds +0.1 max damage every level', () => {
     expect(cumulativeLevelBonuses(1).maxDamageBonus).toBe(0);
     expect(cumulativeLevelBonuses(2).maxDamageBonus).toBe(10);
-    expect(cumulativeLevelBonuses(3).maxDamageBonus).toBe(10);
-    expect(cumulativeLevelBonuses(4).maxDamageBonus).toBe(20);
-    expect(cumulativeLevelBonuses(10).maxDamageBonus).toBe(50);
+    expect(cumulativeLevelBonuses(3).maxDamageBonus).toBe(20);
+    expect(cumulativeLevelBonuses(4).maxDamageBonus).toBe(30);
+    expect(cumulativeLevelBonuses(10).maxDamageBonus).toBe(90);
   });
 
-  it('adds +0.1 min damage every 5th level', () => {
-    expect(cumulativeLevelBonuses(4).minDamageBonus).toBe(0);
-    expect(cumulativeLevelBonuses(5).minDamageBonus).toBe(10);
-    expect(cumulativeLevelBonuses(9).minDamageBonus).toBe(10);
-    expect(cumulativeLevelBonuses(10).minDamageBonus).toBe(20);
+  it('adds +0.1 min damage every 2nd level', () => {
+    expect(cumulativeLevelBonuses(1).minDamageBonus).toBe(0);
+    expect(cumulativeLevelBonuses(2).minDamageBonus).toBe(10);
+    expect(cumulativeLevelBonuses(3).minDamageBonus).toBe(10);
+    expect(cumulativeLevelBonuses(4).minDamageBonus).toBe(20);
+    expect(cumulativeLevelBonuses(10).minDamageBonus).toBe(50);
   });
 });
 
@@ -57,16 +58,16 @@ describe('levelUpDelta', () => {
     expect(levelUpDelta(7).hpBonus).toBe(100);
   });
 
-  it('grants +0.1 max damage only on even levels', () => {
+  it('grants +0.1 max damage on every level', () => {
     expect(levelUpDelta(2).maxDamageBonus).toBe(10);
-    expect(levelUpDelta(3).maxDamageBonus).toBe(0);
+    expect(levelUpDelta(3).maxDamageBonus).toBe(10);
     expect(levelUpDelta(4).maxDamageBonus).toBe(10);
   });
 
-  it('grants +0.1 min damage only on multiples of 5', () => {
-    expect(levelUpDelta(5).minDamageBonus).toBe(10);
+  it('grants +0.1 min damage only on even levels', () => {
+    expect(levelUpDelta(2).minDamageBonus).toBe(10);
     expect(levelUpDelta(10).minDamageBonus).toBe(10);
-    expect(levelUpDelta(6).minDamageBonus).toBe(0);
+    expect(levelUpDelta(5).minDamageBonus).toBe(0);
   });
 
   it('sums up to the cumulative total across all levels', () => {

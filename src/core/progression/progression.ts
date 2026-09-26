@@ -1,5 +1,5 @@
 /**
- * XP, levels and the stat bonuses they grant (GDD 6.2, Changelog v1.6).
+ * XP, levels and the stat bonuses they grant (GDD 6.1/6.2, Changelog v1.7).
  *
  * All XP amounts here are internal hundredths (core/numbers), like HP and
  * damage - enemy XP rewards can have 1 decimal place (e.g. 5.5), so plain
@@ -8,8 +8,8 @@
  * Level-up bonuses (Tomas, M3):
  * - every level: +1.0 max HP, and the squirrel is healed by that same amount
  *   at once (not a full heal).
- * - every 2nd level (2, 4, 6, ...): +0.1 to unarmed max damage.
- * - every 5th level (5, 10, 15, ...): +0.1 to unarmed min damage too.
+ * - every level: +0.1 to max damage.
+ * - every 2nd level (2, 4, 6, ...): +0.1 to min damage too.
  *
  * No level cap (GDD 6.2). Skill tree points are a later stage (M11), not
  * handled here.
@@ -53,8 +53,8 @@ export function xpToNextLevelHundredths(level: number): number {
 export function cumulativeLevelBonuses(level: number): LevelBonuses {
   return {
     hpBonus: (level - 1) * 100,
-    maxDamageBonus: Math.floor(level / 2) * 10,
-    minDamageBonus: Math.floor(level / 5) * 10,
+    maxDamageBonus: (level - 1) * 10,
+    minDamageBonus: Math.floor(level / 2) * 10,
   };
 }
 
@@ -62,8 +62,8 @@ export function cumulativeLevelBonuses(level: number): LevelBonuses {
 export function levelUpDelta(level: number): LevelBonuses {
   return {
     hpBonus: 100,
-    maxDamageBonus: level % 2 === 0 ? 10 : 0,
-    minDamageBonus: level % 5 === 0 ? 10 : 0,
+    maxDamageBonus: 10,
+    minDamageBonus: level % 2 === 0 ? 10 : 0,
   };
 }
 

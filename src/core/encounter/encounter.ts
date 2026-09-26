@@ -5,8 +5,8 @@
  * M2 scope: attacks hit or miss and deal damage (core/combat). When the enemy
  * dies, the next search starts automatically (GDD 7.1), and the player gains
  * the enemy's XP - possibly leveling up (core/progression), which raises max
- * HP (healing by the same amount at once) and, every 2nd/5th level, unarmed
- * damage. When the squirrel is defeated the fight ends and she is back to
+ * HP (healing by the same amount at once) and damage (+0.1 max every level,
+ * +0.1 min every 2nd level). When the squirrel is defeated the fight ends and she is back to
  * full HP in `idle` - a placeholder until real death (hideout, XP loss)
  * arrives in M3.2. No regeneration yet.
  *
@@ -90,7 +90,7 @@ export type EncounterEvent =
       readonly damage: number;
     }
   | { readonly type: 'enemyDefeated' }
-  /** Player leveled up (GDD 6.2): +1.0 max HP (healed at once), and damage every 2nd/5th level. */
+  /** Player leveled up (GDD 6.2): +1.0 max HP (healed at once), +0.1 max damage, and +0.1 min damage on even levels. */
   | { readonly type: 'leveledUp'; readonly level: number }
   /** M2 placeholder: fight over, squirrel back to full HP in idle (real death in M3.2). */
   | { readonly type: 'playerDefeated' }
@@ -147,8 +147,8 @@ export function createEncounter(config: EncounterConfig, rng: RngState): Encount
 
 /**
  * The player's current effective stats: base stats plus the cumulative bonus
- * for `level` (GDD 6.2: +1.0 max HP/level, +0.1 max damage every 2nd level,
- * +0.1 min damage every 5th level).
+ * for `level` (GDD 6.1/6.2: +1.0 max HP/level, +0.1 max damage every level,
+ * +0.1 min damage every 2nd level).
  */
 export function playerStats(config: EncounterConfig, level: number): FighterStats {
   const bonus = cumulativeLevelBonuses(level);

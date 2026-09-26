@@ -136,15 +136,16 @@ describe('playerStats (GDD 6.2 level bonuses)', () => {
     expect(playerStats(config, 6).maxHp).toBe(1000);
   });
 
-  it('adds +0.1 max damage every 2nd level', () => {
+  it('adds +0.1 max damage every level', () => {
     expect(playerStats(config, 2).damageMax).toBe(50);
-    expect(playerStats(config, 3).damageMax).toBe(50);
-    expect(playerStats(config, 4).damageMax).toBe(60);
+    expect(playerStats(config, 3).damageMax).toBe(60);
+    expect(playerStats(config, 4).damageMax).toBe(70);
   });
 
-  it('adds +0.1 min damage every 5th level', () => {
-    expect(playerStats(config, 4).damageMin).toBe(30);
-    expect(playerStats(config, 5).damageMin).toBe(40);
+  it('adds +0.1 min damage every 2nd level', () => {
+    expect(playerStats(config, 2).damageMin).toBe(40);
+    expect(playerStats(config, 3).damageMin).toBe(40);
+    expect(playerStats(config, 4).damageMin).toBe(50);
   });
 });
 

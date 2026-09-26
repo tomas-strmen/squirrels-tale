@@ -23,7 +23,7 @@ import {
 import { formatHundredths } from '../../core/numbers/numbers';
 import { xpToNextLevelHundredths } from '../../core/progression/progression';
 import { createRng } from '../../core/rng/rng';
-import { consumeFrame } from '../../core/time/fixedStep';
+import { consumeFrame, DEFAULT_MAX_STEPS_PER_FRAME } from '../../core/time/fixedStep';
 import { t, tDynamic } from '../text';
 import { Button } from '../ui/Button';
 import { DebugPanel } from '../ui/DebugPanel';
@@ -40,7 +40,7 @@ const LUNGE_PX = 40;
 const PEACE_X = 1080;
 const BUTTON_Y = 620;
 const HP_BAR_Y = FIGHTER_Y - 95;
-const SPEED_OPTIONS = [1, 4, 20] as const;
+const SPEED_OPTIONS = [1, 4, 20, 50] as const;
 
 /**
  * M0.1: squirrel waits, "Find enemy" → search bar → enemy appears → attack bars loop.
@@ -70,7 +70,7 @@ export class FightScene extends Phaser.Scene {
   private enemyHpBar!: ProgressBar;
   private enemyHpText!: Phaser.GameObjects.Text;
   private textStyle = { fontFamily: 'Arial, sans-serif', color: '#e0e0e0' };
-  private speedButton!: Button;
+  private speedButtons: Button[] = [];
   private levelText!: Phaser.GameObjects.Text;
   private statsButton!: Button;
   private statsPanel!: StatsPanel;
@@ -188,9 +188,18 @@ export class FightScene extends Phaser.Scene {
       this.debugPanel.setVisible(!this.debugPanel.visible);
     });
 
-    // Debug tool (GDD 22, M2.2): speed x1/x4/x20, so tempo is easy to test/balance.
-    this.speedButton = new Button(this, W - 100, 40, this.speedLabel(), () => this.onCycleSpeed());
-    this.speedButton.setScale(0.55);
+    // Debug tool (GDD 22, M2.2): one button per speed x1/x4/x20/x50, the active one highlighted.
+    this.add
+      .text(W - 370, 40, t('debug.speed'), { ...textStyle, fontSize: '20px' })
+      .setOrigin(1, 0.5);
+    this.speedButtons = SPEED_OPTIONS.map((speed, index) =>
+      new Button(this, W - 320 + index * 88, 40, `×${speed}`, () => this.onSelectSpeed(index), {
+        width: 80,
+        height: 40,
+        fontSize: 20,
+      }),
+    );
+    this.refreshSpeedButtons();
 
     // Player-facing stats panel (Tomas, M3.1): level, XP, HP, damage, hit%, armor.
     this.statsButton = new Button(this, 150, 40, t('stats.button'), () => this.onToggleStats());
@@ -203,13 +212,13 @@ export class FightScene extends Phaser.Scene {
     return SPEED_OPTIONS[this.speedIndex] ?? 1;
   }
 
-  private speedLabel(): string {
-    return `${t('debug.speed')} ×${this.currentSpeed()}`;
+  private onSelectSpeed(index: number): void {
+    this.speedIndex = index;
+    this.refreshSpeedButtons();
   }
 
-  private onCycleSpeed(): void {
-    this.speedIndex = (this.speedIndex + 1) % SPEED_OPTIONS.length;
-    this.speedButton.setLabel(this.speedLabel());
+  private refreshSpeedButtons(): void {
+    this.speedButtons.forEach((button, index) => button.setSelected(index === this.speedIndex));
   }
 
   private onToggleStats(): void {
@@ -233,7 +242,12 @@ export class FightScene extends Phaser.Scene {
 
   override update(_time: number, delta: number): void {
     const scaledDelta = delta * this.currentSpeed();
-    const frame = consumeFrame(this.accumulatorMs, scaledDelta);
+    // Allow more steps per frame at higher speeds, so x50 is not capped by the safety limit.
+    const frame = consumeFrame(
+      this.accumulatorMs,
+      scaledDelta,
+      DEFAULT_MAX_STEPS_PER_FRAME * this.currentSpeed(),
+    );
     this.accumulatorMs = frame.accumulatorMs;
     for (let i = 0; i < frame.steps; i++) {
       const step = tick(this.state, this.config);

@@ -1,8 +1,8 @@
 # PROGRESS – stav vývoja
 
 ## Aktuálne
-- **Etapa:** M1 Základy core (GDD kap. 22)
-- **Posledný krok:** M1.2 – `core/rng`, `core/clock`, `core/events` – **schválené**, zlúčené cez PR #4. M1.3 (debug panel) rozpracované (Tomas dal voľnú ruku na hodinu práce, priebežne mergujem sám cez jeho Chrome).
+- **Etapa:** M1 Základy core (GDD kap. 22) – **M1 hotové** ✅ (numbers, rng, clock, event bus, zod validácia dát, debug panel)
+- **Posledný krok:** M1.3 – debug panel – hotové, zlúčené cez PR #5. Tomas dal na toto sedenie voľnú ruku (~1 h) – PR #3, #4, #5 som otvoril aj zmergoval sám cez jeho prihlásené Chrome (rozšírenie „Claude in Chrome“), keďže `gh` CLI nebolo prihlásené.
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model Claude Sonnet 5 (Opus 5.5 len pre náročnejšie etapy – povie sa vopred). AI spúšťa npm/git sama.
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.
@@ -75,7 +75,17 @@
 - GDD v1.1 a v1.2 zapísané v `docs/GDD.md` aj v projekte (`claude/GDD.md`).
 
 ## Ďalší krok
-**M0 Kostra je celá hotová.** Ďalej podľa GDD kap. 22: **M1 Základy core** – `numbers`, `rng`, `clock`, event bus, načítanie dát so zod schémami, debug panel. Navrhnem konkrétny prvý krok na budúcom sedení.
+**M1 Základy core je celá hotová.** Ďalej podľa GDD kap. 22: **M2 Boj** – simulácia 1v1 v 100 ms
+krokoch s HP, hit/miss, armor a poškodením (presný vzorec v GDD 7.2), HP bary, Worker Ant
+v slučke, debug rýchlosť ×1/×4/×20.
+- **Zámerne som M2 nezačal sám**, hoci som mal na toto sedenie voľnú ruku – je to väčšia etapa,
+  ktorá mení dátovú schému (`data/enemies.json` potrebuje pridať HP/damage/armor) a herný pocit
+  (ako rýchlo sa umiera), preto si to podľa dohodnutého postupu zaslúži tvoje „ok" k rozdeleniu
+  na kroky, nie len tichý PR.
+- Návrh rozdelenia (poviem podrobne na budúcom sedení): **M2.1** – rozšíriť `data/enemies.json`
+  o `hp`, `damageMin`/`damageMax`, `armor` (zatiaľ len Worker Ant) + `core/combat` (čisté HP/damage
+  bez crit/stun/dodge – tie sú podľa GDD 12/13 zamknuté až do M12); **M2.2** – HP bary vo
+  `FightScene`, smrť/víťazstvo, debug rýchlosť ×1/×4/×20.
 - Ešte treba: otestovať hru na mobile (na šírku) na https://tomas-strmen.github.io/squirrels-tale/ – jediné, čo AI z počítača nevie sama overiť.
 
 ## Rozhodnutia (2026-09-26)

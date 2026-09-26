@@ -146,23 +146,38 @@ export function tick(state: EncounterState, config: EncounterConfig): EncounterS
   }
 }
 
-/** Search progress 0..1 (0 when not searching yet, 1 once the enemy is found). */
-export function searchProgress(state: EncounterState, config: EncounterConfig): number {
+/**
+ * Search progress 0..1 (0 when not searching yet, 1 once the enemy is found).
+ *
+ * `extraMs` is real time elapsed since the last simulation tick (always < 100 ms,
+ * from `consumeFrame`'s leftover `accumulatorMs`). It only smooths the bar for
+ * rendering between ticks - the simulation itself still only advances in fixed
+ * 100 ms steps.
+ */
+export function searchProgress(
+  state: EncounterState,
+  config: EncounterConfig,
+  extraMs = 0,
+): number {
   if (state.phase === 'idle') return 0;
   if (state.phase === 'fighting') return 1;
-  return clamp01(state.searchElapsedMs / config.searchMs);
+  return clamp01((state.searchElapsedMs + extraMs) / config.searchMs);
 }
 
-/** Attack bar progress 0..1 for one fighter (0 when not fighting). */
+/**
+ * Attack bar progress 0..1 for one fighter (0 when not fighting).
+ * `extraMs`: see `searchProgress`.
+ */
 export function attackProgress(
   state: EncounterState,
   config: EncounterConfig,
   who: Combatant,
+  extraMs = 0,
 ): number {
   if (state.phase !== 'fighting') return 0;
   return who === 'player'
-    ? clamp01(state.playerAttackElapsedMs / config.playerAttackIntervalMs)
-    : clamp01(state.enemyAttackElapsedMs / config.enemyAttackIntervalMs);
+    ? clamp01((state.playerAttackElapsedMs + extraMs) / config.playerAttackIntervalMs)
+    : clamp01((state.enemyAttackElapsedMs + extraMs) / config.enemyAttackIntervalMs);
 }
 
 function clamp01(value: number): number {

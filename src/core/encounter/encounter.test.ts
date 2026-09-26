@@ -182,4 +182,21 @@ describe('progress helpers', () => {
     expect(attackProgress(s, config, 'player')).toBeCloseTo(0.5);
     expect(attackProgress(s, config, 'enemy')).toBeCloseTo(1 / 3);
   });
+
+  it('extraMs smooths progress between ticks without changing the state', () => {
+    const searching = run(startSearch(createEncounter()).state, 5).state; // 0.5 s of 1.0 s
+    const copy = structuredClone(searching);
+    expect(searchProgress(searching, config, 50)).toBeCloseTo(0.55);
+    expect(searchProgress(searching, config)).toBeCloseTo(0.5); // default: no change
+    expect(searching).toEqual(copy);
+
+    const s = run(fighting(), 10).state; // 1 s in: player at 0.5, enemy at 1/3
+    expect(attackProgress(s, config, 'player', 50)).toBeCloseTo(0.525);
+  });
+
+  it('extraMs never pushes progress above 1', () => {
+    expect(searchProgress(fighting(), config, 999)).toBe(1);
+    const s = run(fighting(), 10).state;
+    expect(attackProgress(s, config, 'player', 100_000)).toBe(1);
+  });
 });

@@ -2,8 +2,8 @@
 
 ## Aktuálne
 - **Etapa:** M3 Progres (GDD kap. 22)
-- **Posledný krok:** M3.1 – XP, levely, rast štatistík, panel Show stats – hotové, čaká na test/schválenie (PR na GitHube)
-- **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model: Opus 5.5 na M2.1, na M2.2 stačí Sonnet 5. AI spúšťa npm/git sama; PR otvára a merguje cez Tomasovo Chrome (rozšírenie Claude in Chrome).
+- **Posledný krok:** M3.1 – XP, levely, rast štatistík, panel Show stats – **schválené**, zlúčené cez PR #8.
+- **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model: podľa náročnosti kroku (poviem vopred). Od teraz: AI pripraví vetvu/commit/push a dá Tomasovi presné príkazy/odkaz na PR, test a merge robí Tomas sám (šetrí tokeny oproti ovládaniu prehliadača).
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.
 

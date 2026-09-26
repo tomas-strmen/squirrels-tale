@@ -2,12 +2,21 @@
 
 ## Aktuálne
 - **Etapa:** M1 Základy core (GDD kap. 22)
-- **Posledný krok:** M1.2 – `core/rng`, `core/clock`, `core/events` – hotové (Tomas dal voľnú ruku na hodinu práce, priebežne mergujem sám)
+- **Posledný krok:** M1.2 – `core/rng`, `core/clock`, `core/events` – **schválené**, zlúčené cez PR #4. M1.3 (debug panel) rozpracované (Tomas dal voľnú ruku na hodinu práce, priebežne mergujem sám cez jeho Chrome).
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model Claude Sonnet 5 (Opus 5.5 len pre náročnejšie etapy – povie sa vopred). AI spúšťa npm/git sama.
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.
 
 ## Hotové
+### M1.3 – debug panel (2026-09-26)
+- `src/game/ui/DebugPanel.ts`: prekryv v ľavom hornom rohu, zapína/vypína klávesou **D**.
+  Ukazuje zoznam načítaných nepriateľov (id + interval útoku) a počet načítaných textov
+  z `en.json` (GDD kap. 22, M1: „debug panel ukáže načítaných nepriateľov a texty“).
+- `FightScene` teraz validuje `data/enemies.json` aj `data/balance.json` cez zod schémy
+  z `core/content` (M1.1) priamo pri behu hry, nielen v testoch.
+- Texty: `debug.hint`, `debug.title`, `debug.enemiesLoaded`, `debug.textsLoaded` v `en.json`.
+- Overené v prehliadači (AI): D zobrazí/skryje panel, žiadna zmena v boji.
+
 ### M1.2 – core/rng, core/clock, core/events (2026-09-26)
 - `src/core/rng`: seedovaný deterministický RNG (mulberry32) – `createRng`, `next`, `nextInt`,
   `nextBool`, `branch` (nezávislý vetvený stream zo seedu + labelu, napr. pre loot alebo

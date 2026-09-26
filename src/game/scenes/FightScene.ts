@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
-import balance from '../../../data/balance.json';
-import enemies from '../../../data/enemies.json';
+import balanceData from '../../../data/balance.json';
+import enemiesData from '../../../data/enemies.json';
+import en from '../../../strings/en.json';
+import { parseBalance, parseEnemies } from '../../core/content/schemas';
 import {
   attackProgress,
   createEncounter,
@@ -17,6 +19,7 @@ import {
 import { consumeFrame } from '../../core/time/fixedStep';
 import { t, tDynamic } from '../text';
 import { Button } from '../ui/Button';
+import { DebugPanel } from '../ui/DebugPanel';
 import { ProgressBar } from '../ui/ProgressBar';
 
 // Layout only (not game balance) – placeholder grey shapes.
@@ -48,12 +51,17 @@ export class FightScene extends Phaser.Scene {
   private searchBar!: ProgressBar;
   private findButton!: Button;
   private peaceButton!: Button;
+  private debugPanel!: DebugPanel;
 
   constructor() {
     super('FightScene');
   }
 
   create(): void {
+    // Validated against their zod schemas (core/content) so bad data fails
+    // loudly here too, not only in tests.
+    const enemies = parseEnemies(enemiesData);
+    const balance = parseBalance(balanceData);
     const enemyData = enemies[0];
     if (!enemyData) throw new Error('data/enemies.json has no enemies');
 
@@ -119,6 +127,19 @@ export class FightScene extends Phaser.Scene {
     // Peace! button (visible while searching or fighting)
     this.peaceButton = new Button(this, PEACE_X, BUTTON_Y, t('fight.peace'), () => this.onPeace());
     this.peaceButton.setVisible(false);
+
+    // M1 debug panel: shows loaded enemies/texts, toggled with "D".
+    this.add
+      .text(10, 690, t('debug.hint'), { ...textStyle, fontSize: '14px', color: '#707070' })
+      .setOrigin(0, 0);
+    this.debugPanel = new DebugPanel(this, 10, 10, {
+      enemies,
+      textCount: Object.keys(en).length,
+    });
+    this.debugPanel.setVisible(false);
+    this.input.keyboard?.on('keydown-D', () => {
+      this.debugPanel.setVisible(!this.debugPanel.visible);
+    });
   }
 
   override update(_time: number, delta: number): void {

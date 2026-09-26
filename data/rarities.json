@@ -1,0 +1,8 @@
+[
+  {"id": "common", "weight": 0, "isRemainder": true, "statMultPct": 100, "affixCount": 0, "mfScaling": "none", "itemKind": "base", "pity": false, "minTileTier": 1, "color": "#b8b8b8"},
+  {"id": "uncommon", "weight": 22.0, "isRemainder": false, "statMultPct": 115, "affixCount": 1, "mfScaling": "linear", "itemKind": "base", "pity": false, "minTileTier": 1, "color": "#6fcf6f"},
+  {"id": "rare", "weight": 6.0, "isRemainder": false, "statMultPct": 135, "affixCount": 2, "mfScaling": "linear", "itemKind": "base", "pity": false, "minTileTier": 1, "color": "#6f9fef"},
+  {"id": "unique", "weight": 0.9, "isRemainder": false, "statMultPct": 160, "affixCount": 2, "mfScaling": "diminishing", "itemKind": "unique", "pity": true, "minTileTier": 1, "color": "#f0a040"},
+  {"id": "set", "weight": 0.8, "isRemainder": false, "statMultPct": 140, "affixCount": 0, "mfScaling": "diminishing", "itemKind": "set", "pity": true, "minTileTier": 3, "color": "#40cfcf"},
+  {"id": "legendary", "weight": 0.3, "isRemainder": false, "statMultPct": 200, "affixCount": 3, "mfScaling": "diminishing", "itemKind": "base", "pity": true, "minTileTier": 1, "color": "#b070ef"}
+]

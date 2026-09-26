@@ -4,9 +4,15 @@
  * the game and the content tests build fights exactly the same way.
  */
 import type { EncounterConfigInput } from '../encounter/encounter';
-import type { Balance, Enemy } from './schemas';
+import type { AffixData, Balance, Enemy, ItemData, RarityData } from './schemas';
 
-export function toEncounterConfigInput(balance: Balance, enemy: Enemy): EncounterConfigInput {
+export interface LootData {
+  readonly items: readonly ItemData[];
+  readonly rarities: readonly RarityData[];
+  readonly affixes: readonly AffixData[];
+}
+
+export function toEncounterConfigInput(balance: Balance, enemy: Enemy, lootData: LootData): EncounterConfigInput {
   return {
     searchDurationS: balance.encounter.searchDurationS,
     playerAttackIntervalS: balance.player.unarmedAttackIntervalS,
@@ -38,5 +44,8 @@ export function toEncounterConfigInput(balance: Balance, enemy: Enemy): Encounte
     regenGrowthPctPerLevel: balance.player.regenGrowthPctPerLevel,
     hideoutRegenS: balance.death.hideoutRegenS,
     deathXpLossPct: balance.death.xpLossPct,
+    loot: { ...lootData, balance: balance.loot },
+    // Placeholder until the map (M6): the only tile is T1.
+    tileTier: 1,
   };
 }

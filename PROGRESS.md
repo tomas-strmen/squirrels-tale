@@ -1,13 +1,28 @@
 # PROGRESS – stav vývoja
 
 ## Aktuálne
-- **Etapa:** M3 Progres (GDD kap. 22)
-- **Posledný krok:** M3.2 – regenerácia HP a skutočná smrť (úkryt) – hotové, čaká na test/schválenie (PR na GitHube)
+- **Etapa:** M4 Predmety (GDD kap. 22) – M3 Progres hotová ✅
+- **Posledný krok:** M4.1 – generovanie a drop predmetov – hotové, čaká na test/schválenie (PR na GitHube)
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model: podľa náročnosti kroku (poviem vopred). Od teraz: AI pripraví vetvu/commit/push a dá Tomasovi presné príkazy/odkaz na PR, test a merge robí Tomas sám (šetrí tokeny oproti ovládaniu prehliadača).
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.
 
 ## Hotové
+### M4.1 – generovanie a drop predmetov (2026-09-26)
+- Dáta: `items.json` (5 predmetov pre T1: Sharp Twig, Pebble Club, Leaf Cap, Leaf Vest, Pebble Pendant),
+  `rarities.json` (váhy, násobky, afixy, MF, pity, Set až od T3), `affixes.json` (12 afixov, zamknuté
+  crit/MF/dodge/stun), `balance.json` `loot` (drop 4 %, pity 1000, rast afixov 35 %/tier). Zod schémy.
+- Nový modul `core/loot`: drop 4 % za zabitie, hod na vzácnosť (MF lineárne/klesajúco, Common = zvyšok),
+  pity 1000 zabití → istý Unique+ (na T1 bez unikátov = Legendary), generovanie hodnôt na 0.01 × násobok
+  vzácnosti, afixy bez duplicít a bez zamknutých, Unique bez unikátu → Rare s 3 afixmi (GDD 9.5).
+- `core/encounter`: po zabití hod na drop (vlastný Rng stream – loot nemení priebeh boja), udalosť
+  `itemFound`, zoznam `foundItems` (dočasne, kým nepríde inventár v M5).
+- `FightScene`: „Found: Sharp Twig“ vo farbe vzácnosti, tlačidlo **Found items** (posledných 10).
+- GDD v2.0: 9.3 hodnoty na 0.01; 24 interval pästí = základ postavy, zbraň ho vylepšuje (vzorec v M5).
+- Test podľa GDD: 10 000 hodov má správne rozdelenie vzácností. 184 testov zelených (bolo 159).
+- **Neskôr:** unikáty/sety a ich vlastnosti, legendárne črty, vylepšovanie (M16); kocka + pity počítadlo
+  + skladanie štatistík z výbavy (M4.2).
+
 ### Opravy po teste M3.2 (2026-09-26)
 - **Bug:** HP bar/text vedel ukázať „0.0“, kým bol bojovník ešte nažive (napr. mravec po zásahu
   1.1 z 1.2 HP) a útočil ďalej – bolo to len zobrazenie (floor na 0.1 z v1.7), nie chyba v HP. Nová
@@ -165,9 +180,9 @@
 - GDD v1.1 a v1.2 zapísané v `docs/GDD.md` aj v projekte (`claude/GDD.md`).
 
 ## Ďalší krok
-1. Tomas otestuje M3.2 (PR) → merge. **M3 Progres je tým celá hotová.**
-2. Ďalej podľa GDD kap. 22: **M4 Predmety** (základné predmety, vzácnosti, afixy, drop 4 %, hod
-   kockou, MF, pity, skladanie štatistík z výbavy). Model: Opus 5.5 (pravdepodobnosti/drop tabuľky).
+1. Tomas otestuje M4.1 (PR) → merge.
+2. **M4.2** – animácia k20 kocky, pity počítadlo „Lucky acorn“, `core/stats` (postava + výbava:
+   pevné hodnoty sa sčítajú, percentá násobia). Model: Sonnet 5 stačí (kocka/UI), Opus pri `core/stats`.
 
 ## Rozhodnutia (2026-09-26)
 - Find enemy po príchode na políčko, potom automatické hľadanie po každom zabití; Peace! zastaví a ukončí boj hneď (bez XP/lootu).

@@ -1,7 +1,7 @@
-# Veverička – Game Design Document (GDD) v1.9
+# Veverička – Game Design Document (GDD) v2.0
 
 > **Pracovný názov hry:** *Squirrel's Tale* (dočasný – finálny názov vybrať pred vydaním; nesmie pripomínať „Hero Tale“).
-> **Stav:** v1.9, 26. 9. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
+> **Stav:** v2.0, 26. 9. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
 > **Súvisiace:** `claude/ROADMAP.md` (technológia, architektúra, etapy vydania), `claude/PROMPT-vyvoj.md` (ako má AI pracovať).
 
 ---
@@ -302,7 +302,7 @@ ak stun (šanca stun%) → cieľ má ďalší útok oneskorený o 1.5 s (boss 0.
 ### 9.3 Generovanie predmetu
 1. Vyber základný predmet z drop tabuľky políčka (tier ≤ t a ≥ t−2).
 2. Hoď na vzácnosť (9.6).
-3. Každá hodnota: náhodne v rozsahu `base × rarityMult × (1 + 0.08 × upgradeLevel)`, zaokrúhlené na 0.1.
+3. Každá hodnota: náhodne v rozsahu `base × rarityMult × (1 + 0.08 × upgradeLevel)`, na **0.01** (zobrazenie floor na 0.1, kap. 5). Zbraň: rozsah poškodenia `min–max × rarityMult` (hod na úder je v boji); ostatné hodnoty (armor, +HP…) sa hodia raz pri vzniku predmetu.
 4. Afixy: náhodne z poolu (bez zamknutých štatistík, bez duplicít); hodnota podľa tieru `base × (1 + 0.35 × (tier − 1))`.
 
 **Afixy [MVP] (rozsah pre tier 1):**
@@ -680,7 +680,7 @@ tools/sim/         # headless simulácia tempa (npm run sim) → tabuľka čas/l
 
 - Premium +10 % XP/MF a Mythical +XP/počasie – overiť pri testeroch, či to nepôsobí ako pay-to-win.
 - Finálny názov hry.
-- **Interval útoku so zbraňou (v1.8):** keď veverička drží zbraň, nahrádza interval zbrane interval pästí (4.0 s), alebo sa kombinujú? Rozhodnúť pred M4.
+- **Interval útoku so zbraňou (v2.0, Tomas):** interval pästí (4.0 s) je **základ postavy**; zbraň ho **vylepšuje** (nenahrádza), rovnako ako ostatné bonusy. Presný vzorec (ako interval zbrane z 9.4 skráti základ) doladiť v M5 pri nasadzovaní.
 - **Balans zbraní (v1.8):** zbrane z 9.4 sa teraz **pripočítajú** k poškodeniu postavy – rozsahy zbraní prepočítať v M4/M20.
 - Presné čísla (všetko v kap. 6–18) – ladenie v M20 a pri hraní.
 - Šanca na kúsky setu – overiť v M20, či je celý set dosiahnuteľný okolo T7–T8.
@@ -703,3 +703,4 @@ tools/sim/         # headless simulácia tempa (npm run sim) → tabuľka čas/l
 | 1.7 | 2026-09-26 | 5: výpočty na 2 desatinné miesta, zobrazenie floor na 0.1, poškodenie úderu na 0.01. 6.1: poškodenie +0.1 max každý level a +0.1 min každý 2. level (nahrádza pravidlo z v1.6, platí aj so zbraňou); rýchlosť útoku ×1.01/level; presnosť 85 % pri rovnakom leveli ±0.5 %/level rozdielu. 6.2: need(L) = round(10 × 1.3^(L−1)). 7.2: vzorce upravené. 24: levely nepriateľov – otvorené. Debug rýchlosť rozšírená o ×50. |
 | 1.8 | 2026-09-26 | 6.1: postava a výbava sa vedú oddelene, level mení len postavu, v boji sa sčítajú (percentá násobia). 7.1/7.2: poškodenie = postava + zbraň; presnosť nepriateľa zrkadlí rozdiel levelov. 8.4: nové – levely nepriateľov na políčkach a rast za level (HP +10 %, poškodenie +5 %, XP +10 %, dodge +0.5 %, crit +1 %). 24: nové otvorené otázky (interval so zbraňou, balans zbraní). |
 | 1.9 | 2026-09-26 | 6.1: regenerácia 0.1 HP / 2 s → 0.1 HP / 3 s (Tomas, M3.2). |
+| 2.0 | 2026-09-26 | 9.3: hodnoty predmetov na 0.01 (zobrazenie floor 0.1); zbraň má rozsah × rarityMult. 24: interval pästí je základ postavy, zbraň ho vylepšuje (vzorec v M5). |

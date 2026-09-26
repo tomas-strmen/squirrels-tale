@@ -52,6 +52,8 @@ export const enemySchema = z
     hitPct: percentSchema,
     armor: designValueSchema,
     dodgePct: percentSchema,
+    /** XP granted when defeated (GDD 6.2, 8.3). */
+    xp: designValueSchema,
   })
   .refine(damageRangeValid, { message: 'damageMin must not be greater than damageMax' });
 export type Enemy = z.infer<typeof enemySchema>;

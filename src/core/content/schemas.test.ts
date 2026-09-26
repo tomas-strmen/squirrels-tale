@@ -25,6 +25,7 @@ describe('enemiesSchema / parseEnemies', () => {
     hitPct: 65,
     armor: 0,
     dodgePct: 0,
+    xp: 2,
   };
   const valid = [ant];
 

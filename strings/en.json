@@ -11,6 +11,15 @@
   "debug.enemiesLoaded": "Enemies loaded",
   "debug.textsLoaded": "Texts loaded",
   "debug.speed": "Speed",
+  "stats.button": "Show stats",
+  "stats.title": "STATS",
+  "stats.level": "Level",
+  "stats.xp": "XP",
+  "stats.maxHp": "Max HP",
+  "stats.damage": "Damage",
+  "stats.hitChance": "Hit chance",
+  "stats.armor": "Armor",
+  "fight.leveledUp": "Level up!",
   "player.name": "Squirrel",
   "enemy.worker_ant.name": "Worker Ant"
 }

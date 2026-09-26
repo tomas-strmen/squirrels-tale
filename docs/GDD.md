@@ -1,7 +1,7 @@
 # Veverička – Game Design Document (GDD) v1.3
 
 > **Pracovný názov hry:** *Squirrel's Tale* (dočasný – finálny názov vybrať pred vydaním; nesmie pripomínať „Hero Tale“).
-> **Stav:** v1.5, 26. 9. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
+> **Stav:** v1.6, 26. 9. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
 > **Súvisiace:** `claude/ROADMAP.md` (technológia, architektúra, etapy vydania), `claude/PROMPT-vyvoj.md` (ako má AI pracovať).
 
 ---
@@ -132,7 +132,7 @@
 ### 6.1 Štatistiky
 | Štatistika | Základ Lv1 | Rast | Strop | Odomknutie |
 |---|---|---|---|---|
-| Max HP | 5.0 | +0.5 / level | – | od začiatku |
+| Max HP | 5.0 | +1.0 / level | – | od začiatku |
 | Regenerácia | 0.1 HP / 2 s | +3 % / level (relatívne) | – | od začiatku |
 | Poškodenie | zo zbrane (bez zbrane 0.3–0.4) | – | – | od začiatku |
 | Rýchlosť útoku | interval zbrane (napr. 2.0 s; bez zbrane 4.0 s) | % bonusy skracujú interval | min. interval 0.5 s | od začiatku |
@@ -148,7 +148,8 @@
 ### 6.2 Level a XP
 - **Žiadny strop levelov.**
 - XP na ďalší level: `need(L) = round(10 × 1.4^(L−1))` → Lv1: 10, Lv2: 14, Lv3: 20, Lv5: 38, Lv10: 207, Lv15: 1111, Lv20: 5976.
-- Za level: +0.5 max HP, +1 bod do stromu. **Každých 5 levelov** (5, 10, 15…) navyše **1 špeciálny bod**.
+- Za level: **+1.0 max HP (vylieči sa hneď o toľko istá)**, +1 bod do stromu. **Každých 5 levelov** (5, 10, 15…) navyše **1 špeciálny bod**.
+- **Rast poškodenia bez zbrane** (M2/M3, kým nie sú zbrane): **každý druhý level +0.1 k hornej hranici** úderu, **každý piaty level** navyše **+0.1 aj k dolnej hranici**.
 - Cieľ tempa (overené hrubou simuláciou, doladiť v M20): Lv2 ~40 s, Lv10 ~15 min, koniec MVP ~Lv18–21.
 
 ### 6.3 Smrť
@@ -677,3 +678,4 @@ tools/sim/         # headless simulácia tempa (npm run sim) → tabuľka čas/l
 | 1.3 | 2026-09-26 | 6.3: strata pri smrti = 10 % aktuálneho postupu v leveli (nie 10 % potrebného XP). 6.3/17.2: „o polovicu pomalšie“ offline = čas zabitia ×2 (polovičné XP, predmety aj meny); súhrn ukáže loot, meny, XP, smrti a regeneráciu. |
 | 1.4 | 2026-09-26 | 6.1: interval útoku bez zbrane 3.0 s → 4.0 s (vyváženie tempa M0.1 boja). |
 | 1.5 | 2026-09-26 | 6.1/7.1: poškodenie bez zbrane 0.2–0.3 → 0.3–0.4 (Tomas, M2). |
+| 1.6 | 2026-09-26 | 6.1/6.2: rast max HP za level 0.5 → 1.0 (hneď aj vylieči o toľko). Nové pravidlo (Tomas, M3): poškodenie bez zbrane rastie s levelom – každý 2. level +0.1 max, každý 5. level +0.1 aj min. |

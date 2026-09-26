@@ -9,7 +9,10 @@
     "unarmedDamageMax": 0.4,
     "hitPct": 85,
     "armor": 0,
-    "attackSpeedPctPerLevel": 1
+    "attackSpeedPctPerLevel": 1,
+    "regenAmount": 0.1,
+    "regenIntervalS": 2.0,
+    "regenGrowthPctPerLevel": 3
   },
   "combat": {
     "minHitPct": 5,
@@ -19,5 +22,9 @@
     "minDamage": 0.1,
     "hitPctPerLevelDiff": 0.5,
     "minAttackIntervalS": 0.5
+  },
+  "death": {
+    "hideoutRegenS": 10.0,
+    "xpLossPct": 10
   }
 }

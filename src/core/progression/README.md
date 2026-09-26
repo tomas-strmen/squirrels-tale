@@ -17,6 +17,10 @@ are internal hundredths (core/numbers), like HP and damage.
   returns the new state and every level reached, in order.
 - `addLevelBonus(baseDesignValue, bonusHundredths)` – base + bonus as a clean design
   value (e.g. `5.0 + 100 -> 6.0`).
+- `regenAmountHundredths(baseAmount, level, growthPctPerLevel)` – HP regenerated per
+  regen tick at `level` (GDD 6.1: base amount, compounding % growth per level).
+- `applyDeathXpLoss(state, lossPct)` – online death (GDD 6.3): subtracts `lossPct` % of
+  the current level's XP progress; never drops a level.
 
 ## Rules
 - No level cap (GDD 6.2). Skill tree points are a later stage (M11), not handled here.

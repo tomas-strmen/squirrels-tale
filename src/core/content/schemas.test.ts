@@ -88,6 +88,9 @@ describe('balanceSchema / parseBalance', () => {
       hitPct: 85,
       armor: 0,
       attackSpeedPctPerLevel: 1,
+      regenAmount: 0.1,
+      regenIntervalS: 2.0,
+      regenGrowthPctPerLevel: 3,
     },
     combat: {
       minHitPct: 5,
@@ -98,6 +101,7 @@ describe('balanceSchema / parseBalance', () => {
       hitPctPerLevelDiff: 0.5,
       minAttackIntervalS: 0.5,
     },
+    death: { hideoutRegenS: 10.0, xpLossPct: 10 },
   };
 
   it('accepts valid data', () => {

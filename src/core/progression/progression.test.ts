@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   addLevelBonus,
+  applyDeathXpLoss,
   attackIntervalMsAtLevel,
   createProgression,
   cumulativeLevelBonuses,
   gainXp,
   levelUpDelta,
+  regenAmountHundredths,
   xpToNextLevel,
   xpToNextLevelHundredths,
 } from './progression';
@@ -147,5 +149,31 @@ describe('attackIntervalMsAtLevel (GDD 6.1 v1.7: x1.01 per level, compounding)',
 
   it('never goes below the minimum interval', () => {
     expect(attackIntervalMsAtLevel(600, 100, 1, 500)).toBe(500);
+  });
+});
+
+describe('regenAmountHundredths (GDD 6.1: base + growth %/level, compounding)', () => {
+  it('is the base amount at level 1', () => {
+    expect(regenAmountHundredths(0.1, 1, 3)).toBe(10);
+  });
+
+  it('grows by growthPctPerLevel % per level, compounding', () => {
+    expect(regenAmountHundredths(0.1, 2, 3)).toBe(Math.round(10 * 1.03));
+    expect(regenAmountHundredths(0.1, 11, 3)).toBe(Math.round(10 * 1.03 ** 10));
+  });
+});
+
+describe('applyDeathXpLoss (GDD 6.3)', () => {
+  it('subtracts a percentage of the current progress, keeps the level', () => {
+    const state = { level: 3, xp: 1000 };
+    expect(applyDeathXpLoss(state, 10)).toEqual({ level: 3, xp: 900 });
+  });
+
+  it('does nothing at 0 XP progress', () => {
+    expect(applyDeathXpLoss({ level: 2, xp: 0 }, 10)).toEqual({ level: 2, xp: 0 });
+  });
+
+  it('never goes negative', () => {
+    expect(applyDeathXpLoss({ level: 1, xp: 5 }, 100).xp).toBe(0);
   });
 });

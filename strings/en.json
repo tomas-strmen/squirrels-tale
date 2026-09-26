@@ -6,6 +6,7 @@
   "fight.attack": "Attack",
   "fight.miss": "Miss",
   "fight.knockedOut": "Knocked out!",
+  "hideout.regenerating": "In the hideout...",
   "debug.hint": "Press D for debug info",
   "debug.title": "DEBUG",
   "debug.enemiesLoaded": "Enemies loaded",

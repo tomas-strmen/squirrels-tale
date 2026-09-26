@@ -11,7 +11,7 @@
     "armor": 0,
     "attackSpeedPctPerLevel": 1,
     "regenAmount": 0.1,
-    "regenIntervalS": 2.0,
+    "regenIntervalS": 3.0,
     "regenGrowthPctPerLevel": 3
   },
   "combat": {

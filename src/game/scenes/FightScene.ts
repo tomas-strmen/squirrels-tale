@@ -23,8 +23,8 @@ import {
   type EncounterState,
 } from '../../core/encounter/encounter';
 import { hitChancePct } from '../../core/combat/combat';
-import { formatHundredths } from '../../core/numbers/numbers';
-import { xpToNextLevelHundredths } from '../../core/progression/progression';
+import { formatHpHundredths, formatHundredths, fromHundredths } from '../../core/numbers/numbers';
+import { regenAmountHundredths, xpToNextLevelHundredths } from '../../core/progression/progression';
 import { createRng } from '../../core/rng/rng';
 import { consumeFrame, DEFAULT_MAX_STEPS_PER_FRAME } from '../../core/time/fixedStep';
 import { t, tDynamic } from '../text';
@@ -249,7 +249,11 @@ export class FightScene extends Phaser.Scene {
       `${t('stats.xp')}: ${formatHundredths(xp)} / ${formatHundredths(needed)}`,
       `${t('stats.maxHp')}: ${formatHundredths(stats.maxHp)}`,
       `${t('stats.damage')}: ${formatHundredths(stats.damageMin)} - ${formatHundredths(stats.damageMax)}`,
-      `${t('stats.attackInterval')}: ${formatHundredths(playerAttackIntervalMs(this.config, level) / 10)} s`,
+      // Explicit 2 decimals here (not the usual floor-to-0.1) so small per-level changes show up.
+      `${t('stats.attackInterval')}: ${(playerAttackIntervalMs(this.config, level) / 1000).toFixed(2)} s`,
+      `${t('stats.regen')}: ${formatHundredths(
+        regenAmountHundredths(fromHundredths(this.config.regenAmount), level, this.config.regenGrowthPctPerLevel),
+      )} / ${(this.config.regenIntervalMs / 1000).toFixed(1)} s`,
       // Against the current enemy (level difference, GDD 7.2 v1.7); floor to 0.1 for display.
       `${t('stats.hitChance')}: ${(Math.floor(hitChancePct(stats, this.config.enemy, this.config.rules, level - this.config.enemyLevel) * 10) / 10).toFixed(1)} %`,
       `${t('stats.armor')}: ${formatHundredths(stats.armor)}`,
@@ -282,14 +286,14 @@ export class FightScene extends Phaser.Scene {
     );
     this.playerHpBar.setProgress(hpFraction(this.state, this.config, 'player'));
     const playerMaxHp = playerStats(this.config, this.state.progression.level).maxHp;
-    this.playerHpText.setText(`${formatHundredths(this.state.playerHp)} / ${formatHundredths(playerMaxHp)}`);
+    this.playerHpText.setText(`${formatHpHundredths(this.state.playerHp)} / ${formatHundredths(playerMaxHp)}`);
     this.levelText.setText(`${t('stats.level')} ${this.state.progression.level}`);
     if (this.statsPanel.visible) this.refreshStatsPanel();
     // Keep showing the last enemy HP while it fades out after its defeat.
     if (this.state.phase === 'fighting') {
       this.enemyHpBar.setProgress(hpFraction(this.state, this.config, 'enemy'));
       this.enemyHpText.setText(
-        `${formatHundredths(this.state.enemyHp)} / ${formatHundredths(this.config.enemy.maxHp)}`,
+        `${formatHpHundredths(this.state.enemyHp)} / ${formatHundredths(this.config.enemy.maxHp)}`,
       );
     }
   }

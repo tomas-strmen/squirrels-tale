@@ -22,6 +22,7 @@
   "stats.attackInterval": "Attack interval",
   "fight.levelShort": "Lv",
   "stats.armor": "Armor",
+  "stats.regen": "Regen",
   "fight.leveledUp": "Level up!",
   "player.name": "Squirrel",
   "enemy.worker_ant.name": "Worker Ant"

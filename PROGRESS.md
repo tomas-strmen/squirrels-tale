@@ -8,6 +8,16 @@
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.
 
 ## Hotové
+### Opravy po teste M3.2 (2026-09-26)
+- **Bug:** HP bar/text vedel ukázať „0.0“, kým bol bojovník ešte nažive (napr. mravec po zásahu
+  1.1 z 1.2 HP) a útočil ďalej – bolo to len zobrazenie (floor na 0.1 z v1.7), nie chyba v HP. Nová
+  funkcia `core/numbers.formatHpHundredths`: kým je HP > 0, nikdy sa nezobrazí „0.0“ (ukáže „0.1“).
+- Regenerácia **0.1 HP / 2 s → 0.1 HP / 3 s** (Tomas). GDD 6.1 + Changelog v1.9.
+- Do „Show stats“ pribudla hodnota regenerácie (`Regen: 0.1 / 3.0 s`).
+- Interval útoku v „Show stats“ teraz na **2 desatinné miesta** (predtým floor na 0.1, malé rozdiely
+  medzi levelmi neboli vidieť).
+- 159 testov zelených (bolo 156).
+
 ### M3.2 – regenerácia HP a skutočná smrť (2026-09-26)
 - **Regenerácia** (GDD 6.1/7.1): 0.1 HP každé 2 s, +3 %/level (zložene). Tiká v `idle`, `searching`
   aj `fighting` (nie v úkryte – ten má vlastné doliečenie). Nikdy nepresiahne max HP.

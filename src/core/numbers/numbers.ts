@@ -40,3 +40,14 @@ export function formatHundredths(hundredths: number): string {
   const tenths = Math.floor(hundredths / 10);
   return (tenths / 10).toFixed(1);
 }
+
+/**
+ * Same floor-to-0.1 display as `formatHundredths`, but a value that is still
+ * above 0 never displays as "0.0" (it shows "0.1" instead) - so a bar of HP
+ * that is barely alive never looks dead. Only exactly 0 shows "0.0".
+ */
+export function formatHpHundredths(hundredths: number): string {
+  if (hundredths <= 0) return '0.0';
+  const tenths = Math.max(1, Math.floor(hundredths / 10));
+  return (tenths / 10).toFixed(1);
+}

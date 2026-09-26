@@ -6,6 +6,7 @@ import {
   createEncounterConfig,
   hpFraction,
   makePeace,
+  playerStats,
   searchProgress,
   startSearch,
   tick,
@@ -26,6 +27,7 @@ function makeConfig(patch: Partial<EncounterConfigInput> = {}): EncounterConfig 
     enemyAttackIntervalS: 3.0,
     player: squirrelInput,
     enemy: antInput,
+    enemyXp: 2,
     rules,
     ...patch,
   });
@@ -69,13 +71,40 @@ function attacks(log: LogEntry[], attacker: 'player' | 'enemy'): LogEntry[] {
   return log.filter((l) => l.event.type === 'attack' && l.event.attacker === attacker);
 }
 
+/**
+ * Ticks until `predicate` matches some event, then stops (inclusive of that
+ * tick). Enemies respawn automatically (GDD 7.1), so a plain fixed-step `run`
+ * over many ticks can keep killing and re-leveling past the first event of
+ * interest - tests that care about "the first kill" use this instead.
+ */
+function runUntil(
+  state: EncounterState,
+  cfg: EncounterConfig,
+  predicate: (event: EncounterEvent) => boolean,
+  maxSteps = 2000,
+): { state: EncounterState; log: LogEntry[] } {
+  const log: LogEntry[] = [];
+  let s = state;
+  for (let i = 1; i <= maxSteps; i++) {
+    const r = tick(s, cfg);
+    s = r.state;
+    let matched = false;
+    for (const event of r.events) {
+      log.push({ tick: i, event });
+      if (predicate(event)) matched = true;
+    }
+    if (matched) return { state: s, log };
+  }
+  throw new Error('runUntil: predicate never matched within maxSteps');
+}
+
 describe('createEncounterConfig', () => {
   it('converts seconds to milliseconds and stats to hundredths', () => {
     expect(config.searchMs).toBe(1000);
     expect(config.playerAttackIntervalMs).toBe(2000);
     expect(config.enemyAttackIntervalMs).toBe(3000);
-    expect(config.player.maxHp).toBe(500);
     expect(config.enemy.maxHp).toBe(120);
+    expect(config.enemyXp).toBe(200);
     expect(config.rules.minDamage).toBe(10);
   });
 
@@ -84,13 +113,47 @@ describe('createEncounterConfig', () => {
     expect(() => makeConfig({ playerAttackIntervalS: 0 })).toThrow();
     expect(() => makeConfig({ enemyAttackIntervalS: 0.25 })).toThrow();
   });
+
+  it('rejects an invalid player base (e.g. 0 HP)', () => {
+    expect(() => makeConfig({ player: { ...squirrelInput, maxHp: 0 } })).toThrow();
+  });
+});
+
+describe('playerStats (GDD 6.2 level bonuses)', () => {
+  it('equals the base stats at level 1', () => {
+    expect(playerStats(config, 1)).toEqual({
+      maxHp: 500,
+      damageMin: 30,
+      damageMax: 40,
+      hitPct: 85,
+      armor: 0,
+      dodgePct: 0,
+    });
+  });
+
+  it('adds +1.0 max HP per level', () => {
+    expect(playerStats(config, 2).maxHp).toBe(600);
+    expect(playerStats(config, 6).maxHp).toBe(1000);
+  });
+
+  it('adds +0.1 max damage every 2nd level', () => {
+    expect(playerStats(config, 2).damageMax).toBe(50);
+    expect(playerStats(config, 3).damageMax).toBe(50);
+    expect(playerStats(config, 4).damageMax).toBe(60);
+  });
+
+  it('adds +0.1 min damage every 5th level', () => {
+    expect(playerStats(config, 4).damageMin).toBe(30);
+    expect(playerStats(config, 5).damageMin).toBe(40);
+  });
 });
 
 describe('encounter', () => {
-  it('starts idle at full HP and does nothing on its own', () => {
+  it('starts idle at full HP, level 1, and does nothing on its own', () => {
     const idle = fresh();
     expect(idle.phase).toBe('idle');
     expect(idle.playerHp).toBe(500);
+    expect(idle.progression).toEqual({ level: 1, xp: 0 });
     const { state, log } = run(idle, 100);
     expect(state).toEqual(idle);
     expect(log).toEqual([]);
@@ -146,17 +209,45 @@ describe('encounter', () => {
     }
   });
 
-  it('when the enemy dies, the next search starts at once and the squirrel keeps her HP', () => {
-    // A 0.1 HP enemy dies from the first hit.
-    const fragile = makeConfig({ enemy: { ...antInput, maxHp: 0.1, hitPct: 0 } });
-    const { log } = run(fighting(fragile), 200, fragile);
+  it('when the enemy dies, the next search starts at once and grants XP', () => {
+    // A 0.1 HP enemy dies from the first hit; xp 5.0 (< 10.0 needed for Lv2, no level-up here).
+    const fragile = makeConfig({ enemy: { ...antInput, maxHp: 0.1, hitPct: 0 }, enemyXp: 5.0 });
+    const { state, log } = runUntil(fighting(fragile), fragile, (e) => e.type === 'enemyDefeated');
     const defeatTick = log.find((l) => l.event.type === 'enemyDefeated')?.tick;
-    expect(defeatTick).toBeDefined();
     const sameTick = log.filter((l) => l.tick === defeatTick).map((l) => l.event.type);
     expect(sameTick).toEqual(['attack', 'enemyDefeated', 'searchStarted']);
-    // Next enemy is found exactly 1.0 s later, at full HP again.
-    const next = log.find((l) => l.event.type === 'enemyFound' && l.tick > (defeatTick ?? 0));
-    expect(next?.tick).toBe((defeatTick ?? 0) + 10);
+    expect(state.progression).toEqual({ level: 1, xp: 500 });
+    expect(state.phase).toBe('searching');
+  });
+
+  it('leveling up from a kill heals by exactly the HP bonus and raises max HP', () => {
+    const fragile = makeConfig({ enemy: { ...antInput, maxHp: 0.1, hitPct: 0 }, enemyXp: 10.0 });
+    const before = fighting(fragile);
+    const { state, log } = runUntil(before, fragile, (e) => e.type === 'leveledUp');
+    const defeatTick = log.find((l) => l.event.type === 'enemyDefeated')?.tick;
+    const sameTick = log.filter((l) => l.tick === defeatTick).map((l) => l.event);
+    expect(sameTick).toEqual([
+      { type: 'attack', attacker: 'player', hit: true, damage: expect.any(Number) },
+      { type: 'enemyDefeated' },
+      { type: 'leveledUp', level: 2 },
+      { type: 'searchStarted' },
+    ]);
+    expect(state.progression).toEqual({ level: 2, xp: 0 });
+    // Healed by exactly +1.0 HP (100 hundredths), not to full of the new max.
+    expect(state.playerHp).toBe(before.playerHp + 100);
+    expect(playerStats(fragile, 2).maxHp).toBe(600);
+  });
+
+  it('can level up more than once from a single big XP gain', () => {
+    // Lv1 needs 10.0, Lv2 needs 14.0 -> a 25.0 XP kill takes the squirrel to level 3.
+    const fragile = makeConfig({ enemy: { ...antInput, maxHp: 0.1, hitPct: 0 }, enemyXp: 25.0 });
+    const { state, log } = runUntil(fighting(fragile), fragile, (e) => e.type === 'enemyDefeated');
+    const levelUps = log.filter((l) => l.event.type === 'leveledUp').map((l) => l.event);
+    expect(levelUps).toEqual([
+      { type: 'leveledUp', level: 2 },
+      { type: 'leveledUp', level: 3 },
+    ]);
+    expect(state.progression.level).toBe(3);
   });
 
   it('a killed enemy does not attack in the same tick', () => {
@@ -174,13 +265,13 @@ describe('encounter', () => {
     }
   });
 
-  it('when the squirrel is defeated: back to idle at full HP (M2 placeholder)', () => {
+  it('when the squirrel is defeated: back to idle at full (leveled) HP (M2 placeholder)', () => {
     const deadly = makeConfig({ enemy: { ...antInput, maxHp: 999.0, damageMin: 5.0, damageMax: 5.0, hitPct: 100 } });
     const { state, log } = run(fighting(deadly), 200, deadly);
     const defeated = log.find((l) => l.event.type === 'playerDefeated');
     expect(defeated).toBeDefined();
     expect(state.phase).toBe('idle');
-    expect(state.playerHp).toBe(500);
+    expect(state.playerHp).toBe(playerStats(deadly, state.progression.level).maxHp);
     expect(log.filter((l) => l.tick > (defeated?.tick ?? 0))).toEqual([]);
   });
 
@@ -240,12 +331,13 @@ describe('makePeace (GDD 7.1)', () => {
     expect(r.events).toEqual([{ type: 'peaceMade', from: 'searching' }]);
   });
 
-  it('ends the fight at once; the squirrel keeps her current HP', () => {
+  it('ends the fight at once; the squirrel keeps her current HP and XP', () => {
     const midFight = run(fighting(tanky), 300, tanky).state;
-    expect(midFight.playerHp).toBeLessThan(tanky.player.maxHp);
+    expect(midFight.playerHp).toBeLessThan(playerStats(tanky, 1).maxHp);
     const r = makePeace(midFight);
     expect(r.state.phase).toBe('idle');
     expect(r.state.playerHp).toBe(midFight.playerHp);
+    expect(r.state.progression).toEqual(midFight.progression);
     expect(r.state.enemyHp).toBe(0);
     expect(r.events).toEqual([{ type: 'peaceMade', from: 'fighting' }]);
   });

@@ -11,6 +11,7 @@ import {
   createEncounterConfig,
   hpFraction,
   makePeace,
+  playerStats,
   searchProgress,
   startSearch,
   tick,
@@ -20,12 +21,14 @@ import {
   type EncounterState,
 } from '../../core/encounter/encounter';
 import { formatHundredths } from '../../core/numbers/numbers';
+import { xpToNextLevelHundredths } from '../../core/progression/progression';
 import { createRng } from '../../core/rng/rng';
 import { consumeFrame } from '../../core/time/fixedStep';
 import { t, tDynamic } from '../text';
 import { Button } from '../ui/Button';
 import { DebugPanel } from '../ui/DebugPanel';
 import { ProgressBar } from '../ui/ProgressBar';
+import { StatsPanel } from '../ui/StatsPanel';
 
 // Layout only (not game balance) – placeholder grey shapes.
 const W = 1280;
@@ -68,6 +71,9 @@ export class FightScene extends Phaser.Scene {
   private enemyHpText!: Phaser.GameObjects.Text;
   private textStyle = { fontFamily: 'Arial, sans-serif', color: '#e0e0e0' };
   private speedButton!: Button;
+  private levelText!: Phaser.GameObjects.Text;
+  private statsButton!: Button;
+  private statsPanel!: StatsPanel;
 
   constructor() {
     super('FightScene');
@@ -103,6 +109,10 @@ export class FightScene extends Phaser.Scene {
       height: 22,
       fillColor: 0xdddddd,
     });
+    // Level (always visible for the squirrel, GDD 6.2)
+    this.levelText = this.add
+      .text(PLAYER_X, HP_BAR_Y - 44, '', { ...textStyle, fontSize: '16px', color: '#c8c8ff' })
+      .setOrigin(0.5);
     // HP (always visible for the squirrel)
     this.playerHpText = this.add
       .text(PLAYER_X, HP_BAR_Y - 24, '', { ...textStyle, fontSize: '18px' })
@@ -181,6 +191,12 @@ export class FightScene extends Phaser.Scene {
     // Debug tool (GDD 22, M2.2): speed x1/x4/x20, so tempo is easy to test/balance.
     this.speedButton = new Button(this, W - 100, 40, this.speedLabel(), () => this.onCycleSpeed());
     this.speedButton.setScale(0.55);
+
+    // Player-facing stats panel (Tomas, M3.1): level, XP, HP, damage, hit%, armor.
+    this.statsButton = new Button(this, 150, 40, t('stats.button'), () => this.onToggleStats());
+    this.statsButton.setScale(0.55);
+    this.statsPanel = new StatsPanel(this, 10, 70);
+    this.statsPanel.setVisible(false);
   }
 
   private currentSpeed(): number {
@@ -194,6 +210,25 @@ export class FightScene extends Phaser.Scene {
   private onCycleSpeed(): void {
     this.speedIndex = (this.speedIndex + 1) % SPEED_OPTIONS.length;
     this.speedButton.setLabel(this.speedLabel());
+  }
+
+  private onToggleStats(): void {
+    this.statsPanel.setVisible(!this.statsPanel.visible);
+  }
+
+  private refreshStatsPanel(): void {
+    const stats = playerStats(this.config, this.state.progression.level);
+    const { level, xp } = this.state.progression;
+    const needed = xpToNextLevelHundredths(level);
+    this.statsPanel.setLines([
+      t('stats.title'),
+      `${t('stats.level')}: ${level}`,
+      `${t('stats.xp')}: ${formatHundredths(xp)} / ${formatHundredths(needed)}`,
+      `${t('stats.maxHp')}: ${formatHundredths(stats.maxHp)}`,
+      `${t('stats.damage')}: ${formatHundredths(stats.damageMin)} - ${formatHundredths(stats.damageMax)}`,
+      `${t('stats.hitChance')}: ${stats.hitPct} %`,
+      `${t('stats.armor')}: ${formatHundredths(stats.armor)}`,
+    ]);
   }
 
   override update(_time: number, delta: number): void {
@@ -215,9 +250,10 @@ export class FightScene extends Phaser.Scene {
       attackProgress(this.state, this.config, 'enemy', this.accumulatorMs),
     );
     this.playerHpBar.setProgress(hpFraction(this.state, this.config, 'player'));
-    this.playerHpText.setText(
-      `${formatHundredths(this.state.playerHp)} / ${formatHundredths(this.config.player.maxHp)}`,
-    );
+    const playerMaxHp = playerStats(this.config, this.state.progression.level).maxHp;
+    this.playerHpText.setText(`${formatHundredths(this.state.playerHp)} / ${formatHundredths(playerMaxHp)}`);
+    this.levelText.setText(`${t('stats.level')} ${this.state.progression.level}`);
+    if (this.statsPanel.visible) this.refreshStatsPanel();
     // Keep showing the last enemy HP while it fades out after its defeat.
     if (this.state.phase === 'fighting') {
       this.enemyHpBar.setProgress(hpFraction(this.state, this.config, 'enemy'));
@@ -269,6 +305,9 @@ export class FightScene extends Phaser.Scene {
           duration: 400,
           onComplete: () => this.enemyGroup.setVisible(false),
         });
+        break;
+      case 'leveledUp':
+        this.floatingText(PLAYER_X, FIGHTER_Y - 100, t('fight.leveledUp'), '#ffe08a', 1200);
         break;
       case 'playerDefeated':
         this.resetToIdle();

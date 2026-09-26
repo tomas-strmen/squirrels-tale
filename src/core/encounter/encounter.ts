@@ -1,11 +1,14 @@
 /**
- * Encounter: searching for an enemy and a 1v1 fight with HP (GDD 7.1, 7.2).
+ * Encounter: searching for an enemy and a 1v1 fight with HP, XP and levels
+ * (GDD 7.1, 7.2, 6.2).
  *
  * M2 scope: attacks hit or miss and deal damage (core/combat). When the enemy
- * dies, the next search starts automatically (GDD 7.1). When the squirrel
- * is defeated, the fight ends and she is back to full HP in `idle` - a
- * placeholder until real death (hideout, XP loss) arrives in M3. No
- * regeneration yet (M3).
+ * dies, the next search starts automatically (GDD 7.1), and the player gains
+ * the enemy's XP - possibly leveling up (core/progression), which raises max
+ * HP (healing by the same amount at once) and, every 2nd/5th level, unarmed
+ * damage. When the squirrel is defeated the fight ends and she is back to
+ * full HP in `idle` - a placeholder until real death (hideout, XP loss)
+ * arrives in M3.2. No regeneration yet.
  *
  * All functions are pure: they never modify the state passed in. The seeded
  * Rng lives in the state, so the same seed always gives the same fights.
@@ -19,6 +22,14 @@ import {
   type FighterStats,
   type FighterStatsInput,
 } from '../combat/combat';
+import { toHundredths } from '../numbers/numbers';
+import {
+  addLevelBonus,
+  createProgression,
+  cumulativeLevelBonuses,
+  gainXp,
+  type ProgressionState,
+} from '../progression/progression';
 import type { RngState } from '../rng/rng';
 import { secondsToMs, TICK_MS } from '../time/fixedStep';
 
@@ -32,8 +43,11 @@ export interface EncounterConfig {
   readonly playerAttackIntervalMs: number;
   /** Time between two enemy attacks (ms). */
   readonly enemyAttackIntervalMs: number;
-  readonly player: FighterStats;
+  /** Player's base stats at level 1, before level bonuses (GDD 6.2). */
+  readonly playerBase: FighterStatsInput;
   readonly enemy: FighterStats;
+  /** XP granted when the enemy is defeated (hundredths). */
+  readonly enemyXp: number;
   readonly rules: CombatRules;
 }
 
@@ -44,6 +58,8 @@ export interface EncounterConfigInput {
   readonly enemyAttackIntervalS: number;
   readonly player: FighterStatsInput;
   readonly enemy: FighterStatsInput;
+  /** XP granted when the enemy is defeated (design value, GDD 6.2/8.3). */
+  readonly enemyXp: number;
   readonly rules: CombatRulesInput;
 }
 
@@ -59,6 +75,7 @@ export interface EncounterState {
   readonly playerHp: number;
   /** Current HP of the enemy (hundredths). Only meaningful while fighting. */
   readonly enemyHp: number;
+  readonly progression: ProgressionState;
   readonly rng: RngState;
 }
 
@@ -73,7 +90,9 @@ export type EncounterEvent =
       readonly damage: number;
     }
   | { readonly type: 'enemyDefeated' }
-  /** M2 placeholder: fight over, squirrel back to full HP in idle (real death in M3). */
+  /** Player leveled up (GDD 6.2): +1.0 max HP (healed at once), and damage every 2nd/5th level. */
+  | { readonly type: 'leveledUp'; readonly level: number }
+  /** M2 placeholder: fight over, squirrel back to full HP in idle (real death in M3.2). */
   | { readonly type: 'playerDefeated' }
   /** Player pressed "Peace!": search or fight ended at once (no XP, no loot). */
   | { readonly type: 'peaceMade'; readonly from: 'searching' | 'fighting' };
@@ -97,27 +116,48 @@ export function createEncounterConfig(input: EncounterConfigInput): EncounterCon
   if (playerAttackIntervalMs < TICK_MS || enemyAttackIntervalMs < TICK_MS) {
     throw new Error(`Attack intervals must be at least ${TICK_MS / 1000} s`);
   }
+  // Validates the base stats early (e.g. maxHp > 0); the checked value itself
+  // is discarded because effective stats are recomputed per level, see playerStats().
+  createFighterStats(input.player);
   return {
     searchMs,
     playerAttackIntervalMs,
     enemyAttackIntervalMs,
-    player: createFighterStats(input.player),
+    playerBase: input.player,
     enemy: createFighterStats(input.enemy),
+    enemyXp: toHundredths(input.enemyXp),
     rules: createCombatRules(input.rules),
   };
 }
 
-/** New encounter in phase `idle`, squirrel at full HP. */
+/** New encounter in phase `idle`, squirrel at full HP, level 1, no XP. */
 export function createEncounter(config: EncounterConfig, rng: RngState): EncounterState {
+  const progression = createProgression();
   return {
     phase: 'idle',
     searchElapsedMs: 0,
     playerAttackElapsedMs: 0,
     enemyAttackElapsedMs: 0,
-    playerHp: config.player.maxHp,
+    playerHp: playerStats(config, progression.level).maxHp,
     enemyHp: 0,
+    progression,
     rng,
   };
+}
+
+/**
+ * The player's current effective stats: base stats plus the cumulative bonus
+ * for `level` (GDD 6.2: +1.0 max HP/level, +0.1 max damage every 2nd level,
+ * +0.1 min damage every 5th level).
+ */
+export function playerStats(config: EncounterConfig, level: number): FighterStats {
+  const bonus = cumulativeLevelBonuses(level);
+  return createFighterStats({
+    ...config.playerBase,
+    maxHp: addLevelBonus(config.playerBase.maxHp, bonus.hpBonus),
+    damageMax: addLevelBonus(config.playerBase.damageMax, bonus.maxDamageBonus),
+    damageMin: addLevelBonus(config.playerBase.damageMin, bonus.minDamageBonus),
+  });
 }
 
 /** Player pressed "Find enemy". Only works while idle. */
@@ -181,19 +221,28 @@ export function tick(state: EncounterState, config: EncounterConfig): EncounterS
 
 function tickFight(state: EncounterState, config: EncounterConfig): EncounterStep {
   const events: EncounterEvent[] = [];
-  let { rng, playerHp, enemyHp } = state;
+  let { rng, playerHp, enemyHp, progression } = state;
   let playerAttackElapsedMs = state.playerAttackElapsedMs + TICK_MS;
   let enemyAttackElapsedMs = state.enemyAttackElapsedMs + TICK_MS;
+  const player = playerStats(config, progression.level);
 
   if (playerAttackElapsedMs >= config.playerAttackIntervalMs) {
     playerAttackElapsedMs -= config.playerAttackIntervalMs;
-    const attack = resolveAttack(config.player, config.enemy, config.rules, rng);
+    const attack = resolveAttack(player, config.enemy, config.rules, rng);
     rng = attack.rng;
     enemyHp = Math.max(0, enemyHp - attack.result.damage);
     events.push({ type: 'attack', attacker: 'player', ...attack.result });
     if (enemyHp === 0) {
+      events.push({ type: 'enemyDefeated' });
+      const gain = gainXp(progression, config.enemyXp);
+      progression = gain.state;
+      // Every level gained heals by exactly its HP bonus (GDD 6.2) - never a full heal.
+      for (const level of gain.levelsGained) {
+        playerHp += 100; // levelUpDelta().hpBonus is always +1.0 (100 hundredths).
+        events.push({ type: 'leveledUp', level });
+      }
       // GDD 7.1: after each defeated enemy the next search starts automatically.
-      events.push({ type: 'enemyDefeated' }, { type: 'searchStarted' });
+      events.push({ type: 'searchStarted' });
       return {
         state: {
           ...state,
@@ -203,6 +252,7 @@ function tickFight(state: EncounterState, config: EncounterConfig): EncounterSte
           enemyAttackElapsedMs: 0,
           playerHp,
           enemyHp: 0,
+          progression,
           rng,
         },
         events,
@@ -212,19 +262,19 @@ function tickFight(state: EncounterState, config: EncounterConfig): EncounterSte
 
   if (enemyAttackElapsedMs >= config.enemyAttackIntervalMs) {
     enemyAttackElapsedMs -= config.enemyAttackIntervalMs;
-    const attack = resolveAttack(config.enemy, config.player, config.rules, rng);
+    const attack = resolveAttack(config.enemy, player, config.rules, rng);
     rng = attack.rng;
     playerHp = Math.max(0, playerHp - attack.result.damage);
     events.push({ type: 'attack', attacker: 'enemy', ...attack.result });
     if (playerHp === 0) {
       events.push({ type: 'playerDefeated' });
-      // M2 placeholder: back to full HP in idle (real death in M3).
-      return { state: toIdle({ ...state, rng }, config.player.maxHp), events };
+      // M2 placeholder: back to full HP in idle (real death in M3.2).
+      return { state: toIdle({ ...state, progression, rng }, player.maxHp), events };
     }
   }
 
   return {
-    state: { ...state, playerAttackElapsedMs, enemyAttackElapsedMs, playerHp, enemyHp, rng },
+    state: { ...state, playerAttackElapsedMs, enemyAttackElapsedMs, playerHp, enemyHp, progression, rng },
     events,
   };
 }
@@ -278,7 +328,7 @@ export function attackProgress(
 /** HP bar value 0..1 for one fighter. */
 export function hpFraction(state: EncounterState, config: EncounterConfig, who: Combatant): number {
   return who === 'player'
-    ? clamp01(state.playerHp / config.player.maxHp)
+    ? clamp01(state.playerHp / playerStats(config, state.progression.level).maxHp)
     : clamp01(state.enemyHp / config.enemy.maxHp);
 }
 

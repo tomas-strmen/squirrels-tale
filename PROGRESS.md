@@ -1,13 +1,30 @@
 # PROGRESS – stav vývoja
 
 ## Aktuálne
-- **Etapa:** M2 Boj (GDD kap. 22) – **M2 hotová** ✅
-- **Posledný krok:** M2.2 – rýchlosť ×1/×4/×20 – **schválené**, zlúčené cez PR #7.
+- **Etapa:** M3 Progres (GDD kap. 22)
+- **Posledný krok:** M3.1 – XP, levely, rast štatistík, panel Show stats – hotové, čaká na test/schválenie (PR na GitHube)
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model: Opus 5.5 na M2.1, na M2.2 stačí Sonnet 5. AI spúšťa npm/git sama; PR otvára a merguje cez Tomasovo Chrome (rozšírenie Claude in Chrome).
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.
 
 ## Hotové
+### M3.1 – XP, levely, rast štatistík, Show stats (2026-09-26)
+- Nový modul `core/progression`: XP krivka podľa GDD 6.2 (`need(L) = round(10 × 1.4^(L−1))`),
+  levelovanie bez stropu. Bonusy za level (Tomas): **+1.0 max HP** (hneď aj vylieči presne o toľko,
+  nie plné doliečenie), **každý 2. level +0.1** k hornej hranici úderu, **každý 5. level +0.1**
+  aj k dolnej hranici. Zapísané do GDD 6.1/6.2 + Changelog v1.6 (pôvodne bolo +0.5 HP/level).
+- `data/enemies.json`: Worker Ant dostal `xp: 2` (GDD 8.3). Zod schéma rozšírená.
+- `core/encounter`: `playerBase` (level 1) + `playerStats(config, level)` počíta efektívne štatistiky;
+  po zabití nepriateľa sa pripočíta XP a prípadne prebehne levelovanie (aj viacnásobné z jedného
+  zisku), s udalosťou `leveledUp { level }`. Dočasná smrť (M2) teraz vracia na aktuálne (leveled) max HP.
+- `FightScene`: level a XP progres viditeľné trvalo nad HP barom, „Level up!“ pri leveli. Nové
+  tlačidlo **„Show stats“** otvára/zatvára panel so štatistikami (level, XP, max HP, poškodenie,
+  zásah, armor), živo sa aktualizuje.
+- Overené v prehliadači: level 1→2, HP 5.0→6.0, poškodenie 0.3–0.4 → 0.3–0.5, panel Show stats.
+  133 testov zelených (bolo 109 → +24).
+- **Zámerne mimo tohto kroku (M3.2):** regenerácia HP a skutočná smrť (úkryt, strata XP, GDD 6.3) –
+  zatiaľ platí dočasné správanie z M2 (plné/leveled HP v idle po páde).
+
 ### M2.2 – rýchlosť ×1/×4/×20 (2026-09-26)
 - Tlačidlo vpravo hore v `FightScene` cyklí ×1 → ×4 → ×20 → ×1. Zrýchľuje len simuláciu (viac
   100 ms krokov za snímku), nie vizuálne animácie (skok, čísla poškodenia) – tie sa pri vyšších
@@ -95,9 +112,9 @@
 - GDD v1.1 a v1.2 zapísané v `docs/GDD.md` aj v projekte (`claude/GDD.md`).
 
 ## Ďalší krok
-**M3 Progres** (GDD kap. 22): XP, levely, regenerácia, smrť → úkryt (kap. 6.2, 6.3). Nahradí
-dočasné M2 správanie (plné HP v idle po páde). Model: Sonnet 5 stačí, Opus pri XP krivke/smrti
-len ak sa zasekneme. Navrhnem rozdelenie na kroky na budúcom sedení.
+1. Tomas otestuje M3.1 (PR) → „schválené" → merge.
+2. **M3.2** – regenerácia HP a skutočná smrť → úkryt (GDD 6.3): online strata 10 % postupu v leveli,
+   10 s regenerácia, hráč vyberie políčko. Model: Sonnet 5 stačí.
 
 ## Rozhodnutia (2026-09-26)
 - Find enemy po príchode na políčko, potom automatické hľadanie po každom zabití; Peace! zastaví a ukončí boj hneď (bez XP/lootu).

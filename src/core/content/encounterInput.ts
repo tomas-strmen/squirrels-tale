@@ -28,6 +28,7 @@ export function toEncounterConfigInput(balance: Balance, enemy: Enemy): Encounte
       armor: enemy.armor,
       dodgePct: enemy.dodgePct,
     },
+    enemyXp: enemy.xp,
     rules: balance.combat,
   };
 }

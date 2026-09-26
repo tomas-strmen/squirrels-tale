@@ -38,7 +38,7 @@ const lootInput = {
   items: parseItems(itemsData),
   rarities: parseRarities(raritiesData),
   affixes: parseAffixes(affixesData),
-  balance: { dropChancePct: 4, pityKills: 1000, pityMinRarity: 'rare', affixTierGrowthPct: 35, upgradeGrowthPct: 8 },
+  balance: { dropChancePct: 4, pity: [{ rarity: 'rare', kills: 1000 }, { rarity: 'unique', kills: 5000 }, { rarity: 'legendary', kills: 20000 }], affixTierGrowthPct: 35, upgradeGrowthPct: 8 },
 };
 
 function makeConfig(patch: Partial<EncounterConfigInput> = {}): EncounterConfig {

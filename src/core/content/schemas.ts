@@ -218,10 +218,15 @@ export const balanceSchema = z.object({
   /** Item drops (GDD 9.3, 9.6). */
   loot: z.object({
     dropChancePct: percentSchema,
-    /** Kills without a drop of `pityMinRarity` or better before the next drop is guaranteed (9.6). */
-    pityKills: z.number().int().min(1),
-    /** The pity guarantee: at least this rarity (v2.1: "rare" for now). */
-    pityMinRarity: idSchema,
+    /**
+     * Pity guarantees (GDD 9.6 v2.2): after `kills` kills without a drop of `rarity` or better,
+     * the next drop is at least that rarity. Each counter resets on such a drop.
+     */
+    pity: z
+      .array(z.object({ rarity: idSchema, kills: z.number().int().min(1) }))
+      .refine((p) => new Set(p.map((x) => x.rarity)).size === p.length, {
+        message: 'one pity entry per rarity',
+      }),
     /** Affix value growth per item tier: base x (1 + pct/100 x (tier - 1)) (9.3). */
     affixTierGrowthPct: percentSchema,
     /** Value growth per upgrade level (9.3, 12.2 - used from M16). */

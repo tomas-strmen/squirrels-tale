@@ -2,12 +2,18 @@
 
 ## Aktuálne
 - **Etapa:** M4 Predmety (GDD kap. 22) – M3 Progres hotová ✅
-- **Posledný krok:** M4.1b – pity na Rare + odpočet, Legendary zamknutý, čas hry – hotové, čaká na test (PR)
+- **Posledný krok:** M4.1c – pity podľa vzácnosti (Rare 1000 / Unique 5000 / Legendary 20 000) – hotové, čaká na test (PR)
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model: podľa náročnosti kroku (poviem vopred). Od teraz: AI pripraví vetvu/commit/push a dá Tomasovi presné príkazy/odkaz na PR, test a merge robí Tomas sám (šetrí tokeny oproti ovládaniu prehliadača).
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.
 
 ## Hotové
+### M4.1c – pity podľa vzácnosti (2026-09-26)
+- Samostatné počítadlá: Rare 1000, Unique 5000, Legendary 20 000 zabití (`balance.json` `loot.pity`).
+  Drop vynuluje počítadlá svojej a nižších vzácností. Počíta sa len keď vzácnosť môže padnúť
+  (na T1: len Rare – unikáty tu nie sú, Legendary zamknutý). GDD v2.2. 189 testov zelených.
+- Tip: ak hra na localhost nejde po prepnutí vetiev, reštartovať `npm run dev` (zastaraná cache Vite).
+
 ### M4.1b – úpravy po teste M4.1 (2026-09-26)
 - Pity garantuje aspoň **Rare** (bolo Unique+); vľavo dole odpočet „Lucky acorn: Rare guaranteed in N kills“.
 - **Legendary zamknutý** (`rarities.json` `unlockedBy`), kým ho neodomkne quest (ktorý – otvorené, GDD 24).

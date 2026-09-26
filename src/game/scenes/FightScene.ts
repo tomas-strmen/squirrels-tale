@@ -29,7 +29,7 @@ import { hitChancePct } from '../../core/combat/combat';
 import { formatHpHundredths, formatHundredths, fromHundredths } from '../../core/numbers/numbers';
 import { regenAmountHundredths, xpToNextLevelHundredths } from '../../core/progression/progression';
 import { createRng } from '../../core/rng/rng';
-import { killsUntilPity, pityRarity } from '../../core/loot/loot';
+import { pityCountdowns } from '../../core/loot/loot';
 import { consumeFrame, DEFAULT_MAX_STEPS_PER_FRAME, TICK_MS } from '../../core/time/fixedStep';
 import { itemName, itemSummary, rarityName } from '../itemText';
 import { t, tDynamic } from '../text';
@@ -337,10 +337,17 @@ export class FightScene extends Phaser.Scene {
     if (this.statsPanel.visible) this.refreshStatsPanel();
     if (this.lootPanel.visible) this.refreshLootPanel();
     this.timeText.setText(`${t('hud.time')}: ${formatDuration(this.simElapsedMs)}`);
+    // One line per pity rarity that can drop here (GDD 9.6 v2.2); locked ones stay hidden.
+    const countdowns = pityCountdowns(this.state.loot, this.config.loot, {
+      tileTier: this.config.tileTier,
+      magicFindPct: 0,
+      unlocked: new Set(),
+    });
     this.pityText.setText(
-      t('loot.pityCountdown')
-        .replace('{rarity}', rarityName(pityRarity(this.config.loot).id))
-        .replace('{kills}', String(killsUntilPity(this.state.loot, this.config.loot))),
+      `${t('loot.luckyAcorn')}: ` +
+        countdowns
+          .map((c) => t('loot.pityCountdown').replace('{rarity}', rarityName(c.rarityId)).replace('{kills}', String(c.killsLeft)))
+          .join(' · '),
     );
     // Keep showing the last enemy HP while it fades out after its defeat.
     if (this.state.phase === 'fighting') {

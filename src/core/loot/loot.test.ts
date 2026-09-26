@@ -10,8 +10,7 @@ import {
   createLootState,
   effectiveMagicFind,
   generateItem,
-  killsUntilPity,
-  pityRarity,
+  pityCountdowns,
   rarityWeights,
   rollAffixes,
   rollKillDrop,
@@ -76,7 +75,7 @@ describe('rarityWeights (GDD 9.6)', () => {
   });
 
   it('pity-only: at least Rare, only what can drop here (T1: no uniques, Legendary locked -> Rare)', () => {
-    const ws = rarityWeights(config, t1, true);
+    const ws = rarityWeights(config, t1, 2); // rank of Rare
     expect(weightOf(ws, 'common')).toBe(0);
     expect(weightOf(ws, 'uncommon')).toBe(0);
     expect(weightOf(ws, 'rare')).toBe(6);
@@ -225,18 +224,41 @@ describe('rollKillDrop (GDD 9.6)', () => {
     expect(drops / kills).toBeLessThan(0.047);
   });
 
-  it('pity: after 999 kills without Rare+, the 1000th kill surely drops Rare+ and resets', () => {
-    const state = { killsSincePity: 999, nextUid: 5 };
+  it('pity Rare: after 999 kills without Rare+, the 1000th kill surely drops Rare+ and resets', () => {
+    const state = { pityCounters: { rare: 999 }, nextUid: 5 };
     const r = rollKillDrop(state, config, createRng(12), t1);
-    expect(r.item).not.toBeNull();
     expect(r.item?.rarityId).toBe('rare');
-    expect(r.state).toEqual({ killsSincePity: 0, nextUid: 6 });
-    expect(killsUntilPity(r.state, config)).toBe(1000);
+    expect(r.state.pityCounters.rare).toBe(0);
+    expect(r.state.nextUid).toBe(6);
   });
 
-  it('killsUntilPity counts down; pityRarity is Rare for now', () => {
-    expect(killsUntilPity({ killsSincePity: 734, nextUid: 1 }, config)).toBe(266);
-    expect(pityRarity(config).id).toBe('rare');
+  it('separate counters: Unique 5000, Legendary 20000 - only while that rarity can drop', () => {
+    // T1: no unique items and Legendary is locked -> only the Rare counter runs.
+    const r = rollKillDrop(createLootState(), config, createRng(20), { ...t1 });
+    expect(Object.keys(r.state.pityCounters)).toEqual(['rare']);
+    const cd = pityCountdowns(r.state, config, t1);
+    expect(cd.map((c) => c.rarityId)).toEqual(['rare']);
+  });
+
+  it('Legendary pity (unlocked) forces a Legendary at 20000 and resets all lower counters too', () => {
+    const unlockedCtx: LootContext = { ...t1, unlocked: new Set(['legendary_quest']) };
+    const state = { pityCounters: { rare: 5, legendary: 19999 }, nextUid: 1 };
+    const r = rollKillDrop(state, config, createRng(21), unlockedCtx);
+    expect(r.item?.rarityId).toBe('legendary');
+    expect(r.state.pityCounters).toEqual({ rare: 0, legendary: 0 });
+  });
+
+  it('a Rare drop resets only the Rare counter', () => {
+    const unlockedCtx: LootContext = { ...t1, unlocked: new Set(['legendary_quest']) };
+    const state = { pityCounters: { rare: 999, legendary: 100 }, nextUid: 1 };
+    const r = rollKillDrop(state, config, createRng(22), unlockedCtx);
+    expect(r.item?.rarityId).not.toBe('common');
+    if (r.item?.rarityId === 'rare') expect(r.state.pityCounters).toEqual({ rare: 0, legendary: 101 });
+  });
+
+  it('pityCountdowns shows kills left per rarity', () => {
+    const state = { pityCounters: { rare: 734 }, nextUid: 1 };
+    expect(pityCountdowns(state, config, t1)).toEqual([{ rarityId: 'rare', killsLeft: 266 }]);
   });
 
   it('counts kills towards pity and gives each item a new uid', () => {
@@ -250,7 +272,7 @@ describe('rollKillDrop (GDD 9.6)', () => {
       if (r.item) uids.push(r.item.uid);
     }
     expect(new Set(uids).size).toBe(uids.length);
-    expect(state.killsSincePity).toBeGreaterThan(0);
+    expect(state.pityCounters.rare ?? 0).toBeGreaterThan(0);
   });
 
   it('does not modify the state passed in', () => {

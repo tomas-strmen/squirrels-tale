@@ -12,7 +12,11 @@ Open http://localhost:5173
 ## Check
 ```
 npm run check   # typecheck + lint + tests
+npm run test:e2e # Playwright smoke test (builds + opens it in a real browser)
 ```
+
+## Play in the browser
+https://tomas-strmen.github.io/squirrels-tale/ (auto-deployed from `main`)
 
 ## Layout
 ```

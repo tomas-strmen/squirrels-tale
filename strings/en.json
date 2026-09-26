@@ -10,6 +10,7 @@
   "debug.title": "DEBUG",
   "debug.enemiesLoaded": "Enemies loaded",
   "debug.textsLoaded": "Texts loaded",
+  "debug.speed": "Speed",
   "player.name": "Squirrel",
   "enemy.worker_ant.name": "Worker Ant"
 }

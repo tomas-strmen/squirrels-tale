@@ -37,6 +37,7 @@ const LUNGE_PX = 40;
 const PEACE_X = 1080;
 const BUTTON_Y = 620;
 const HP_BAR_Y = FIGHTER_Y - 95;
+const SPEED_OPTIONS = [1, 4, 20] as const;
 
 /**
  * M0.1: squirrel waits, "Find enemy" → search bar → enemy appears → attack bars loop.
@@ -48,6 +49,7 @@ export class FightScene extends Phaser.Scene {
   private config!: EncounterConfig;
   private state!: EncounterState;
   private accumulatorMs = 0;
+  private speedIndex = 0;
 
   private player!: Phaser.GameObjects.Rectangle;
   private enemy!: Phaser.GameObjects.Rectangle;
@@ -65,6 +67,7 @@ export class FightScene extends Phaser.Scene {
   private enemyHpBar!: ProgressBar;
   private enemyHpText!: Phaser.GameObjects.Text;
   private textStyle = { fontFamily: 'Arial, sans-serif', color: '#e0e0e0' };
+  private speedButton!: Button;
 
   constructor() {
     super('FightScene');
@@ -174,10 +177,28 @@ export class FightScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown-D', () => {
       this.debugPanel.setVisible(!this.debugPanel.visible);
     });
+
+    // Debug tool (GDD 22, M2.2): speed x1/x4/x20, so tempo is easy to test/balance.
+    this.speedButton = new Button(this, W - 100, 40, this.speedLabel(), () => this.onCycleSpeed());
+    this.speedButton.setScale(0.55);
+  }
+
+  private currentSpeed(): number {
+    return SPEED_OPTIONS[this.speedIndex] ?? 1;
+  }
+
+  private speedLabel(): string {
+    return `${t('debug.speed')} ×${this.currentSpeed()}`;
+  }
+
+  private onCycleSpeed(): void {
+    this.speedIndex = (this.speedIndex + 1) % SPEED_OPTIONS.length;
+    this.speedButton.setLabel(this.speedLabel());
   }
 
   override update(_time: number, delta: number): void {
-    const frame = consumeFrame(this.accumulatorMs, delta);
+    const scaledDelta = delta * this.currentSpeed();
+    const frame = consumeFrame(this.accumulatorMs, scaledDelta);
     this.accumulatorMs = frame.accumulatorMs;
     for (let i = 0; i < frame.steps; i++) {
       const step = tick(this.state, this.config);

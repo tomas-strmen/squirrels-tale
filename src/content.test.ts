@@ -1,35 +1,38 @@
 /**
- * Content checks: data files and texts fit together.
- * (Full zod schemas come in M1.)
+ * Content checks: data/*.json validate against their zod schemas (core/content),
+ * and the texts they reference exist in strings/en.json.
  */
 import { describe, expect, it } from 'vitest';
 import balance from '../data/balance.json';
 import enemies from '../data/enemies.json';
 import en from '../strings/en.json';
+import { parseBalance, parseEnemies } from './core/content/schemas';
 import { createEncounterConfig } from './core/encounter/encounter';
 
 const strings: Record<string, string> = en;
 
 describe('data + strings', () => {
-  it('has at least one enemy', () => {
-    expect(enemies.length).toBeGreaterThan(0);
+  it('data/enemies.json matches its schema', () => {
+    expect(() => parseEnemies(enemies)).not.toThrow();
   });
 
-  it('every enemy has a unique snake_case id and an English name', () => {
-    const ids = enemies.map((e) => e.id);
-    expect(new Set(ids).size).toBe(ids.length);
-    for (const id of ids) {
-      expect(id).toMatch(/^[a-z][a-z0-9_]*$/);
-      expect(strings[`enemy.${id}.name`], `missing text enemy.${id}.name`).toBeTruthy();
+  it('data/balance.json matches its schema', () => {
+    expect(() => parseBalance(balance)).not.toThrow();
+  });
+
+  it('every enemy has an English name in strings/en.json', () => {
+    for (const enemy of parseEnemies(enemies)) {
+      expect(strings[`enemy.${enemy.id}.name`], `missing text enemy.${enemy.id}.name`).toBeTruthy();
     }
   });
 
   it('every enemy builds a valid encounter config with the balance values', () => {
-    for (const enemy of enemies) {
+    const validBalance = parseBalance(balance);
+    for (const enemy of parseEnemies(enemies)) {
       expect(() =>
         createEncounterConfig({
-          searchDurationS: balance.encounter.searchDurationS,
-          playerAttackIntervalS: balance.player.unarmedAttackIntervalS,
+          searchDurationS: validBalance.encounter.searchDurationS,
+          playerAttackIntervalS: validBalance.player.unarmedAttackIntervalS,
           enemyAttackIntervalS: enemy.attackIntervalS,
         }),
       ).not.toThrow();

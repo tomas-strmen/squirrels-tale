@@ -2,7 +2,7 @@
 
 Cieľ: 2D mobilná hra robená s AI asistentom, testovateľná v prehliadači na PC, vydaná na Google Play (premium nákup + reklamy). Bez deadlinov – mapa smerovania.
 
-**Dokumenty projektu:** `claude/GDD.md` (čo je hra + plán etáp MVP M0–M20), `claude/PROMPT-vyvoj.md` (ako má AI pracovať v novom chate), `claude/GDD-odpovede.md` (archív odpovedí).
+**Dokumenty projektu:** `docs/GDD.md` (čo je hra + plán etáp MVP M0–M20, jediný zdroj pravdy), `CLAUDE.md` (ako má AI pracovať), `docs/PROMPT-vyvoj.md` a `docs/archiv/GDD-odpovede.md` (archív z obdobia pred M0).
 
 ## 1. Technológia
 - **TypeScript + Phaser + Vite** – hra beží v prehliadači (`npm run dev`), hot reload, test aj na mobile cez lokálnu sieť.
@@ -52,7 +52,7 @@ Pravidlá: malé úlohy, pred prerábkou systému najprv „napíš testy na sú
 Nástroje: Claude Code / Claude na kód, tento Claude projekt na plánovanie a dizajn.
 
 ## 5. Etapy
-0. **Nápad** – ✅ hotové: `claude/GDD.md` v1.0 (žáner, core loop, rozsah MVP, Premium, plán etáp M0–M20).
+0. **Nápad** – ✅ hotové: GDD v1.0 (žáner, core loop, rozsah MVP, Premium, plán etáp M0–M20).
 1. **Kostra** (GDD M0) – repo, Vite+TS+Phaser, testy, CI, CLAUDE.md, web deploy. Hotové: na mobile otvorím link a vidím, ako sa veverička-štvorček sama bije s nepriateľom.
 2. **Prototyp core loopu** (GDD M1–M9) – sivé kocky, žiadna grafika. Otázka: je to zábava? Meniť sa oplatí tu, je to lacné.
 3. **Systémy riadené dátami** (GDD M10–M20) – obchod, strom, questy, bossovia, úkryt, kováč, vrátenie v čase, boosty, mock Ads/Store, balans.

@@ -3,6 +3,6 @@
     "searchDurationS": 1.0
   },
   "player": {
-    "unarmedAttackIntervalS": 3.0
+    "unarmedAttackIntervalS": 4.0
   }
 }

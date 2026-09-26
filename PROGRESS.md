@@ -1,13 +1,24 @@
 # PROGRESS – stav vývoja
 
 ## Aktuálne
-- **Etapa:** M0 Kostra (GDD kap. 22) – **M0 hotové** ✅
-- **Posledný krok:** vyhladenie barov hľadania/útoku (mimo plánu, na žiadosť Tomasa) – zlúčené do `main` cez PR #2
+- **Etapa:** M1 Základy core (GDD kap. 22)
+- **Posledný krok:** M1.1 – `core/numbers` + zod validácia dát – hotové, čaká na test/schválenie Tomasa
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model Claude Sonnet 5 (Opus 5.5 len pre náročnejšie etapy – povie sa vopred). AI spúšťa npm/git sama.
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.
 
 ## Hotové
+### M1.1 – core/numbers + zod validácia dát (2026-09-26)
+- Nový modul `src/core/numbers`: `toHundredths`/`fromHundredths`/`formatHundredths` – design
+  čísla (max 1 desatinné miesto) ↔ interné celé stotiny ↔ zobrazenie na 0.1 (GDD 5). Zatiaľ sa
+  nepoužíva v boji (ten čísla zatiaľ nepotrebuje), pripravené pre HP/poškodenie v M2.
+- Nový modul `src/core/content`: zod schémy pre `data/enemies.json` a `data/balance.json`
+  (`idSchema`, `designSecondsSchema`, `enemySchema`/`enemiesSchema`, `balanceSchema`,
+  `parseEnemies`/`parseBalance`). Nahradili ručné kontroly v `src/content.test.ts`.
+- Balans: rýchlosť útoku veveričky bez zbrane **3.0 s → 4.0 s** (GDD 6.1, Changelog v1.4;
+  Tomas si vyžiadal pomalšie tempo).
+- 52 testov zelených (bolo 33 → +19).
+
 ### Vyhladenie barov hľadania/útoku (2026-09-26)
 - `searchProgress`/`attackProgress` v `core/encounter` majú nový voliteľný parameter `extraMs`
   (reálny čas od posledného 100 ms kroku) – bary sa vykresľujú plynulo medzi krokmi, samotná

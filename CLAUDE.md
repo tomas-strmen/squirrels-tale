@@ -8,7 +8,7 @@ Tomas = orchestrator (decides, approves, tests). AI = proposes, programs, tests,
 2. `docs/ROADMAP.md` – technology, architecture, safety net.
 3. `PROGRESS.md` – where we stopped, what is next, open questions.
 4. `docs/PROMPT-vyvoj.md` – full working agreement. `docs/archiv/` = archive only; on conflict the GDD wins.
-The GDD also lives in the Claude project (`claude/GDD.md`). Both copies must stay identical.
+`docs/GDD.md` in this repo is the single source of truth (no other copy is kept anywhere else).
 
 ## Session flow
 Status (3–5 points) → propose ONE small step (files touched, what stays untouched, how Tomas tests it in 10–20 min)

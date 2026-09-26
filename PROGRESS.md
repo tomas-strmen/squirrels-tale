@@ -16,7 +16,7 @@
   (`idSchema`, `designSecondsSchema`, `enemySchema`/`enemiesSchema`, `balanceSchema`,
   `parseEnemies`/`parseBalance`). Nahradili ručné kontroly v `src/content.test.ts`.
 - Balans: rýchlosť útoku veveričky bez zbrane **3.0 s → 4.0 s** (GDD 6.1, Changelog v1.4;
-  Tomas si vyžiadal pomalšie tempo). Pripomienka: aktualizovať aj GDD kópiu v Claude projekte.
+  Tomas si vyžiadal pomalšie tempo).
 - 52 testov zelených (bolo 33 → +19).
 
 ### Vyhladenie barov hľadania/útoku (2026-09-26)

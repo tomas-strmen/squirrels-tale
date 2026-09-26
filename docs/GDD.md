@@ -1,7 +1,7 @@
 # Veverička – Game Design Document (GDD) v1.3
 
 > **Pracovný názov hry:** *Squirrel's Tale* (dočasný – finálny názov vybrať pred vydaním; nesmie pripomínať „Hero Tale“).
-> **Stav:** v1.3, 26. 9. 2026. Zdroj: odpovede Tomasa v `claude/GDD-odpovede.md` (archív – pri rozpore platí tento dokument).
+> **Stav:** v1.4, 26. 9. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
 > **Súvisiace:** `claude/ROADMAP.md` (technológia, architektúra, etapy vydania), `claude/PROMPT-vyvoj.md` (ako má AI pracovať).
 
 ---

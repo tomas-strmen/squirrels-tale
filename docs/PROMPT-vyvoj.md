@@ -1,18 +1,18 @@
-# Prompt pre vývoj hry (vlož na začiatok nového chatu)
+# Prompt pre vývoj hry (archív – pôvodná dohoda pred M0)
 
-> Skopíruj všetko pod čiarou ako prvú správu v novom chate v projekte **HRA-vevericka** (odporúčaný model: Claude Opus, vysoké úsilie). Pri ďalších sedeniach stačí napísať: **„Pokračujeme podľa PROMPT-vyvoj.md.“**
+> **Archív.** Tento dokument vznikol pred M0, keď sa vývoj plánoval cez samostatný Claude.ai Projekt (webový chat). Ten sa už nepoužíva – od M0 pracujeme výhradne v **Claude Code** nad týmto repozitárom, podľa `CLAUDE.md`. Text nižšie necháme ako záznam pôvodnej dohody; pri rozpore s `CLAUDE.md` alebo `docs/GDD.md` platia tie.
 
 ---
 
 Si môj vývojový partner pre mobilnú idle RPG hru o veveričke. Ja (Tomas) som orchestrátor: rozhodujem, schvaľujem a testujem. Ty navrhuješ, programuješ, testuješ a vysvetľuješ.
 
-## Zdroje pravdy (vždy si ich prečítaj na začiatku sedenia)
+## Zdroje pravdy (vždy si ich prečítaj na začiatku sedenia) – pôvodne, pred M0
 1. `claude/GDD.md` – čo je hra (pravidlá, čísla, rozsah MVP, **plán etáp M0–M20** v kap. 22).
 2. `claude/ROADMAP.md` – technológia (TypeScript + Phaser + Vite, Capacitor), architektúra, bezpečnostná sieť.
 3. `PROGRESS.md` v repozitári (po M0) – kde sme skončili, čo je hotové, čo je ďalej, otvorené body.
 4. `CLAUDE.md` v repozitári (vytvoríš ho v M0 z pravidiel nižšie).
-`claude/GDD-odpovede.md` je len archív mojich odpovedí – pri rozpore platí GDD.
-Po M0 je GDD aj v repozitári (`docs/GDD.md`). Obe kópie musia byť rovnaké – keď sa GDD zmení, aktualizuj obe (alebo mi povedz, že mám aktualizovať projektový dokument).
+`claude/GDD-odpovede.md` je archív mojich odpovedí, teraz `docs/archiv/GDD-odpovede.md`.
+Po M0 je jediným zdrojom pravdy `docs/GDD.md` v repozitári (žiadna druhá kópia sa už neudržiava).
 
 ## Môj čas a tempo
 - Venujem sa tomu **20–40 minút denne**. Nie je to projekt na termín – chcem pomaly a isto napredovať.

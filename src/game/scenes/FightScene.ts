@@ -1,10 +1,13 @@
 import Phaser from 'phaser';
+import affixesData from '../../../data/affixes.json';
 import balanceData from '../../../data/balance.json';
 import enemiesData from '../../../data/enemies.json';
+import itemsData from '../../../data/items.json';
+import raritiesData from '../../../data/rarities.json';
 import en from '../../../strings/en.json';
 import { now } from '../../core/clock/clock';
 import { toEncounterConfigInput } from '../../core/content/encounterInput';
-import { parseBalance, parseEnemies } from '../../core/content/schemas';
+import { parseAffixes, parseBalance, parseEnemies, parseItems, parseRarities } from '../../core/content/schemas';
 import {
   attackProgress,
   createEncounter,
@@ -27,6 +30,7 @@ import { formatHpHundredths, formatHundredths, fromHundredths } from '../../core
 import { regenAmountHundredths, xpToNextLevelHundredths } from '../../core/progression/progression';
 import { createRng } from '../../core/rng/rng';
 import { consumeFrame, DEFAULT_MAX_STEPS_PER_FRAME } from '../../core/time/fixedStep';
+import { itemName, itemSummary } from '../itemText';
 import { t, tDynamic } from '../text';
 import { Button } from '../ui/Button';
 import { DebugPanel } from '../ui/DebugPanel';
@@ -79,6 +83,9 @@ export class FightScene extends Phaser.Scene {
   private levelText!: Phaser.GameObjects.Text;
   private statsButton!: Button;
   private statsPanel!: StatsPanel;
+  private lootButton!: Button;
+  private lootPanel!: StatsPanel;
+  private rarityColors = new Map<string, string>();
 
   constructor() {
     super('FightScene');
@@ -92,7 +99,15 @@ export class FightScene extends Phaser.Scene {
     const enemyData = enemies[0];
     if (!enemyData) throw new Error('data/enemies.json has no enemies');
 
-    this.config = createEncounterConfig(toEncounterConfigInput(balance, enemyData));
+    const rarities = parseRarities(raritiesData);
+    this.rarityColors = new Map(rarities.map((r) => [r.id, r.color]));
+    this.config = createEncounterConfig(
+      toEncounterConfigInput(balance, enemyData, {
+        items: parseItems(itemsData),
+        rarities,
+        affixes: parseAffixes(affixesData),
+      }),
+    );
     // Seeded Rng (GDD 5); a new seed per session until saves arrive in M8.
     this.state = createEncounter(this.config, createRng(now()));
     this.accumulatorMs = 0;
@@ -220,6 +235,25 @@ export class FightScene extends Phaser.Scene {
     this.statsButton.setScale(0.55);
     this.statsPanel = new StatsPanel(this, 10, 70);
     this.statsPanel.setVisible(false);
+
+    // M4.1: items found so far (placeholder until the inventory in M5). Shares the spot with Stats.
+    this.lootButton = new Button(this, 340, 40, t('loot.button'), () => this.onToggleLoot());
+    this.lootButton.setScale(0.55);
+    this.lootPanel = new StatsPanel(this, 10, 70);
+    this.lootPanel.setVisible(false);
+  }
+
+  private onToggleLoot(): void {
+    this.lootPanel.setVisible(!this.lootPanel.visible);
+    if (this.lootPanel.visible) this.statsPanel.setVisible(false);
+  }
+
+  private refreshLootPanel(): void {
+    const latest = [...this.state.foundItems].reverse().slice(0, 10);
+    this.lootPanel.setLines([
+      t('loot.title'),
+      ...(latest.length ? latest.map(itemSummary) : [t('loot.none')]),
+    ]);
   }
 
   private currentSpeed(): number {
@@ -237,6 +271,7 @@ export class FightScene extends Phaser.Scene {
 
   private onToggleStats(): void {
     this.statsPanel.setVisible(!this.statsPanel.visible);
+    if (this.statsPanel.visible) this.lootPanel.setVisible(false);
   }
 
   private refreshStatsPanel(): void {
@@ -289,6 +324,7 @@ export class FightScene extends Phaser.Scene {
     this.playerHpText.setText(`${formatHpHundredths(this.state.playerHp)} / ${formatHundredths(playerMaxHp)}`);
     this.levelText.setText(`${t('stats.level')} ${this.state.progression.level}`);
     if (this.statsPanel.visible) this.refreshStatsPanel();
+    if (this.lootPanel.visible) this.refreshLootPanel();
     // Keep showing the last enemy HP while it fades out after its defeat.
     if (this.state.phase === 'fighting') {
       this.enemyHpBar.setProgress(hpFraction(this.state, this.config, 'enemy'));
@@ -340,6 +376,15 @@ export class FightScene extends Phaser.Scene {
           duration: 400,
           onComplete: () => this.enemyGroup.setVisible(false),
         });
+        break;
+      case 'itemFound':
+        this.floatingText(
+          PLAYER_X,
+          FIGHTER_Y - 130,
+          `${t('loot.found')}: ${itemName(event.item)}`,
+          this.rarityColors.get(event.item.rarityId) ?? '#ffffff',
+          1800,
+        );
         break;
       case 'leveledUp':
         this.floatingText(PLAYER_X, FIGHTER_Y - 100, t('fight.leveledUp'), '#ffe08a', 1200);

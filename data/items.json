@@ -1,0 +1,7 @@
+[
+  { "id": "sharp_twig", "slot": "melee", "tier": 1, "kind": "base", "weapon": { "damageMin": 0.3, "damageMax": 0.5, "attackIntervalS": 2.0 }, "stats": [] },
+  { "id": "pebble_club", "slot": "melee", "tier": 1, "kind": "base", "weapon": { "damageMin": 0.4, "damageMax": 0.7, "attackIntervalS": 2.6 }, "stats": [] },
+  { "id": "leaf_cap", "slot": "head", "tier": 1, "kind": "base", "weapon": null, "stats": [{ "stat": "armor", "min": 0.1, "max": 0.3 }] },
+  { "id": "leaf_vest", "slot": "body", "tier": 1, "kind": "base", "weapon": null, "stats": [{ "stat": "armor", "min": 0.2, "max": 0.4 }] },
+  { "id": "pebble_pendant", "slot": "amulet", "tier": 1, "kind": "base", "weapon": null, "stats": [{ "stat": "armor", "min": 0.1, "max": 0.2 }, { "stat": "maxHp", "min": 0.2, "max": 0.2 }] }
+]

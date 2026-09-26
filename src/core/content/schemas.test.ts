@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { balanceSchema, enemiesSchema, idSchema, parseBalance, parseEnemies } from './schemas';
+import {
+  affixesSchema,
+  balanceSchema,
+  enemiesSchema,
+  idSchema,
+  itemsSchema,
+  parseBalance,
+  parseEnemies,
+  raritiesSchema,
+} from './schemas';
 
 describe('idSchema', () => {
   it('accepts snake_case ids', () => {
@@ -101,6 +110,7 @@ describe('balanceSchema / parseBalance', () => {
       hitPctPerLevelDiff: 0.5,
       minAttackIntervalS: 0.5,
     },
+    loot: { dropChancePct: 4, pityKills: 1000, affixTierGrowthPct: 35, upgradeGrowthPct: 8 },
     death: { hideoutRegenS: 10.0, xpLossPct: 10 },
   };
 
@@ -120,5 +130,56 @@ describe('balanceSchema / parseBalance', () => {
   it('rejects minHitPct greater than maxHitPct', () => {
     const bad = { ...valid, combat: { ...valid.combat, minHitPct: 99 } };
     expect(balanceSchema.safeParse(bad).success).toBe(false);
+  });
+});
+
+describe('items / rarities / affixes schemas (M4.1)', () => {
+  const twig = {
+    id: 'sharp_twig',
+    slot: 'melee',
+    tier: 1,
+    kind: 'base',
+    weapon: { damageMin: 0.3, damageMax: 0.5, attackIntervalS: 2.0 },
+    stats: [],
+  };
+
+  it('accepts a valid item and rejects bad ones', () => {
+    expect(itemsSchema.safeParse([twig]).success).toBe(true);
+    expect(itemsSchema.safeParse([{ ...twig, slot: 'tail' }]).success).toBe(false);
+    expect(itemsSchema.safeParse([{ ...twig, tier: 0 }]).success).toBe(false);
+    expect(itemsSchema.safeParse([twig, twig]).success).toBe(false);
+    expect(
+      itemsSchema.safeParse([{ ...twig, weapon: { damageMin: 0.6, damageMax: 0.5, attackIntervalS: 2.0 } }]).success,
+    ).toBe(false);
+    expect(itemsSchema.safeParse([{ ...twig, stats: [{ stat: 'luck', min: 1, max: 2 }] }]).success).toBe(false);
+  });
+
+  const rarity = {
+    id: 'common',
+    weight: 0,
+    isRemainder: true,
+    statMultPct: 100,
+    affixCount: 0,
+    mfScaling: 'none',
+    itemKind: 'base',
+    pity: false,
+    minTileTier: 1,
+    color: '#b8b8b8',
+  };
+
+  it('needs exactly one remainder rarity and weights <= 100', () => {
+    expect(raritiesSchema.safeParse([rarity]).success).toBe(true);
+    expect(raritiesSchema.safeParse([{ ...rarity, isRemainder: false }]).success).toBe(false);
+    expect(
+      raritiesSchema.safeParse([rarity, { ...rarity, id: 'uncommon', isRemainder: false, weight: 100.1 }]).success,
+    ).toBe(false);
+    expect(raritiesSchema.safeParse([{ ...rarity, color: 'grey' }]).success).toBe(false);
+  });
+
+  it('rejects affixes with min > max or unknown stats', () => {
+    const hp = { id: 'max_hp', stat: 'maxHp', min: 0.2, max: 0.4, unlockedBy: null };
+    expect(affixesSchema.safeParse([hp]).success).toBe(true);
+    expect(affixesSchema.safeParse([{ ...hp, min: 0.5 }]).success).toBe(false);
+    expect(affixesSchema.safeParse([{ ...hp, stat: 'luck' }]).success).toBe(false);
   });
 });

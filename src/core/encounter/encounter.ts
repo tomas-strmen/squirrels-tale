@@ -35,7 +35,16 @@ import {
   regenAmountHundredths,
   type ProgressionState,
 } from '../progression/progression';
-import type { RngState } from '../rng/rng';
+import {
+  createLootConfig,
+  createLootState,
+  rollKillDrop,
+  type Item,
+  type LootConfig,
+  type LootConfigInput,
+  type LootState,
+} from '../loot/loot';
+import { branch, type RngState } from '../rng/rng';
 import { secondsToMs, TICK_MS } from '../time/fixedStep';
 
 export type EncounterPhase = 'idle' | 'searching' | 'fighting' | 'hideout';
@@ -67,6 +76,9 @@ export interface EncounterConfig {
   readonly hideoutMs: number;
   /** % of the current level's XP progress lost on an online death (GDD 6.3). */
   readonly deathXpLossPct: number;
+  readonly loot: LootConfig;
+  /** Tier of the current tile (GDD 8.2/9.3). Fixed to 1 until the map (M6). */
+  readonly tileTier: number;
 }
 
 /** Design values as they are written in data/*.json. */
@@ -86,6 +98,8 @@ export interface EncounterConfigInput {
   readonly regenGrowthPctPerLevel: number;
   readonly hideoutRegenS: number;
   readonly deathXpLossPct: number;
+  readonly loot: LootConfigInput;
+  readonly tileTier: number;
 }
 
 export interface EncounterState {
@@ -106,6 +120,11 @@ export interface EncounterState {
   readonly hideoutElapsedMs: number;
   readonly progression: ProgressionState;
   readonly rng: RngState;
+  readonly loot: LootState;
+  /** Separate stream for drops, so loot never changes how fights play out. */
+  readonly lootRng: RngState;
+  /** Every item found this session, oldest first. Placeholder until the inventory (M5). */
+  readonly foundItems: readonly Item[];
 }
 
 export type EncounterEvent =
@@ -119,6 +138,8 @@ export type EncounterEvent =
       readonly damage: number;
     }
   | { readonly type: 'enemyDefeated' }
+  /** A killed enemy dropped an item (GDD 9.6). */
+  | { readonly type: 'itemFound'; readonly item: Item }
   /** Player leveled up (GDD 6.2): +1.0 max HP (healed at once), +0.1 max damage, and +0.1 min damage on even levels. */
   | { readonly type: 'leveledUp'; readonly level: number }
   /** Squirrel was defeated (GDD 6.3, online death): fight over, she goes to the hideout. */
@@ -176,6 +197,8 @@ export function createEncounterConfig(input: EncounterConfigInput): EncounterCon
     regenGrowthPctPerLevel: input.regenGrowthPctPerLevel,
     hideoutMs,
     deathXpLossPct: input.deathXpLossPct,
+    loot: createLootConfig(input.loot),
+    tileTier: input.tileTier,
   };
 }
 
@@ -193,6 +216,9 @@ export function createEncounter(config: EncounterConfig, rng: RngState): Encount
     hideoutElapsedMs: 0,
     progression,
     rng,
+    loot: createLootState(),
+    lootRng: branch(rng, 'loot'),
+    foundItems: [],
   };
 }
 
@@ -336,6 +362,16 @@ function tickFight(state: EncounterState, config: EncounterConfig): EncounterSte
     events.push({ type: 'attack', attacker: 'player', ...attack.result });
     if (enemyHp === 0) {
       events.push({ type: 'enemyDefeated' });
+      // GDD 9.6: drop roll per kill. Magic Find is locked until quest Q4 (GDD 6.1).
+      const drop = rollKillDrop(state.loot, config.loot, state.lootRng, {
+        tileTier: config.tileTier,
+        magicFindPct: 0,
+        unlocked: NO_UNLOCKS,
+      });
+      const loot = drop.state;
+      const lootRng = drop.rng;
+      const foundItems = drop.item ? [...state.foundItems, drop.item] : state.foundItems;
+      if (drop.item) events.push({ type: 'itemFound', item: drop.item });
       const gain = gainXp(progression, config.enemyXp);
       progression = gain.state;
       // Every level gained heals by exactly its HP bonus (GDD 6.2) - never a full heal.
@@ -356,6 +392,9 @@ function tickFight(state: EncounterState, config: EncounterConfig): EncounterSte
           enemyHp: 0,
           progression,
           rng,
+          loot,
+          lootRng,
+          foundItems,
         },
         events,
       };
@@ -396,6 +435,9 @@ function tickFight(state: EncounterState, config: EncounterConfig): EncounterSte
     events,
   };
 }
+
+/** No stats are unlocked yet: quests come in M13. */
+const NO_UNLOCKS: ReadonlySet<string> = new Set();
 
 function toIdle(state: EncounterState, playerHp: number): EncounterState {
   return {

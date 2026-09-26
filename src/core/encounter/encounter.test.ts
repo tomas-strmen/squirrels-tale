@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import affixesData from '../../../data/affixes.json';
+import itemsData from '../../../data/items.json';
+import raritiesData from '../../../data/rarities.json';
+import { parseAffixes, parseItems, parseRarities } from '../content/schemas';
 import { createRng } from '../rng/rng';
 import {
   attackProgress,
@@ -30,6 +34,13 @@ const rules = {
 const squirrelInput = { maxHp: 5.0, damageMin: 0.3, damageMax: 0.4, hitPct: 85, armor: 0, dodgePct: 0 };
 const antInput = { maxHp: 1.2, damageMin: 0.2, damageMax: 0.3, hitPct: 65, armor: 0, dodgePct: 0 };
 
+const lootInput = {
+  items: parseItems(itemsData),
+  rarities: parseRarities(raritiesData),
+  affixes: parseAffixes(affixesData),
+  balance: { dropChancePct: 4, pityKills: 1000, affixTierGrowthPct: 35, upgradeGrowthPct: 8 },
+};
+
 function makeConfig(patch: Partial<EncounterConfigInput> = {}): EncounterConfig {
   return createEncounterConfig({
     searchDurationS: 1.0,
@@ -46,6 +57,8 @@ function makeConfig(patch: Partial<EncounterConfigInput> = {}): EncounterConfig 
     regenGrowthPctPerLevel: 3,
     hideoutRegenS: 10.0,
     deathXpLossPct: 10,
+    loot: lootInput,
+    tileTier: 1,
     ...patch,
   });
 }
@@ -308,6 +321,27 @@ describe('encounter', () => {
       { type: 'leveledUp', level: 3 },
     ]);
     expect(state.progression.level).toBe(3);
+  });
+
+  it('kills can drop items (GDD 9.6): itemFound right after enemyDefeated, kept in foundItems', () => {
+    const lucky = makeConfig({
+      enemy: { ...antInput, maxHp: 0.1, hitPct: 0 },
+      loot: { ...lootInput, balance: { ...lootInput.balance, dropChancePct: 100 } },
+    });
+    const { state, log } = runUntil(fighting(lucky), lucky, (e) => e.type === 'enemyDefeated');
+    const defeatTick = log.find((l) => l.event.type === 'enemyDefeated')?.tick;
+    const types = log.filter((l) => l.tick === defeatTick).map((l) => l.event.type);
+    expect(types).toEqual(['attack', 'enemyDefeated', 'itemFound', 'searchStarted']);
+    expect(state.foundItems).toHaveLength(1);
+    expect(state.foundItems[0]?.tier).toBe(1);
+  });
+
+  it('loot uses its own Rng stream: drops never change how the fight plays out', () => {
+    const noDrops = makeConfig({ loot: { ...lootInput, balance: { ...lootInput.balance, dropChancePct: 0 } } });
+    const allDrops = makeConfig({ loot: { ...lootInput, balance: { ...lootInput.balance, dropChancePct: 100 } } });
+    const attacksOf = (cfg: EncounterConfig) =>
+      run(startSearch(fresh(cfg, 77)).state, 3000, cfg).log.filter((l) => l.event.type === 'attack');
+    expect(attacksOf(allDrops)).toEqual(attacksOf(noDrops));
   });
 
   it('a killed enemy does not attack in the same tick', () => {

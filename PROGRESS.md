@@ -2,12 +2,26 @@
 
 ## Aktuálne
 - **Etapa:** M3 Progres (GDD kap. 22)
-- **Posledný krok:** M3.1b – zvyšok GDD v1.7/v1.8 v kóde – hotové, čaká na test/schválenie (PR na GitHube)
+- **Posledný krok:** M3.2 – regenerácia HP a skutočná smrť (úkryt) – hotové, čaká na test/schválenie (PR na GitHube)
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model: podľa náročnosti kroku (poviem vopred). Od teraz: AI pripraví vetvu/commit/push a dá Tomasovi presné príkazy/odkaz na PR, test a merge robí Tomas sám (šetrí tokeny oproti ovládaniu prehliadača).
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.
 
 ## Hotové
+### M3.2 – regenerácia HP a skutočná smrť (2026-09-26)
+- **Regenerácia** (GDD 6.1/7.1): 0.1 HP každé 2 s, +3 %/level (zložene). Tiká v `idle`, `searching`
+  aj `fighting` (nie v úkryte – ten má vlastné doliečenie). Nikdy nepresiahne max HP.
+- **Skutočná smrť (online, GDD 6.3):** pri páde na 0 HP veverička stratí **10 % postupu v aktuálnom
+  leveli** (level nikdy neklesne), prejde do novej fázy **`hideout`** (úkryt) na 10 s a potom sa
+  vráti do `idle` s plným HP. Kým je v úkryte, Find enemy aj Peace! nič nerobia.
+- Dáta: `balance.json` – `player.regenAmount/regenIntervalS/regenGrowthPctPerLevel`, nová sekcia
+  `death.hideoutRegenS/xpLossPct`. Zod schémy rozšírené.
+- `FightScene`: počas úkrytu sa ukáže bar „In the hideout...“, „Knocked out!“ a „-X XP“ pri páde.
+- 156 testov zelených (bolo 144). Overené v prehliadači: regenerácia drží veveričku nažive aj cez
+  level 10 (mravec je na jej úrovni neškodný – to je v poriadku, zápas je nevyrovnaný zámerne, kým
+  nepríde mapa s ťažšími políčkami). Smrť/úkryt som naživo nevyvolal (trvalo by to veľmi dlho pri
+  súčasnom balanse), ale je pokrytá testami vrátane deterministického scenára s "istou" smrťou.
+
 ### M3.1b – GDD v1.7/v1.8 v kóde (2026-09-26)
 - `core/numbers`: zobrazenie **floor na 0.1** (4.99 → 4.9); interne 2 desatinné miesta (stotiny).
 - `core/combat`: hod poškodenia po **0.01**, výsledok zaokrúhlený na 0.01 (min 0.1); presnosť
@@ -141,9 +155,9 @@
 - GDD v1.1 a v1.2 zapísané v `docs/GDD.md` aj v projekte (`claude/GDD.md`).
 
 ## Ďalší krok
-1. Tomas otestuje M3.1b (PR) → merge.
-2. **M3.2** – regenerácia HP a skutočná smrť → úkryt (GDD 6.3): online strata 10 % postupu v leveli,
-   10 s regenerácia, hráč vyberie políčko. Model: Sonnet 5 stačí.
+1. Tomas otestuje M3.2 (PR) → merge. **M3 Progres je tým celá hotová.**
+2. Ďalej podľa GDD kap. 22: **M4 Predmety** (základné predmety, vzácnosti, afixy, drop 4 %, hod
+   kockou, MF, pity, skladanie štatistík z výbavy). Model: Opus 5.5 (pravdepodobnosti/drop tabuľky).
 
 ## Rozhodnutia (2026-09-26)
 - Find enemy po príchode na políčko, potom automatické hľadanie po každom zabití; Peace! zastaví a ukončí boj hneď (bez XP/lootu).

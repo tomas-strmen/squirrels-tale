@@ -8,6 +8,7 @@ import {
   makePeace,
   playerAttackIntervalMs,
   playerStats,
+  hideoutProgress,
   searchProgress,
   startSearch,
   tick,
@@ -40,6 +41,11 @@ function makeConfig(patch: Partial<EncounterConfigInput> = {}): EncounterConfig 
     enemyLevel: 1,
     enemyXp: 2,
     rules,
+    regenAmount: 0.1,
+    regenIntervalS: 2.0,
+    regenGrowthPctPerLevel: 3,
+    hideoutRegenS: 10.0,
+    deathXpLossPct: 10,
     ...patch,
   });
 }
@@ -50,6 +56,7 @@ const config = makeConfig();
 const tanky = makeConfig({
   player: { ...squirrelInput, maxHp: 999.0 },
   enemy: { ...antInput, maxHp: 999.0 },
+  regenAmount: 0, // isolates attack-timing/damage tests from passive regen
 });
 
 type LogEntry = { tick: number; event: EncounterEvent };
@@ -318,14 +325,41 @@ describe('encounter', () => {
     }
   });
 
-  it('when the squirrel is defeated: back to idle at full (leveled) HP (M2 placeholder)', () => {
-    const deadly = makeConfig({ enemy: { ...antInput, maxHp: 999.0, damageMin: 5.0, damageMax: 5.0, hitPct: 100 } });
-    const { state, log } = run(fighting(deadly), 200, deadly);
+  const deadly = makeConfig({
+    enemy: { ...antInput, maxHp: 999.0, damageMin: 5.0, damageMax: 5.0, hitPct: 100 },
+  });
+  /** A squirrel already mid-level, with XP progress to lose, about to get one-shot. */
+  function aboutToDie(): EncounterState {
+    return { ...fighting(deadly), progression: { level: 3, xp: 500 } };
+  }
+
+  it('when the squirrel is defeated: goes to the hideout, losing 10 % of her XP progress (GDD 6.3)', () => {
+    const { state, log } = runUntil(aboutToDie(), deadly, (e) => e.type === 'playerDefeated');
     const defeated = log.find((l) => l.event.type === 'playerDefeated');
-    expect(defeated).toBeDefined();
-    expect(state.phase).toBe('idle');
-    expect(state.playerHp).toBe(playerStats(deadly, state.progression.level).maxHp);
-    expect(log.filter((l) => l.tick > (defeated?.tick ?? 0))).toEqual([]);
+    expect(defeated?.event).toEqual({ type: 'playerDefeated', xpLost: 50 });
+    expect(state.phase).toBe('hideout');
+    expect(state.playerHp).toBe(0);
+    expect(state.hideoutElapsedMs).toBe(0);
+    expect(state.progression).toEqual({ level: 3, xp: 450 });
+  });
+
+  it('leaves the hideout after hideoutRegenS, back to idle at full HP, keeping the reduced XP', () => {
+    const afterDefeat = runUntil(aboutToDie(), deadly, (e) => e.type === 'playerDefeated').state;
+    expect(afterDefeat.phase).toBe('hideout');
+    const stillWaiting = run(afterDefeat, 99, deadly); // 9.9 s: not there yet
+    expect(stillWaiting.state.phase).toBe('hideout');
+    expect(stillWaiting.log.some((l) => l.event.type === 'returnedFromHideout')).toBe(false);
+    const oneMoreTick = run(stillWaiting.state, 1, deadly); // exactly 10.0 s
+    expect(oneMoreTick.log).toEqual([{ tick: 1, event: { type: 'returnedFromHideout' } }]);
+    expect(oneMoreTick.state.phase).toBe('idle');
+    expect(oneMoreTick.state.playerHp).toBe(playerStats(deadly, 3).maxHp);
+    expect(oneMoreTick.state.progression).toEqual({ level: 3, xp: 450 });
+  });
+
+  it('Find enemy and Peace! do nothing while in the hideout', () => {
+    const inHideout = runUntil(aboutToDie(), deadly, (e) => e.type === 'playerDefeated').state;
+    expect(startSearch(inHideout)).toEqual({ state: inHideout, events: [] });
+    expect(makePeace(inHideout)).toEqual({ state: inHideout, events: [] });
   });
 
   it('is deterministic: same seed gives the same fights, another seed differs', () => {
@@ -411,6 +445,39 @@ describe('makePeace (GDD 7.1)', () => {
   });
 });
 
+describe('passive HP regeneration (GDD 6.1/7.1)', () => {
+  it('heals 0.1 HP every 2.0 s while idle', () => {
+    const hurt = { ...fresh(), playerHp: 100 };
+    const after19 = run(hurt, 19).state;
+    expect(after19.playerHp).toBe(100);
+    const after20 = run(hurt, 20).state; // exactly 2.0 s
+    expect(after20.playerHp).toBe(110);
+  });
+
+  it('ticks while searching and fighting too, not only idle', () => {
+    const hurtSearching = { ...startSearch(fresh()).state, playerHp: 100 };
+    expect(run(hurtSearching, 20).state.playerHp).toBe(110);
+
+    const hurtFighting = { ...fighting(tanky), playerHp: 100 };
+    const cfg = makeConfig({ regenAmount: 0.1, regenIntervalS: 2.0 });
+    expect(run(hurtFighting, 20, { ...tanky, regenAmount: cfg.regenAmount }).state.playerHp).toBe(110);
+  });
+
+  it('never regenerates above max HP', () => {
+    const almostFull = { ...fresh(), playerHp: fresh().playerHp - 5 };
+    const { state } = run(almostFull, 20);
+    expect(state.playerHp).toBe(fresh().playerHp);
+  });
+
+  it('does not regenerate while in the hideout (that has its own fixed recovery)', () => {
+    const deadly = makeConfig({
+      enemy: { ...antInput, maxHp: 999.0, damageMin: 5.0, damageMax: 5.0, hitPct: 100 },
+    });
+    const inHideout = runUntil(fighting(deadly), deadly, (e) => e.type === 'playerDefeated').state;
+    expect(run(inHideout, 20, deadly).state.playerHp).toBe(0);
+  });
+});
+
 describe('progress helpers', () => {
   it('reports search progress', () => {
     const idle = fresh();
@@ -450,5 +517,13 @@ describe('progress helpers', () => {
     expect(hpFraction(f, config, 'enemy')).toBe(1);
     expect(hpFraction({ ...f, playerHp: 250 }, config, 'player')).toBe(0.5);
     expect(hpFraction(fresh(), config, 'enemy')).toBe(0);
+  });
+
+  it('reports hideout recovery progress', () => {
+    expect(hideoutProgress(fresh(), config)).toBe(0);
+    expect(hideoutProgress(fighting(), config)).toBe(0);
+    const inHideout = { ...fresh(), phase: 'hideout' as const, hideoutElapsedMs: 5000 };
+    expect(hideoutProgress(inHideout, config)).toBeCloseTo(0.5);
+    expect(hideoutProgress(inHideout, config, 50)).toBeCloseTo(0.505);
   });
 });

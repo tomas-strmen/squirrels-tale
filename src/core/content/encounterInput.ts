@@ -33,5 +33,10 @@ export function toEncounterConfigInput(balance: Balance, enemy: Enemy): Encounte
     enemyLevel: enemy.baseLevel,
     enemyXp: enemy.xp,
     rules: balance.combat,
+    regenAmount: balance.player.regenAmount,
+    regenIntervalS: balance.player.regenIntervalS,
+    regenGrowthPctPerLevel: balance.player.regenGrowthPctPerLevel,
+    hideoutRegenS: balance.death.hideoutRegenS,
+    deathXpLossPct: balance.death.xpLossPct,
   };
 }

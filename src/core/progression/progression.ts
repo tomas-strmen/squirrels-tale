@@ -105,6 +105,29 @@ export function attackIntervalMsAtLevel(
 }
 
 /**
+ * HP regenerated per tick of `regenIntervalS` at `level` (GDD 6.1: base amount,
+ * +growthPctPerLevel% per level, compounding - "relatívne"). Result in hundredths.
+ */
+export function regenAmountHundredths(
+  baseAmount: number,
+  level: number,
+  growthPctPerLevel: number,
+): number {
+  const factor = (1 + growthPctPerLevel / 100) ** (level - 1);
+  return Math.round(toHundredths(baseAmount) * factor);
+}
+
+/**
+ * XP lost on an online death (GDD 6.3): a percentage of the current level's
+ * progress (never enough to drop a level - `xp` is always < the level's
+ * requirement already, so this can never go negative).
+ */
+export function applyDeathXpLoss(state: ProgressionState, lossPct: number): ProgressionState {
+  const lost = Math.round((state.xp * lossPct) / 100);
+  return { ...state, xp: state.xp - lost };
+}
+
+/**
  * Adds the cumulative level bonuses for `level` to a base design value
  * (e.g. 5.0 maxHp at level 1 -> 6.0 at level 2). Uses hundredths internally
  * so repeated 0.1 steps never drift from floating point rounding.

@@ -81,6 +81,11 @@ export const balanceSchema = z.object({
       armor: designValueSchema,
       /** Attack speed gained per level, compounding (GDD 6.1 v1.7: 1 % -> x1.01). */
       attackSpeedPctPerLevel: percentSchema,
+      /** HP regenerated every `regenIntervalS`, before the per-level growth (GDD 6.1). */
+      regenAmount: designValueSchema,
+      regenIntervalS: designSecondsSchema.refine((v) => v > 0, 'must be greater than 0'),
+      /** Regen amount growth per level, compounding (GDD 6.1: "+3 % / level, relatívne"). */
+      regenGrowthPctPerLevel: percentSchema,
     })
     .refine((p) => p.unarmedDamageMin <= p.unarmedDamageMax, {
       message: 'unarmedDamageMin must not be greater than unarmedDamageMax',
@@ -101,6 +106,13 @@ export const balanceSchema = z.object({
     .refine((c) => c.minHitPct <= c.maxHitPct, {
       message: 'minHitPct must not be greater than maxHitPct',
     }),
+  /** Death and hideout recovery (GDD 6.3, M3.2 placeholder - no map/hideout screen yet). */
+  death: z.object({
+    /** Squirrel returns from the hideout at full HP after this long (GDD 6.3). */
+    hideoutRegenS: designSecondsSchema.refine((v) => v > 0, 'must be greater than 0'),
+    /** % of the current level's XP progress lost on an online death (GDD 6.3). Level never drops. */
+    xpLossPct: percentSchema,
+  }),
 });
 export type Balance = z.infer<typeof balanceSchema>;
 

@@ -1,14 +1,16 @@
 /**
- * Encounter: searching for an enemy and a 1v1 fight with HP, XP and levels
- * (GDD 7.1, 7.2, 6.2).
+ * Encounter: searching for an enemy, a 1v1 fight with HP, XP and levels, HP
+ * regeneration and death (GDD 6.1, 6.2, 6.3, 7.1, 7.2).
  *
- * M2 scope: attacks hit or miss and deal damage (core/combat). When the enemy
- * dies, the next search starts automatically (GDD 7.1), and the player gains
- * the enemy's XP - possibly leveling up (core/progression), which raises max
- * HP (healing by the same amount at once) and damage (+0.1 max every level,
- * +0.1 min every 2nd level). When the squirrel is defeated the fight ends and she is back to
- * full HP in `idle` - a placeholder until real death (hideout, XP loss)
- * arrives in M3.2. No regeneration yet.
+ * Attacks hit or miss and deal damage (core/combat). When the enemy dies, the
+ * next search starts automatically (GDD 7.1), and the player gains the
+ * enemy's XP - possibly leveling up (core/progression), which raises max HP
+ * (healing by the same amount at once) and damage. HP regenerates passively
+ * over time (idle, searching and fighting - GDD 6.1/7.1). When the squirrel
+ * is defeated (GDD 6.3, online death): she loses a % of her current level's
+ * XP progress (never dropping a level) and goes to the `hideout` phase for a
+ * fixed time, returning to `idle` at full HP. M3.2 placeholder: there is no
+ * map yet, so the player cannot pick a tile - she just reappears where she was.
  *
  * All functions are pure: they never modify the state passed in. The seeded
  * Rng lives in the state, so the same seed always gives the same fights.
@@ -22,19 +24,21 @@ import {
   type FighterStats,
   type FighterStatsInput,
 } from '../combat/combat';
-import { toHundredths } from '../numbers/numbers';
+import { fromHundredths, toHundredths } from '../numbers/numbers';
 import {
   addLevelBonus,
+  applyDeathXpLoss,
   attackIntervalMsAtLevel,
   createProgression,
   cumulativeLevelBonuses,
   gainXp,
+  regenAmountHundredths,
   type ProgressionState,
 } from '../progression/progression';
 import type { RngState } from '../rng/rng';
 import { secondsToMs, TICK_MS } from '../time/fixedStep';
 
-export type EncounterPhase = 'idle' | 'searching' | 'fighting';
+export type EncounterPhase = 'idle' | 'searching' | 'fighting' | 'hideout';
 export type Combatant = 'player' | 'enemy';
 
 export interface EncounterConfig {
@@ -54,6 +58,15 @@ export interface EncounterConfig {
   /** XP granted when the enemy is defeated (hundredths). */
   readonly enemyXp: number;
   readonly rules: CombatRules;
+  /** HP regenerated every `regenIntervalMs` at level 1, before per-level growth (hundredths). */
+  readonly regenAmount: number;
+  readonly regenIntervalMs: number;
+  /** Regen amount growth per level, compounding (GDD 6.1). */
+  readonly regenGrowthPctPerLevel: number;
+  /** How long the squirrel spends in the hideout after an online death (ms, GDD 6.3). */
+  readonly hideoutMs: number;
+  /** % of the current level's XP progress lost on an online death (GDD 6.3). */
+  readonly deathXpLossPct: number;
 }
 
 /** Design values as they are written in data/*.json. */
@@ -68,6 +81,11 @@ export interface EncounterConfigInput {
   /** XP granted when the enemy is defeated (design value, GDD 6.2/8.3). */
   readonly enemyXp: number;
   readonly rules: CombatRulesInput;
+  readonly regenAmount: number;
+  readonly regenIntervalS: number;
+  readonly regenGrowthPctPerLevel: number;
+  readonly hideoutRegenS: number;
+  readonly deathXpLossPct: number;
 }
 
 export interface EncounterState {
@@ -82,6 +100,10 @@ export interface EncounterState {
   readonly playerHp: number;
   /** Current HP of the enemy (hundredths). Only meaningful while fighting. */
   readonly enemyHp: number;
+  /** Time since the last regen tick (ms). Ticks in idle/searching/fighting, not in hideout. */
+  readonly regenElapsedMs: number;
+  /** Time spent in the hideout so far (ms). Only meaningful while `hideout`. */
+  readonly hideoutElapsedMs: number;
   readonly progression: ProgressionState;
   readonly rng: RngState;
 }
@@ -99,8 +121,10 @@ export type EncounterEvent =
   | { readonly type: 'enemyDefeated' }
   /** Player leveled up (GDD 6.2): +1.0 max HP (healed at once), +0.1 max damage, and +0.1 min damage on even levels. */
   | { readonly type: 'leveledUp'; readonly level: number }
-  /** M2 placeholder: fight over, squirrel back to full HP in idle (real death in M3.2). */
-  | { readonly type: 'playerDefeated' }
+  /** Squirrel was defeated (GDD 6.3, online death): fight over, she goes to the hideout. */
+  | { readonly type: 'playerDefeated'; readonly xpLost: number }
+  /** Hideout time is over: back to idle at full HP (GDD 6.3). */
+  | { readonly type: 'returnedFromHideout' }
   /** Player pressed "Peace!": search or fight ended at once (no XP, no loot). */
   | { readonly type: 'peaceMade'; readonly from: 'searching' | 'fighting' };
 
@@ -126,6 +150,14 @@ export function createEncounterConfig(input: EncounterConfigInput): EncounterCon
   if (!Number.isInteger(input.enemyLevel) || input.enemyLevel < 1) {
     throw new Error('enemyLevel must be a whole number >= 1');
   }
+  const regenIntervalMs = secondsToMs(input.regenIntervalS);
+  if (regenIntervalMs < TICK_MS) {
+    throw new Error(`regenIntervalS must be at least ${TICK_MS / 1000} s`);
+  }
+  const hideoutMs = secondsToMs(input.hideoutRegenS);
+  if (hideoutMs < TICK_MS) {
+    throw new Error(`hideoutRegenS must be at least ${TICK_MS / 1000} s`);
+  }
   // Validates the base stats early (e.g. maxHp > 0); the checked value itself
   // is discarded because effective stats are recomputed per level, see playerStats().
   createFighterStats(input.player);
@@ -139,6 +171,11 @@ export function createEncounterConfig(input: EncounterConfigInput): EncounterCon
     enemyLevel: input.enemyLevel,
     enemyXp: toHundredths(input.enemyXp),
     rules: createCombatRules(input.rules),
+    regenAmount: toHundredths(input.regenAmount),
+    regenIntervalMs,
+    regenGrowthPctPerLevel: input.regenGrowthPctPerLevel,
+    hideoutMs,
+    deathXpLossPct: input.deathXpLossPct,
   };
 }
 
@@ -152,6 +189,8 @@ export function createEncounter(config: EncounterConfig, rng: RngState): Encount
     enemyAttackElapsedMs: 0,
     playerHp: playerStats(config, progression.level).maxHp,
     enemyHp: 0,
+    regenElapsedMs: 0,
+    hideoutElapsedMs: 0,
     progression,
     rng,
   };
@@ -196,10 +235,10 @@ export function startSearch(state: EncounterState): EncounterStep {
 /**
  * Player pressed "Peace!" (GDD 7.1). Stops the search, or ends the fight at once:
  * the enemy leaves, no XP and no loot. Back to `idle` until "Find enemy" is pressed again.
- * The squirrel keeps her current HP. Does nothing while idle.
+ * The squirrel keeps her current HP. Does nothing while idle or in the hideout.
  */
 export function makePeace(state: EncounterState): EncounterStep {
-  if (state.phase === 'idle') {
+  if (state.phase !== 'searching' && state.phase !== 'fighting') {
     return { state, events: [] };
   }
   return {
@@ -216,16 +255,28 @@ export function makePeace(state: EncounterState): EncounterStep {
 export function tick(state: EncounterState, config: EncounterConfig): EncounterStep {
   switch (state.phase) {
     case 'idle':
-      return { state, events: [] };
+      return { state: applyRegen(state, config), events: [] };
+
+    case 'hideout': {
+      const hideoutElapsedMs = state.hideoutElapsedMs + TICK_MS;
+      if (hideoutElapsedMs < config.hideoutMs) {
+        return { state: { ...state, hideoutElapsedMs }, events: [] };
+      }
+      return {
+        state: toIdle({ ...state, hideoutElapsedMs }, playerStats(config, state.progression.level).maxHp),
+        events: [{ type: 'returnedFromHideout' }],
+      };
+    }
 
     case 'searching': {
-      const searchElapsedMs = state.searchElapsedMs + TICK_MS;
+      const regenerated = applyRegen(state, config);
+      const searchElapsedMs = regenerated.searchElapsedMs + TICK_MS;
       if (searchElapsedMs < config.searchMs) {
-        return { state: { ...state, searchElapsedMs }, events: [] };
+        return { state: { ...regenerated, searchElapsedMs }, events: [] };
       }
       return {
         state: {
-          ...state,
+          ...regenerated,
           phase: 'fighting',
           searchElapsedMs: config.searchMs,
           playerAttackElapsedMs: 0,
@@ -237,8 +288,34 @@ export function tick(state: EncounterState, config: EncounterConfig): EncounterS
     }
 
     case 'fighting':
-      return tickFight(state, config);
+      return tickFight(applyRegen(state, config), config);
   }
+}
+
+/**
+ * Passive HP regeneration (GDD 6.1: base amount every `regenIntervalMs`,
+ * scaled per level - GDD 7.1: ticks during a fight and between fights).
+ * Never applied in the `hideout` phase (that has its own fixed recovery time).
+ */
+function applyRegen(state: EncounterState, config: EncounterConfig): EncounterState {
+  const maxHp = playerStats(config, state.progression.level).maxHp;
+  if (state.playerHp >= maxHp) {
+    return { ...state, regenElapsedMs: 0 };
+  }
+  const regenElapsedMs = state.regenElapsedMs + TICK_MS;
+  if (regenElapsedMs < config.regenIntervalMs) {
+    return { ...state, regenElapsedMs };
+  }
+  const amount = regenAmountHundredths(
+    fromHundredths(config.regenAmount),
+    state.progression.level,
+    config.regenGrowthPctPerLevel,
+  );
+  return {
+    ...state,
+    regenElapsedMs: regenElapsedMs - config.regenIntervalMs,
+    playerHp: Math.min(maxHp, state.playerHp + amount),
+  };
 }
 
 function tickFight(state: EncounterState, config: EncounterConfig): EncounterStep {
@@ -292,9 +369,25 @@ function tickFight(state: EncounterState, config: EncounterConfig): EncounterSte
     playerHp = Math.max(0, playerHp - attack.result.damage);
     events.push({ type: 'attack', attacker: 'enemy', ...attack.result });
     if (playerHp === 0) {
-      events.push({ type: 'playerDefeated' });
-      // M2 placeholder: back to full HP in idle (real death in M3.2).
-      return { state: toIdle({ ...state, progression, rng }, player.maxHp), events };
+      // GDD 6.3 (online death): lose a % of the current level's progress, level never drops.
+      const beforeLoss = progression;
+      progression = applyDeathXpLoss(progression, config.deathXpLossPct);
+      const xpLost = beforeLoss.xp - progression.xp;
+      events.push({ type: 'playerDefeated', xpLost });
+      return {
+        state: {
+          ...state,
+          phase: 'hideout',
+          playerAttackElapsedMs: 0,
+          enemyAttackElapsedMs: 0,
+          playerHp: 0,
+          enemyHp: 0,
+          hideoutElapsedMs: 0,
+          progression,
+          rng,
+        },
+        events,
+      };
     }
   }
 
@@ -313,6 +406,8 @@ function toIdle(state: EncounterState, playerHp: number): EncounterState {
     enemyAttackElapsedMs: 0,
     playerHp,
     enemyHp: 0,
+    regenElapsedMs: 0,
+    hideoutElapsedMs: 0,
   };
 }
 
@@ -329,9 +424,15 @@ export function searchProgress(
   config: EncounterConfig,
   extraMs = 0,
 ): number {
-  if (state.phase === 'idle') return 0;
+  if (state.phase === 'idle' || state.phase === 'hideout') return 0;
   if (state.phase === 'fighting') return 1;
   return clamp01((state.searchElapsedMs + extraMs) / config.searchMs);
+}
+
+/** Hideout recovery progress 0..1 (0 outside the `hideout` phase). `extraMs`: see `searchProgress`. */
+export function hideoutProgress(state: EncounterState, config: EncounterConfig, extraMs = 0): number {
+  if (state.phase !== 'hideout') return 0;
+  return clamp01((state.hideoutElapsedMs + extraMs) / config.hideoutMs);
 }
 
 /**

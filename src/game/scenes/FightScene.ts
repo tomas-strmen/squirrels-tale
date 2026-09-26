@@ -9,6 +9,7 @@ import {
   attackProgress,
   createEncounter,
   createEncounterConfig,
+  hideoutProgress,
   hpFraction,
   makePeace,
   playerAttackIntervalMs,
@@ -66,6 +67,8 @@ export class FightScene extends Phaser.Scene {
   private searchBar!: ProgressBar;
   private findButton!: Button;
   private peaceButton!: Button;
+  private hideoutGroup!: Phaser.GameObjects.Container;
+  private hideoutBar!: ProgressBar;
   private debugPanel!: DebugPanel;
   private playerHpBar!: ProgressBar;
   private playerHpText!: Phaser.GameObjects.Text;
@@ -178,6 +181,14 @@ export class FightScene extends Phaser.Scene {
     this.peaceButton = new Button(this, PEACE_X, BUTTON_Y, t('fight.peace'), () => this.onPeace());
     this.peaceButton.setVisible(false);
 
+    // Hideout recovery (GDD 6.3, M3.2 placeholder): same spot as Find enemy/search.
+    const hideoutLabel = this.add
+      .text(0, -30, t('hideout.regenerating'), { ...textStyle, fontSize: '22px' })
+      .setOrigin(0.5);
+    this.hideoutBar = new ProgressBar(this, 0, 5, { width: 320, height: 24, fillColor: 0x8fa8bf });
+    this.hideoutGroup = this.add.container(W / 2, BUTTON_Y, [hideoutLabel, this.hideoutBar]);
+    this.hideoutGroup.setVisible(false);
+
     // M1 debug panel: shows loaded enemies/texts, toggled with "D".
     this.add
       .text(10, 690, t('debug.hint'), { ...textStyle, fontSize: '14px', color: '#707070' })
@@ -262,6 +273,7 @@ export class FightScene extends Phaser.Scene {
     // accumulatorMs (< 1 tick, always > 0) smooths the bars between ticks for
     // rendering only - it never changes the simulation state itself.
     this.searchBar.setProgress(searchProgress(this.state, this.config, this.accumulatorMs));
+    this.hideoutBar.setProgress(hideoutProgress(this.state, this.config, this.accumulatorMs));
     this.playerBar.setProgress(
       attackProgress(this.state, this.config, 'player', this.accumulatorMs),
     );
@@ -329,17 +341,26 @@ export class FightScene extends Phaser.Scene {
         this.floatingText(PLAYER_X, FIGHTER_Y - 100, t('fight.leveledUp'), '#ffe08a', 1200);
         break;
       case 'playerDefeated':
-        this.resetToIdle();
+        this.hideFightGroups();
+        this.hideoutGroup.setVisible(true);
         this.floatingText(PLAYER_X, FIGHTER_Y - 70, t('fight.knockedOut'), '#ff9f9f', 1500);
+        if (event.xpLost > 0) {
+          this.floatingText(PLAYER_X, FIGHTER_Y - 100, `-${formatHundredths(event.xpLost)} XP`, '#ffb0b0', 1500);
+        }
+        break;
+      case 'returnedFromHideout':
+        this.hideoutGroup.setVisible(false);
+        this.findButton.setVisible(true);
         break;
       case 'peaceMade':
-        this.resetToIdle();
+        this.hideFightGroups();
+        this.findButton.setVisible(true);
         break;
     }
   }
 
-  /** Enemy leaves at once, bars hide, "Find enemy" is back. */
-  private resetToIdle(): void {
+  /** Enemy leaves at once, bars hide. Caller decides what to show next (Find enemy or the hideout). */
+  private hideFightGroups(): void {
     for (const [shape, baseX] of [
       [this.player, PLAYER_X],
       [this.enemy, ENEMY_X],
@@ -352,7 +373,7 @@ export class FightScene extends Phaser.Scene {
     this.playerAttackGroup.setVisible(false);
     this.searchGroup.setVisible(false);
     this.peaceButton.setVisible(false);
-    this.findButton.setVisible(true);
+    this.findButton.setVisible(false);
   }
 
   /** Damage number or "Miss" rising above the target. */

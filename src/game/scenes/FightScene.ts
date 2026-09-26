@@ -11,6 +11,7 @@ import {
   createEncounterConfig,
   hpFraction,
   makePeace,
+  playerAttackIntervalMs,
   playerStats,
   searchProgress,
   startSearch,
@@ -20,6 +21,7 @@ import {
   type EncounterEvent,
   type EncounterState,
 } from '../../core/encounter/encounter';
+import { hitChancePct } from '../../core/combat/combat';
 import { formatHundredths } from '../../core/numbers/numbers';
 import { xpToNextLevelHundredths } from '../../core/progression/progression';
 import { createRng } from '../../core/rng/rng';
@@ -131,7 +133,8 @@ export class FightScene extends Phaser.Scene {
       .rectangle(ENEMY_X, FIGHTER_Y, FIGHTER_SIZE, FIGHTER_SIZE, 0x7a7a7a)
       .setStrokeStyle(3, 0x4a4a4a);
     const enemyName = this.add
-      .text(ENEMY_X, FIGHTER_Y + 90, tDynamic(`enemy.${enemyData.id}.name`), {
+      // GDD 8.4: level shown next to the name ("Worker Ant Lv1").
+      .text(ENEMY_X, FIGHTER_Y + 90, `${tDynamic(`enemy.${enemyData.id}.name`)} ${t('fight.levelShort')}${this.config.enemyLevel}`, {
         ...textStyle,
         fontSize: '26px',
       })
@@ -235,7 +238,9 @@ export class FightScene extends Phaser.Scene {
       `${t('stats.xp')}: ${formatHundredths(xp)} / ${formatHundredths(needed)}`,
       `${t('stats.maxHp')}: ${formatHundredths(stats.maxHp)}`,
       `${t('stats.damage')}: ${formatHundredths(stats.damageMin)} - ${formatHundredths(stats.damageMax)}`,
-      `${t('stats.hitChance')}: ${stats.hitPct} %`,
+      `${t('stats.attackInterval')}: ${formatHundredths(playerAttackIntervalMs(this.config, level) / 10)} s`,
+      // Against the current enemy (level difference, GDD 7.2 v1.7); floor to 0.1 for display.
+      `${t('stats.hitChance')}: ${(Math.floor(hitChancePct(stats, this.config.enemy, this.config.rules, level - this.config.enemyLevel) * 10) / 10).toFixed(1)} %`,
       `${t('stats.armor')}: ${formatHundredths(stats.armor)}`,
     ]);
   }

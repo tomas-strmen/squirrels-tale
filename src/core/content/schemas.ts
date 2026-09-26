@@ -45,6 +45,8 @@ const damageRangeValid = (v: { damageMin: number; damageMax: number }) =>
 export const enemySchema = z
   .object({
     id: idSchema,
+    /** Lowest level of the tile range where it appears (GDD 8.4, "b"). */
+    baseLevel: z.number().int().min(1),
     maxHp: designValueSchema.refine((v) => v > 0, 'must be greater than 0'),
     damageMin: designValueSchema,
     damageMax: designValueSchema,
@@ -77,6 +79,8 @@ export const balanceSchema = z.object({
       unarmedDamageMax: designValueSchema,
       hitPct: percentSchema,
       armor: designValueSchema,
+      /** Attack speed gained per level, compounding (GDD 6.1 v1.7: 1 % -> x1.01). */
+      attackSpeedPctPerLevel: percentSchema,
     })
     .refine((p) => p.unarmedDamageMin <= p.unarmedDamageMax, {
       message: 'unarmedDamageMin must not be greater than unarmedDamageMax',
@@ -89,6 +93,10 @@ export const balanceSchema = z.object({
       armorConstant: designValueSchema.refine((v) => v > 0, 'must be greater than 0'),
       maxDamageReductionPct: percentSchema,
       minDamage: designValueSchema,
+      /** Hit chance +/- per level of difference attacker vs defender (GDD 6.1/7.2 v1.7). */
+      hitPctPerLevelDiff: designValueSchema,
+      /** Attack interval never goes below this (GDD 6.1). */
+      minAttackIntervalS: designSecondsSchema,
     })
     .refine((c) => c.minHitPct <= c.maxHitPct, {
       message: 'minHitPct must not be greater than maxHitPct',

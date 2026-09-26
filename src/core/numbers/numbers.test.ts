@@ -37,9 +37,11 @@ describe('formatHundredths', () => {
     expect(formatHundredths(530)).toBe('5.3');
   });
 
-  it('rounds to the nearest 0.1 for display', () => {
+  it('rounds DOWN to 0.1 for display (GDD 5, v1.7)', () => {
     expect(formatHundredths(534)).toBe('5.3');
-    expect(formatHundredths(536)).toBe('5.4');
-    expect(formatHundredths(535)).toBe('5.4'); // .5 rounds up
+    expect(formatHundredths(536)).toBe('5.3');
+    expect(formatHundredths(499)).toBe('4.9');
+    expect(formatHundredths(25)).toBe('0.2');
+    expect(formatHundredths(9)).toBe('0.0');
   });
 });

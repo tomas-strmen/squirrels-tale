@@ -1,9 +1,10 @@
 /**
  * Design numbers (GDD 5): stats and other non-duration values (HP, damage, armor, ...).
  *
- * Design values in data/*.json have at most 1 decimal place. Internally they are
- * stored as whole "hundredths" integers (5.3 -> 530), so game math never runs into
- * floating point rounding drift. For display, they are rounded back to 0.1.
+ * Design values in data/*.json have at most 1 decimal place. Internally everything
+ * is computed with 2 decimals, as whole "hundredths" integers (5.3 -> 530), so game
+ * math never runs into floating point drift. For display, values are rounded DOWN
+ * to 0.1 (GDD 5, v1.7).
  *
  * Durations (ms) are a separate concern - see core/time.
  */
@@ -31,8 +32,11 @@ export function fromHundredths(hundredths: number): number {
   return hundredths / HUNDREDTHS_PER_UNIT;
 }
 
-/** Rounds hundredths to the nearest 0.1 and formats it with exactly 1 decimal place. */
+/**
+ * Formats hundredths for display with exactly 1 decimal place, rounded DOWN
+ * (GDD 5, v1.7): 4.99 -> "4.9", 0.25 -> "0.2". Internal math keeps 2 decimals.
+ */
 export function formatHundredths(hundredths: number): string {
-  const tenths = Math.round(hundredths / 10) * 10;
-  return fromHundredths(tenths).toFixed(1);
+  const tenths = Math.floor(hundredths / 10);
+  return (tenths / 10).toFixed(1);
 }

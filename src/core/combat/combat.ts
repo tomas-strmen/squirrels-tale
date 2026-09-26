@@ -1,9 +1,10 @@
 /**
- * One attack, resolved with the hit formula from GDD 7.2 (M2 subset).
+ * One attack, resolved with the hit formula from GDD 7.2 (M2 subset, v1.7).
  *
  * All values are internal integers: HP, damage and armor in hundredths
- * (core/numbers), percentages as whole numbers. Randomness only via the
- * seeded Rng passed in; the function is pure and returns the advanced Rng.
+ * (core/numbers, 2 decimals). Hit chance can have decimals (0.5 % per level
+ * of difference), so the hit roll is done in 0.01 % steps. Randomness only via
+ * the seeded Rng passed in; the function is pure and returns the advanced Rng.
  *
  * M2 subset of GDD 7.2 - not yet included (they come with later stages):
  * hit% / skillHit bonuses, damage%, weapon skill and ammo multipliers (M4,
@@ -11,6 +12,7 @@
  */
 import { toHundredths } from '../numbers/numbers';
 import { nextInt, type RngState } from '../rng/rng';
+import { secondsToMs } from '../time/fixedStep';
 
 /** Constants of the hit formula, from data/balance.json `combat`. */
 export interface CombatRules {
@@ -21,6 +23,10 @@ export interface CombatRules {
   readonly maxDamageReductionPct: number;
   /** Damage of a hit never goes below this (hundredths). */
   readonly minDamage: number;
+  /** Hit chance +/- per level the attacker is above/below the defender (%, may have decimals). */
+  readonly hitPctPerLevelDiff: number;
+  /** Attack interval never goes below this (ms). */
+  readonly minAttackIntervalMs: number;
 }
 
 /** One fighter's combat stats (internal units). */
@@ -46,6 +52,8 @@ export interface CombatRulesInput {
   readonly armorConstant: number;
   readonly maxDamageReductionPct: number;
   readonly minDamage: number;
+  readonly hitPctPerLevelDiff: number;
+  readonly minAttackIntervalS: number;
 }
 
 export interface FighterStatsInput {
@@ -64,6 +72,8 @@ export function createCombatRules(input: CombatRulesInput): CombatRules {
     armorConstant: toHundredths(input.armorConstant),
     maxDamageReductionPct: input.maxDamageReductionPct,
     minDamage: toHundredths(input.minDamage),
+    hitPctPerLevelDiff: input.hitPctPerLevelDiff,
+    minAttackIntervalMs: secondsToMs(input.minAttackIntervalS),
   };
 }
 
@@ -81,9 +91,18 @@ export function createFighterStats(input: FighterStatsInput): FighterStats {
   return stats;
 }
 
-/** hitChance = clamp(attacker hit - defender dodge, min, max) in whole %. */
-export function hitChancePct(attacker: FighterStats, defender: FighterStats, rules: CombatRules): number {
-  return clamp(attacker.hitPct - defender.dodgePct, rules.minHitPct, rules.maxHitPct);
+/**
+ * hitChance = clamp(attacker hit + perLevel x levelDiff - defender dodge, min, max) in %
+ * (GDD 7.2 v1.7). `levelDiff` = attacker level - defender level (0 = same level).
+ */
+export function hitChancePct(
+  attacker: FighterStats,
+  defender: FighterStats,
+  rules: CombatRules,
+  levelDiff = 0,
+): number {
+  const raw = attacker.hitPct + levelDiff * rules.hitPctPerLevelDiff - defender.dodgePct;
+  return clamp(raw, rules.minHitPct, rules.maxHitPct);
 }
 
 /** DR = armor / (armor + K), capped at maxDamageReductionPct. Returns a fraction 0..1. */
@@ -93,36 +112,34 @@ export function damageReduction(armor: number, rules: CombatRules): number {
 }
 
 /**
- * Damage of a hit before the random roll is known: raw (hundredths) reduced
- * by the defender's armor, rounded to 0.1 and at least `minDamage`.
+ * Damage of a hit: raw (hundredths) reduced by the defender's armor, rounded
+ * to 0.01 (GDD 7.2 v1.7: round2) and at least `minDamage`.
  */
 export function finalDamage(raw: number, defenderArmor: number, rules: CombatRules): number {
   const reduced = raw * (1 - damageReduction(defenderArmor, rules));
-  const roundedToTenth = Math.round(reduced / 10) * 10;
-  return Math.max(rules.minDamage, roundedToTenth);
+  return Math.max(rules.minDamage, Math.round(reduced));
 }
 
 /**
- * Resolves one attack: hit roll, then damage roll uniformly in 0.1 steps
- * between damageMin and damageMax (both inclusive), then armor.
+ * Resolves one attack: hit roll (in 0.01 % steps), then damage roll uniformly
+ * in 0.01 steps between damageMin and damageMax (both inclusive), then armor.
+ * `levelDiff` = attacker level - defender level (GDD 7.2 v1.7).
  */
 export function resolveAttack(
   attacker: FighterStats,
   defender: FighterStats,
   rules: CombatRules,
   rng: RngState,
+  levelDiff = 0,
 ): { readonly result: AttackResult; readonly rng: RngState } {
-  const hitRoll = nextInt(rng, 0, 100);
-  if (hitRoll.value >= hitChancePct(attacker, defender, rules)) {
+  const hitRoll = nextInt(rng, 0, 10000);
+  const chanceBasisPoints = Math.round(hitChancePct(attacker, defender, rules, levelDiff) * 100);
+  if (hitRoll.value >= chanceBasisPoints) {
     return { result: { hit: false, damage: 0 }, rng: hitRoll.state };
   }
-  // Design values have 1 decimal place, so min/max are whole tenths (multiples of 10).
-  const minTenths = attacker.damageMin / 10;
-  const maxTenths = attacker.damageMax / 10;
-  const damageRoll = nextInt(hitRoll.state, minTenths, maxTenths + 1);
-  const raw = damageRoll.value * 10;
+  const damageRoll = nextInt(hitRoll.state, attacker.damageMin, attacker.damageMax + 1);
   return {
-    result: { hit: true, damage: finalDamage(raw, defender.armor, rules) },
+    result: { hit: true, damage: finalDamage(damageRoll.value, defender.armor, rules) },
     rng: damageRoll.state,
   };
 }

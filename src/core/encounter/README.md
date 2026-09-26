@@ -16,6 +16,9 @@ M3.2). No regeneration yet.
   1-decimal stats, whole percentages, enemy XP); see `core/content/encounterInput.ts`.
 - `createEncounter(config, rng)` – new state in phase `idle`, squirrel at full HP, level 1.
 - `playerStats(config, level)` – the player's effective stats at `level` (base + level bonuses).
+- `playerAttackIntervalMs(config, level)` – attack interval at `level` (×1.01 per level, min 0.5 s).
+- `config.enemyLevel` – enemy level (GDD 8.4), fixed to its base level until the map (M6);
+  hit chance of both sides shifts 0.5 % per level of difference (GDD 7.2 v1.7).
 - `startSearch(state)` – player pressed **Find enemy** (only from `idle`).
 - `makePeace(state)` – player pressed **Peace!**: from `searching` or `fighting` straight back to
   `idle` (event `peaceMade { from }`; the enemy leaves, no XP/loot, HP and level are kept). Does nothing while `idle`.

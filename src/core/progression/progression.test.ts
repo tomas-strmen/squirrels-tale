@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   addLevelBonus,
+  attackIntervalMsAtLevel,
   createProgression,
   cumulativeLevelBonuses,
   gainXp,
@@ -10,14 +11,15 @@ import {
 } from './progression';
 
 describe('xpToNextLevel (GDD 6.2)', () => {
-  it('matches the values from the GDD', () => {
+  it('matches the values from the GDD (v1.7, exponent 1.3)', () => {
     expect(xpToNextLevel(1)).toBe(10);
-    expect(xpToNextLevel(2)).toBe(14);
-    expect(xpToNextLevel(3)).toBe(20);
-    expect(xpToNextLevel(5)).toBe(38);
-    expect(xpToNextLevel(10)).toBe(207);
-    expect(xpToNextLevel(15)).toBe(1111);
-    expect(xpToNextLevel(20)).toBe(5976);
+    expect(xpToNextLevel(2)).toBe(13);
+    expect(xpToNextLevel(3)).toBe(17);
+    expect(xpToNextLevel(5)).toBe(29);
+    expect(xpToNextLevel(10)).toBe(106);
+    expect(xpToNextLevel(15)).toBe(394);
+    expect(xpToNextLevel(20)).toBe(1462);
+    expect(xpToNextLevel(25)).toBe(5428);
   });
 
   it('has an hundredths variant', () => {
@@ -104,9 +106,9 @@ describe('gainXp', () => {
   });
 
   it('can level up multiple times from one big gain', () => {
-    // Lv1 needs 10, Lv2 needs 14 -> 25.0 XP takes us to level 3 with 1.0 left.
+    // Lv1 needs 10, Lv2 needs 13 -> 25.0 XP takes us to level 3 with 2.0 left.
     const r = gainXp(createProgression(), 2500);
-    expect(r.state).toEqual({ level: 3, xp: 100 });
+    expect(r.state).toEqual({ level: 3, xp: 200 });
     expect(r.levelsGained).toEqual([2, 3]);
   });
 
@@ -129,5 +131,21 @@ describe('addLevelBonus', () => {
     for (let i = 0; i < 10; i++) value = addLevelBonus(value, 100);
     expect(value).toBeCloseTo(15.0);
     expect(Math.round(value * 10)).toBe(150);
+  });
+});
+
+describe('attackIntervalMsAtLevel (GDD 6.1 v1.7: x1.01 per level, compounding)', () => {
+  it('is the base interval at level 1', () => {
+    expect(attackIntervalMsAtLevel(4000, 1, 1, 500)).toBe(4000);
+  });
+
+  it('gets 1 % faster per level, compounding', () => {
+    expect(attackIntervalMsAtLevel(4000, 2, 1, 500)).toBe(Math.round(4000 / 1.01));
+    // Lv10: x1.01^9 ~ +9.4 % speed.
+    expect(attackIntervalMsAtLevel(4000, 10, 1, 500)).toBe(3657);
+  });
+
+  it('never goes below the minimum interval', () => {
+    expect(attackIntervalMsAtLevel(600, 100, 1, 500)).toBe(500);
   });
 });

@@ -2,12 +2,19 @@
 
 ## Aktuálne
 - **Etapa:** M2 Boj (GDD kap. 22)
-- **Posledný krok:** M2.1 – boj s HP, zásahom/minutím, armorom a poškodením – hotové, čaká na test a schválenie Tomasa (PR na GitHube)
+- **Posledný krok:** M2.1 – boj s HP – **schválené**, zlúčené cez PR #6. M2.2 (rýchlosť ×1/×4/×20) hotové, čaká na test/schválenie.
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model: Opus 5.5 na M2.1, na M2.2 stačí Sonnet 5. AI spúšťa npm/git sama; PR otvára a merguje cez Tomasovo Chrome (rozšírenie Claude in Chrome).
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.
 
 ## Hotové
+### M2.2 – rýchlosť ×1/×4/×20 (2026-09-26)
+- Tlačidlo vpravo hore v `FightScene` cyklí ×1 → ×4 → ×20 → ×1. Zrýchľuje len simuláciu (viac
+  100 ms krokov za snímku), nie vizuálne animácie (skok, čísla poškodenia) – tie sa pri vyšších
+  rýchlostiach môžu prekrývať, čo je pri debug nástroji v poriadku.
+- `Button` dostal `setLabel()` na zmenu textu bez nového tlačidla.
+- Overené v prehliadači: ×20 zoberie obom bojovníkom väčšinu HP za ~3 s. 109 testov zelených (bez zmeny).
+
 ### M2.1 – boj s HP (2026-09-26)
 - `data/enemies.json`: Worker Ant 1.2 HP, úder 0.2–0.3, zásah 65 %, armor 0, dodge 0 (GDD 8.3).
   `data/balance.json`: veverička 5.0 HP, úder bez zbrane **0.3–0.4** (Tomas; GDD v1.5), zásah 85 %,
@@ -88,9 +95,8 @@
 - GDD v1.1 a v1.2 zapísané v `docs/GDD.md` aj v projekte (`claude/GDD.md`).
 
 ## Ďalší krok
-1. Tomas otestuje M2.1 (PR) → „schválené" → merge.
-2. **M2.2** – rýchlosť ×1/×4/×20 (tlačidlo vpravo hore, funguje aj na mobile). Model: Sonnet 5.
-3. Potom **M3 Progres** (XP, levely, regenerácia, smrť → úkryt). Model: Sonnet 5 stačí, Opus pri XP krivke/smrti len ak sa zasekneme.
+1. Tomas otestuje M2.2 (PR) → „schválené" → merge. **M2 Boj je tým celá hotová.**
+2. Potom **M3 Progres** (XP, levely, regenerácia, smrť → úkryt). Model: Sonnet 5 stačí, Opus pri XP krivke/smrti len ak sa zasekneme.
 
 ## Rozhodnutia (2026-09-26)
 - Find enemy po príchode na políčko, potom automatické hľadanie po každom zabití; Peace! zastaví a ukončí boj hneď (bez XP/lootu).

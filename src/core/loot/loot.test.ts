@@ -10,6 +10,8 @@ import {
   createLootState,
   effectiveMagicFind,
   generateItem,
+  killsUntilPity,
+  pityRarity,
   rarityWeights,
   rollAffixes,
   rollKillDrop,
@@ -34,8 +36,10 @@ const weightOf = (ws: ReturnType<typeof rarityWeights>, id: string) =>
   ws.find((w) => w.rarity.id === id)?.weight ?? -1;
 
 describe('rarityWeights (GDD 9.6)', () => {
-  it('base weights on T3+: Common is the remainder to 100', () => {
-    const ws = rarityWeights(config, { ...t1, tileTier: 3 });
+  const legendaryUnlocked = new Set(['legendary_quest']);
+
+  it('base weights on T3+ (Legendary unlocked): Common is the remainder to 100', () => {
+    const ws = rarityWeights(config, { ...t1, tileTier: 3, unlocked: legendaryUnlocked });
     expect(weightOf(ws, 'uncommon')).toBe(22);
     expect(weightOf(ws, 'rare')).toBe(6);
     expect(weightOf(ws, 'unique')).toBeCloseTo(0.9);
@@ -44,15 +48,21 @@ describe('rarityWeights (GDD 9.6)', () => {
     expect(weightOf(ws, 'common')).toBeCloseTo(70);
   });
 
+  it('Legendary is locked until its quest (v2.1); its share goes to Common', () => {
+    const ws = rarityWeights(config, { ...t1, tileTier: 3 });
+    expect(weightOf(ws, 'legendary')).toBe(0);
+    expect(weightOf(ws, 'common')).toBeCloseTo(70.3);
+  });
+
   it('Set only from T3: before that its weight goes to Common', () => {
     const ws = rarityWeights(config, t1);
     expect(weightOf(ws, 'set')).toBe(0);
-    expect(weightOf(ws, 'common')).toBeCloseTo(70.8);
+    expect(weightOf(ws, 'common')).toBeCloseTo(71.1);
   });
 
   it('Magic Find: linear for Uncommon/Rare, diminishing for Unique/Set/Legendary', () => {
     expect(effectiveMagicFind(100)).toBe(50);
-    const ws = rarityWeights(config, { ...t1, tileTier: 3, magicFindPct: 100 });
+    const ws = rarityWeights(config, { ...t1, tileTier: 3, magicFindPct: 100, unlocked: legendaryUnlocked });
     expect(weightOf(ws, 'uncommon')).toBeCloseTo(44);
     expect(weightOf(ws, 'rare')).toBeCloseTo(12);
     expect(weightOf(ws, 'unique')).toBeCloseTo(1.35);
@@ -61,16 +71,17 @@ describe('rarityWeights (GDD 9.6)', () => {
   });
 
   it('Common never goes below 0', () => {
-    const ws = rarityWeights(config, { ...t1, tileTier: 3, magicFindPct: 1000 });
+    const ws = rarityWeights(config, { ...t1, tileTier: 3, magicFindPct: 1000, unlocked: legendaryUnlocked });
     expect(weightOf(ws, 'common')).toBe(0);
   });
 
-  it('pity-only: just Unique+ that can actually drop here (T1: no uniques -> Legendary only)', () => {
+  it('pity-only: at least Rare, only what can drop here (T1: no uniques, Legendary locked -> Rare)', () => {
     const ws = rarityWeights(config, t1, true);
     expect(weightOf(ws, 'common')).toBe(0);
-    expect(weightOf(ws, 'rare')).toBe(0);
+    expect(weightOf(ws, 'uncommon')).toBe(0);
+    expect(weightOf(ws, 'rare')).toBe(6);
     expect(weightOf(ws, 'unique')).toBe(0);
-    expect(weightOf(ws, 'legendary')).toBeCloseTo(0.3);
+    expect(weightOf(ws, 'legendary')).toBe(0);
   });
 });
 
@@ -94,7 +105,7 @@ describe('item rarity distribution over 10 000 drops on T1 (GDD M4 test)', () =>
     expect(share('rare')).toBeLessThan(0.077);
     expect(share('unique')).toBe(0);
     expect(share('set')).toBe(0);
-    expect(share('legendary')).toBeLessThan(0.008);
+    expect(share('legendary')).toBe(0); // locked until its quest (v2.1)
   });
 });
 
@@ -214,12 +225,18 @@ describe('rollKillDrop (GDD 9.6)', () => {
     expect(drops / kills).toBeLessThan(0.047);
   });
 
-  it('pity: after 999 kills without Unique+, the 1000th kill surely drops Unique+ and resets', () => {
+  it('pity: after 999 kills without Rare+, the 1000th kill surely drops Rare+ and resets', () => {
     const state = { killsSincePity: 999, nextUid: 5 };
     const r = rollKillDrop(state, config, createRng(12), t1);
     expect(r.item).not.toBeNull();
-    expect(r.item?.rarityId).toBe('legendary'); // the only Unique+ that can drop on T1
+    expect(r.item?.rarityId).toBe('rare');
     expect(r.state).toEqual({ killsSincePity: 0, nextUid: 6 });
+    expect(killsUntilPity(r.state, config)).toBe(1000);
+  });
+
+  it('killsUntilPity counts down; pityRarity is Rare for now', () => {
+    expect(killsUntilPity({ killsSincePity: 734, nextUid: 1 }, config)).toBe(266);
+    expect(pityRarity(config).id).toBe('rare');
   });
 
   it('counts kills towards pity and gives each item a new uid', () => {

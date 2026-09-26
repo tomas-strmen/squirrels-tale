@@ -16,6 +16,7 @@ import { secondsToMs } from '../time/fixedStep';
 export interface LootBalanceInput {
   readonly dropChancePct: number;
   readonly pityKills: number;
+  readonly pityMinRarity: string;
   readonly affixTierGrowthPct: number;
   readonly upgradeGrowthPct: number;
 }
@@ -34,6 +35,8 @@ export interface LootConfig {
   /** Drop chance per normal kill, in 0.01 % (4 % -> 400). */
   readonly dropChanceBp: number;
   readonly pityKills: number;
+  /** Index in `rarities` (= rank) of the pity guarantee's minimum rarity. */
+  readonly pityMinRank: number;
   readonly affixTierGrowthPct: number;
 }
 
@@ -61,7 +64,7 @@ export interface Item {
 }
 
 export interface LootState {
-  /** Kills since the last Unique/Set/Legendary drop (GDD 9.6 pity, "Lucky acorn"). */
+  /** Kills since the last drop of the pity rarity or better (GDD 9.6 pity, "Lucky acorn"). */
   readonly killsSincePity: number;
   readonly nextUid: number;
 }
@@ -76,12 +79,15 @@ export interface LootContext {
 
 export function createLootConfig(input: LootConfigInput): LootConfig {
   if (!input.rarities.some((r) => r.isRemainder)) throw new Error('No remainder rarity (Common)');
+  const pityMinRank = input.rarities.findIndex((r) => r.id === input.balance.pityMinRarity);
+  if (pityMinRank < 0) throw new Error(`Unknown pityMinRarity "${input.balance.pityMinRarity}"`);
   return {
     items: input.items,
     rarities: input.rarities,
     affixes: input.affixes,
     dropChanceBp: input.balance.dropChancePct * 100,
     pityKills: input.balance.pityKills,
+    pityMinRank,
     affixTierGrowthPct: input.balance.affixTierGrowthPct,
   };
 }
@@ -108,10 +114,12 @@ export function rarityWeights(
 ): { readonly rarity: RarityData; readonly weight: number }[] {
   const mfLinear = 1 + ctx.magicFindPct / 100;
   const mfDiminishing = 1 + effectiveMagicFind(ctx.magicFindPct) / 100;
-  const weighted = config.rarities.map((rarity) => {
+  const weighted = config.rarities.map((rarity, rank) => {
     if (rarity.isRemainder || ctx.tileTier < rarity.minTileTier) return { rarity, weight: 0 };
-    if (pityOnly && !rarity.pity) return { rarity, weight: 0 };
-    // The pity guarantee is "at least Unique" (GDD 9.6), so it never picks a
+    // Locked rarities (e.g. Legendary before its quest, GDD 9.6 v2.1) never drop; their share goes to Common.
+    if (rarity.unlockedBy !== null && !ctx.unlocked.has(rarity.unlockedBy)) return { rarity, weight: 0 };
+    if (pityOnly && rank < config.pityMinRank) return { rarity, weight: 0 };
+    // The pity guarantee is "at least X" (GDD 9.6), so it never picks a
     // Unique/Set that would fall back to Rare on this tile.
     if (pityOnly && rarity.itemKind !== 'base' && eligibleItems(config, ctx.tileTier, rarity.itemKind).length === 0) {
       return { rarity, weight: 0 };
@@ -239,9 +247,22 @@ export function rollAffixes(
   return { affixes, rng: r };
 }
 
+/** Kills left until the pity guarantee (shown in the UI as a countdown). */
+export function killsUntilPity(state: LootState, config: LootConfig): number {
+  return Math.max(0, config.pityKills - state.killsSincePity);
+}
+
+/** The pity guarantee's minimum rarity ("rare" for now, GDD 9.6 v2.1). */
+export function pityRarity(config: LootConfig): RarityData {
+  const r = config.rarities[config.pityMinRank];
+  if (!r) throw new Error('pityMinRank out of range');
+  return r;
+}
+
 /**
  * Called once per killed enemy (GDD 9.6): counts towards pity, rolls the
- * 4 % drop chance - or forces a Unique+ drop once the pity counter is full.
+ * 4 % drop chance - or forces a drop of at least the pity rarity once the
+ * pity counter is full.
  */
 export function rollKillDrop(
   state: LootState,
@@ -261,11 +282,11 @@ export function rollKillDrop(
   }
   const rarityRoll = rollRarity(config, r, ctx, forced);
   const gen = generateItem(config, rarityRoll.rng, ctx, rarityRoll.rarity, state.nextUid);
-  const finalRarity = config.rarities.find((x) => x.id === gen.item.rarityId);
+  const finalRank = config.rarities.findIndex((x) => x.id === gen.item.rarityId);
   return {
     state: {
-      // Counter = kills since the last Unique/Set/Legendary ITEM (a Unique that fell back to Rare doesn't count).
-      killsSincePity: finalRarity?.pity ? 0 : kills,
+      // Counter = kills since the last ITEM of the pity rarity or better (actual item, after any fallback).
+      killsSincePity: finalRank >= config.pityMinRank ? 0 : kills,
       nextUid: state.nextUid + 1,
     },
     item: gen.item,

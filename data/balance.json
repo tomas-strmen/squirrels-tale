@@ -26,6 +26,7 @@
   "loot": {
     "dropChancePct": 4,
     "pityKills": 1000,
+    "pityMinRarity": "rare",
     "affixTierGrowthPct": 35,
     "upgradeGrowthPct": 8
   },

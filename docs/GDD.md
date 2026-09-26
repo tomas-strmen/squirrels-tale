@@ -1,7 +1,7 @@
-# Veverička – Game Design Document (GDD) v1.8
+# Veverička – Game Design Document (GDD) v1.9
 
 > **Pracovný názov hry:** *Squirrel's Tale* (dočasný – finálny názov vybrať pred vydaním; nesmie pripomínať „Hero Tale“).
-> **Stav:** v1.8, 26. 9. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
+> **Stav:** v1.9, 26. 9. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
 > **Súvisiace:** `claude/ROADMAP.md` (technológia, architektúra, etapy vydania), `claude/PROMPT-vyvoj.md` (ako má AI pracovať).
 
 ---
@@ -134,7 +134,7 @@
 | Štatistika | Základ Lv1 | Rast | Strop | Odomknutie |
 |---|---|---|---|---|
 | Max HP | 5.0 | +1.0 / level | – | od začiatku |
-| Regenerácia | 0.1 HP / 2 s | +3 % / level (relatívne) | – | od začiatku |
+| Regenerácia | 0.1 HP / 3 s | +3 % / level (relatívne) | – | od začiatku |
 | Poškodenie | postava (päste) 0.3–0.4; zbraň pripočíta svoj rozsah | postava: každý level +0.1 max; každý 2. level aj +0.1 min (zbraň sa levelom nemení) | – | od začiatku |
 | Rýchlosť útoku | interval zbrane (napr. 2.0 s; bez zbrane 4.0 s) | +1 % / level zložene (×1.01 oproti predchádzajúcemu levelu, mimo výbavy a vylepšení); % bonusy z výbavy ďalej skracujú interval | min. interval 0.5 s | od začiatku |
 | Armor | 0 | z výbavy | redukcia max 75 % | od začiatku |
@@ -702,3 +702,4 @@ tools/sim/         # headless simulácia tempa (npm run sim) → tabuľka čas/l
 | 1.6 | 2026-09-26 | 6.1/6.2: rast max HP za level 0.5 → 1.0 (hneď aj vylieči o toľko). Nové pravidlo (Tomas, M3): poškodenie bez zbrane rastie s levelom – každý 2. level +0.1 max, každý 5. level +0.1 aj min. |
 | 1.7 | 2026-09-26 | 5: výpočty na 2 desatinné miesta, zobrazenie floor na 0.1, poškodenie úderu na 0.01. 6.1: poškodenie +0.1 max každý level a +0.1 min každý 2. level (nahrádza pravidlo z v1.6, platí aj so zbraňou); rýchlosť útoku ×1.01/level; presnosť 85 % pri rovnakom leveli ±0.5 %/level rozdielu. 6.2: need(L) = round(10 × 1.3^(L−1)). 7.2: vzorce upravené. 24: levely nepriateľov – otvorené. Debug rýchlosť rozšírená o ×50. |
 | 1.8 | 2026-09-26 | 6.1: postava a výbava sa vedú oddelene, level mení len postavu, v boji sa sčítajú (percentá násobia). 7.1/7.2: poškodenie = postava + zbraň; presnosť nepriateľa zrkadlí rozdiel levelov. 8.4: nové – levely nepriateľov na políčkach a rast za level (HP +10 %, poškodenie +5 %, XP +10 %, dodge +0.5 %, crit +1 %). 24: nové otvorené otázky (interval so zbraňou, balans zbraní). |
+| 1.9 | 2026-09-26 | 6.1: regenerácia 0.1 HP / 2 s → 0.1 HP / 3 s (Tomas, M3.2). |

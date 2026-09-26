@@ -10,6 +10,8 @@ into floating point rounding drift.
 - `fromHundredths(hundredths)` – hundredths → plain decimal, for further math.
 - `formatHundredths(hundredths)` – hundredths → display string rounded **down** to 0.1
   (GDD 5, v1.7: `499` → `"4.9"`). Internal math keeps 2 decimals.
+- `formatHpHundredths(hundredths)` – same, but a value above 0 never displays as `"0.0"`
+  (shows `"0.1"` instead) - so a nearly-dead HP bar never looks dead while still alive.
 
 ## Rules
 - This module is for stats and other non-duration values (HP, damage, armor, ...).

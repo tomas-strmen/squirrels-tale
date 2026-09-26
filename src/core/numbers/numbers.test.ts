@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatHundredths, fromHundredths, toHundredths } from './numbers';
+import { formatHpHundredths, formatHundredths, fromHundredths, toHundredths } from './numbers';
 
 describe('toHundredths', () => {
   it('converts design values to whole hundredths', () => {
@@ -43,5 +43,22 @@ describe('formatHundredths', () => {
     expect(formatHundredths(499)).toBe('4.9');
     expect(formatHundredths(25)).toBe('0.2');
     expect(formatHundredths(9)).toBe('0.0');
+  });
+});
+
+describe('formatHpHundredths', () => {
+  it('matches formatHundredths away from 0', () => {
+    expect(formatHpHundredths(534)).toBe('5.3');
+    expect(formatHpHundredths(100)).toBe('1.0');
+  });
+
+  it('never shows "0.0" while still above 0 (shows "0.1" instead)', () => {
+    expect(formatHpHundredths(5)).toBe('0.1');
+    expect(formatHpHundredths(1)).toBe('0.1');
+    expect(formatHpHundredths(9)).toBe('0.1');
+  });
+
+  it('shows "0.0" only when exactly 0 (or below)', () => {
+    expect(formatHpHundredths(0)).toBe('0.0');
   });
 });

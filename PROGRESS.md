@@ -2,7 +2,7 @@
 
 ## Aktuálne
 - **Etapa:** M1 Základy core (GDD kap. 22)
-- **Posledný krok:** M1.1 – `core/numbers` + zod validácia dát – hotové, čaká na test/schválenie Tomasa
+- **Posledný krok:** M1.1 – `core/numbers` + zod validácia dát – **schválené**, zlúčené do `main` cez PR #3
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model Claude Sonnet 5 (Opus 5.5 len pre náročnejšie etapy – povie sa vopred). AI spúšťa npm/git sama.
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.

@@ -4,6 +4,8 @@
   "fight.searching": "Searching...",
   "fight.peace": "Peace!",
   "fight.attack": "Attack",
+  "fight.miss": "Miss",
+  "fight.knockedOut": "Knocked out!",
   "debug.hint": "Press D for debug info",
   "debug.title": "DEBUG",
   "debug.enemiesLoaded": "Enemies loaded",

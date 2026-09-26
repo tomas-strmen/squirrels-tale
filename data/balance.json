@@ -3,6 +3,18 @@
     "searchDurationS": 1.0
   },
   "player": {
-    "unarmedAttackIntervalS": 4.0
+    "maxHp": 5.0,
+    "unarmedAttackIntervalS": 4.0,
+    "unarmedDamageMin": 0.3,
+    "unarmedDamageMax": 0.4,
+    "hitPct": 85,
+    "armor": 0
+  },
+  "combat": {
+    "minHitPct": 5,
+    "maxHitPct": 98,
+    "armorConstant": 10.0,
+    "maxDamageReductionPct": 75,
+    "minDamage": 0.1
   }
 }

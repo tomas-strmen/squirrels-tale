@@ -1,11 +1,25 @@
 /**
- * Encounter: searching for an enemy and the attack rhythm of a 1v1 fight.
+ * Encounter: searching for an enemy and a 1v1 fight with HP (GDD 7.1, 7.2).
  *
- * M0.1 scope: no HP, no damage, nobody dies. The fight repeats forever.
- * HP, damage and death come in M2 (GDD 7).
+ * M2 scope: attacks hit or miss and deal damage (core/combat). When the enemy
+ * dies, the next search starts automatically (GDD 7.1). When the squirrel
+ * is defeated, the fight ends and she is back to full HP in `idle` - a
+ * placeholder until real death (hideout, XP loss) arrives in M3. No
+ * regeneration yet (M3).
  *
- * All functions are pure: they never modify the state passed in.
+ * All functions are pure: they never modify the state passed in. The seeded
+ * Rng lives in the state, so the same seed always gives the same fights.
  */
+import {
+  createCombatRules,
+  createFighterStats,
+  resolveAttack,
+  type CombatRules,
+  type CombatRulesInput,
+  type FighterStats,
+  type FighterStatsInput,
+} from '../combat/combat';
+import type { RngState } from '../rng/rng';
 import { secondsToMs, TICK_MS } from '../time/fixedStep';
 
 export type EncounterPhase = 'idle' | 'searching' | 'fighting';
@@ -18,13 +32,19 @@ export interface EncounterConfig {
   readonly playerAttackIntervalMs: number;
   /** Time between two enemy attacks (ms). */
   readonly enemyAttackIntervalMs: number;
+  readonly player: FighterStats;
+  readonly enemy: FighterStats;
+  readonly rules: CombatRules;
 }
 
-/** Design values in seconds, as they are written in data/*.json. */
+/** Design values as they are written in data/*.json. */
 export interface EncounterConfigInput {
   readonly searchDurationS: number;
   readonly playerAttackIntervalS: number;
   readonly enemyAttackIntervalS: number;
+  readonly player: FighterStatsInput;
+  readonly enemy: FighterStatsInput;
+  readonly rules: CombatRulesInput;
 }
 
 export interface EncounterState {
@@ -35,14 +55,28 @@ export interface EncounterState {
   readonly playerAttackElapsedMs: number;
   /** Time since the enemy's last attack (ms). Only meaningful while fighting. */
   readonly enemyAttackElapsedMs: number;
+  /** Current HP of the squirrel (hundredths). */
+  readonly playerHp: number;
+  /** Current HP of the enemy (hundredths). Only meaningful while fighting. */
+  readonly enemyHp: number;
+  readonly rng: RngState;
 }
 
 export type EncounterEvent =
   | { readonly type: 'searchStarted' }
   | { readonly type: 'enemyFound' }
+  | {
+      readonly type: 'attack';
+      readonly attacker: Combatant;
+      readonly hit: boolean;
+      /** Damage dealt in hundredths (0 on a miss). */
+      readonly damage: number;
+    }
+  | { readonly type: 'enemyDefeated' }
+  /** M2 placeholder: fight over, squirrel back to full HP in idle (real death in M3). */
+  | { readonly type: 'playerDefeated' }
   /** Player pressed "Peace!": search or fight ended at once (no XP, no loot). */
-  | { readonly type: 'peaceMade'; readonly from: 'searching' | 'fighting' }
-  | { readonly type: 'attack'; readonly attacker: Combatant };
+  | { readonly type: 'peaceMade'; readonly from: 'searching' | 'fighting' };
 
 export interface EncounterStep {
   readonly state: EncounterState;
@@ -50,7 +84,7 @@ export interface EncounterStep {
 }
 
 /**
- * Builds a validated config from design values in seconds.
+ * Builds a validated config from design values.
  * Durations must be multiples of one tick (100 ms) and attack intervals > 0.
  */
 export function createEncounterConfig(input: EncounterConfigInput): EncounterConfig {
@@ -63,15 +97,26 @@ export function createEncounterConfig(input: EncounterConfigInput): EncounterCon
   if (playerAttackIntervalMs < TICK_MS || enemyAttackIntervalMs < TICK_MS) {
     throw new Error(`Attack intervals must be at least ${TICK_MS / 1000} s`);
   }
-  return { searchMs, playerAttackIntervalMs, enemyAttackIntervalMs };
+  return {
+    searchMs,
+    playerAttackIntervalMs,
+    enemyAttackIntervalMs,
+    player: createFighterStats(input.player),
+    enemy: createFighterStats(input.enemy),
+    rules: createCombatRules(input.rules),
+  };
 }
 
-export function createEncounter(): EncounterState {
+/** New encounter in phase `idle`, squirrel at full HP. */
+export function createEncounter(config: EncounterConfig, rng: RngState): EncounterState {
   return {
     phase: 'idle',
     searchElapsedMs: 0,
     playerAttackElapsedMs: 0,
     enemyAttackElapsedMs: 0,
+    playerHp: config.player.maxHp,
+    enemyHp: 0,
+    rng,
   };
 }
 
@@ -89,21 +134,22 @@ export function startSearch(state: EncounterState): EncounterStep {
 /**
  * Player pressed "Peace!" (GDD 7.1). Stops the search, or ends the fight at once:
  * the enemy leaves, no XP and no loot. Back to `idle` until "Find enemy" is pressed again.
- * Does nothing while idle.
+ * The squirrel keeps her current HP. Does nothing while idle.
  */
 export function makePeace(state: EncounterState): EncounterStep {
   if (state.phase === 'idle') {
     return { state, events: [] };
   }
   return {
-    state: createEncounter(),
+    state: toIdle(state, state.playerHp),
     events: [{ type: 'peaceMade', from: state.phase }],
   };
 }
 
 /**
  * Advances the encounter by one simulation step (TICK_MS).
- * If both fighters are due to attack in the same step, the player attacks first.
+ * If both fighters are due to attack in the same step, the player attacks first;
+ * if that attack kills the enemy, the enemy does not attack.
  */
 export function tick(state: EncounterState, config: EncounterConfig): EncounterStep {
   switch (state.phase) {
@@ -117,33 +163,82 @@ export function tick(state: EncounterState, config: EncounterConfig): EncounterS
       }
       return {
         state: {
+          ...state,
           phase: 'fighting',
           searchElapsedMs: config.searchMs,
           playerAttackElapsedMs: 0,
           enemyAttackElapsedMs: 0,
+          enemyHp: config.enemy.maxHp,
         },
         events: [{ type: 'enemyFound' }],
       };
     }
 
-    case 'fighting': {
-      const events: EncounterEvent[] = [];
-      let playerAttackElapsedMs = state.playerAttackElapsedMs + TICK_MS;
-      let enemyAttackElapsedMs = state.enemyAttackElapsedMs + TICK_MS;
-      if (playerAttackElapsedMs >= config.playerAttackIntervalMs) {
-        playerAttackElapsedMs -= config.playerAttackIntervalMs;
-        events.push({ type: 'attack', attacker: 'player' });
-      }
-      if (enemyAttackElapsedMs >= config.enemyAttackIntervalMs) {
-        enemyAttackElapsedMs -= config.enemyAttackIntervalMs;
-        events.push({ type: 'attack', attacker: 'enemy' });
-      }
+    case 'fighting':
+      return tickFight(state, config);
+  }
+}
+
+function tickFight(state: EncounterState, config: EncounterConfig): EncounterStep {
+  const events: EncounterEvent[] = [];
+  let { rng, playerHp, enemyHp } = state;
+  let playerAttackElapsedMs = state.playerAttackElapsedMs + TICK_MS;
+  let enemyAttackElapsedMs = state.enemyAttackElapsedMs + TICK_MS;
+
+  if (playerAttackElapsedMs >= config.playerAttackIntervalMs) {
+    playerAttackElapsedMs -= config.playerAttackIntervalMs;
+    const attack = resolveAttack(config.player, config.enemy, config.rules, rng);
+    rng = attack.rng;
+    enemyHp = Math.max(0, enemyHp - attack.result.damage);
+    events.push({ type: 'attack', attacker: 'player', ...attack.result });
+    if (enemyHp === 0) {
+      // GDD 7.1: after each defeated enemy the next search starts automatically.
+      events.push({ type: 'enemyDefeated' }, { type: 'searchStarted' });
       return {
-        state: { ...state, playerAttackElapsedMs, enemyAttackElapsedMs },
+        state: {
+          ...state,
+          phase: 'searching',
+          searchElapsedMs: 0,
+          playerAttackElapsedMs: 0,
+          enemyAttackElapsedMs: 0,
+          playerHp,
+          enemyHp: 0,
+          rng,
+        },
         events,
       };
     }
   }
+
+  if (enemyAttackElapsedMs >= config.enemyAttackIntervalMs) {
+    enemyAttackElapsedMs -= config.enemyAttackIntervalMs;
+    const attack = resolveAttack(config.enemy, config.player, config.rules, rng);
+    rng = attack.rng;
+    playerHp = Math.max(0, playerHp - attack.result.damage);
+    events.push({ type: 'attack', attacker: 'enemy', ...attack.result });
+    if (playerHp === 0) {
+      events.push({ type: 'playerDefeated' });
+      // M2 placeholder: back to full HP in idle (real death in M3).
+      return { state: toIdle({ ...state, rng }, config.player.maxHp), events };
+    }
+  }
+
+  return {
+    state: { ...state, playerAttackElapsedMs, enemyAttackElapsedMs, playerHp, enemyHp, rng },
+    events,
+  };
+}
+
+function toIdle(state: EncounterState, playerHp: number): EncounterState {
+  return {
+    ...state,
+    phase: 'idle',
+    searchElapsedMs: 0,
+    playerAttackElapsedMs: 0,
+    enemyAttackElapsedMs: 0,
+    playerHp,
+    enemyHp: 0,
+  };
 }
 
 /**
@@ -178,6 +273,13 @@ export function attackProgress(
   return who === 'player'
     ? clamp01((state.playerAttackElapsedMs + extraMs) / config.playerAttackIntervalMs)
     : clamp01((state.enemyAttackElapsedMs + extraMs) / config.enemyAttackIntervalMs);
+}
+
+/** HP bar value 0..1 for one fighter. */
+export function hpFraction(state: EncounterState, config: EncounterConfig, who: Combatant): number {
+  return who === 'player'
+    ? clamp01(state.playerHp / config.player.maxHp)
+    : clamp01(state.enemyHp / config.enemy.maxHp);
 }
 
 function clamp01(value: number): number {

@@ -1,7 +1,7 @@
 # Veverička – Game Design Document (GDD) v1.3
 
 > **Pracovný názov hry:** *Squirrel's Tale* (dočasný – finálny názov vybrať pred vydaním; nesmie pripomínať „Hero Tale“).
-> **Stav:** v1.4, 26. 9. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
+> **Stav:** v1.5, 26. 9. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
 > **Súvisiace:** `claude/ROADMAP.md` (technológia, architektúra, etapy vydania), `claude/PROMPT-vyvoj.md` (ako má AI pracovať).
 
 ---
@@ -134,7 +134,7 @@
 |---|---|---|---|---|
 | Max HP | 5.0 | +0.5 / level | – | od začiatku |
 | Regenerácia | 0.1 HP / 2 s | +3 % / level (relatívne) | – | od začiatku |
-| Poškodenie | zo zbrane (bez zbrane 0.2–0.3) | – | – | od začiatku |
+| Poškodenie | zo zbrane (bez zbrane 0.3–0.4) | – | – | od začiatku |
 | Rýchlosť útoku | interval zbrane (napr. 2.0 s; bez zbrane 4.0 s) | % bonusy skracujú interval | min. interval 0.5 s | od začiatku |
 | Armor | 0 | z výbavy | redukcia max 75 % | od začiatku |
 | Presnosť (hit) | 85 % | +% zo skillu zbrane | 5–98 % | od začiatku |
@@ -164,7 +164,7 @@
 - 1 vs 1 [MVP]. 1 vs 1–3 s voľbou cieľa [NESKÔR].
 - Každý bojovník má časovač útoku (interval). Keď dobehne → útok.
 - **Hľadanie nepriateľa:** po príchode na nové políčko hráč stlačí *Find enemy*; potom sa hľadá automaticky – po každom porazenom nepriateľovi beží bar hľadania 1.0 s. Tlačidlo *Peace!* hľadanie zastaví: veverička zostane na políčku a len regeneruje, kým hráč znova nestlačí *Find enemy*. *Peace!* počas boja boj **hneď ukončí** – nepriateľ odíde, **bez XP a lootu**.
-- **Automatické prepínanie zbraní:** nepriateľ s `flying: true` → len diaľková zbraň; inak zbraň na blízko (ak nie je, diaľková; ak nie je ani tá, päste 0.2–0.3).
+- **Automatické prepínanie zbraní:** nepriateľ s `flying: true` → len diaľková zbraň; inak zbraň na blízko (ak nie je, diaľková; ak nie je ani tá, päste 0.3–0.4).
 
 ### 7.2 Vzorec úderu
 ```
@@ -676,3 +676,4 @@ tools/sim/         # headless simulácia tempa (npm run sim) → tabuľka čas/l
 | 1.2 | 2026-09-26 | 7.1: *Peace!* počas boja boj hneď ukončí (bez XP a lootu). 6.3: online smrť → úkryt, regenerácia 10 s, hráč sám vyberie políčko; zrušený auto-návrat a auto-ústup po 3 smrtiach; offline smrť bez straty XP. 17.2: offline sa farmí vždy na zvolenom políčku (v *Peace!* sa nebojuje), na neudržateľnom políčku 50 % XP a predmetov; súhrn ukáže smrti a čas regenerácie. 22: M3 a M9 upravené. |
 | 1.3 | 2026-09-26 | 6.3: strata pri smrti = 10 % aktuálneho postupu v leveli (nie 10 % potrebného XP). 6.3/17.2: „o polovicu pomalšie“ offline = čas zabitia ×2 (polovičné XP, predmety aj meny); súhrn ukáže loot, meny, XP, smrti a regeneráciu. |
 | 1.4 | 2026-09-26 | 6.1: interval útoku bez zbrane 3.0 s → 4.0 s (vyváženie tempa M0.1 boja). |
+| 1.5 | 2026-09-26 | 6.1/7.1: poškodenie bez zbrane 0.2–0.3 → 0.3–0.4 (Tomas, M2). |

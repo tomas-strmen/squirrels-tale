@@ -23,10 +23,37 @@ export const designSecondsSchema = z
     'must have at most 1 decimal place',
   );
 
-export const enemySchema = z.object({
-  id: idSchema,
-  attackIntervalS: designSecondsSchema,
-});
+/**
+ * A design value such as HP, damage or armor (GDD 5): max. 1 decimal place,
+ * never negative. (Converted to hundredths later by core/numbers.)
+ */
+export const designValueSchema = z
+  .number()
+  .finite()
+  .nonnegative()
+  .refine(
+    (value) => Math.abs(Math.round(value * 10) - value * 10) < 1e-9,
+    'must have at most 1 decimal place',
+  );
+
+/** A whole percentage 0..100 (GDD 5: percentages are whole numbers). */
+export const percentSchema = z.number().int().min(0).max(100);
+
+const damageRangeValid = (v: { damageMin: number; damageMax: number }) =>
+  v.damageMin <= v.damageMax;
+
+export const enemySchema = z
+  .object({
+    id: idSchema,
+    maxHp: designValueSchema.refine((v) => v > 0, 'must be greater than 0'),
+    damageMin: designValueSchema,
+    damageMax: designValueSchema,
+    attackIntervalS: designSecondsSchema,
+    hitPct: percentSchema,
+    armor: designValueSchema,
+    dodgePct: percentSchema,
+  })
+  .refine(damageRangeValid, { message: 'damageMin must not be greater than damageMax' });
 export type Enemy = z.infer<typeof enemySchema>;
 
 export const enemiesSchema = z
@@ -40,9 +67,30 @@ export const balanceSchema = z.object({
   encounter: z.object({
     searchDurationS: designSecondsSchema,
   }),
-  player: z.object({
-    unarmedAttackIntervalS: designSecondsSchema,
-  }),
+  player: z
+    .object({
+      maxHp: designValueSchema.refine((v) => v > 0, 'must be greater than 0'),
+      unarmedAttackIntervalS: designSecondsSchema,
+      unarmedDamageMin: designValueSchema,
+      unarmedDamageMax: designValueSchema,
+      hitPct: percentSchema,
+      armor: designValueSchema,
+    })
+    .refine((p) => p.unarmedDamageMin <= p.unarmedDamageMax, {
+      message: 'unarmedDamageMin must not be greater than unarmedDamageMax',
+    }),
+  /** Constants of the hit formula (GDD 7.2). */
+  combat: z
+    .object({
+      minHitPct: percentSchema,
+      maxHitPct: percentSchema,
+      armorConstant: designValueSchema.refine((v) => v > 0, 'must be greater than 0'),
+      maxDamageReductionPct: percentSchema,
+      minDamage: designValueSchema,
+    })
+    .refine((c) => c.minHitPct <= c.maxHitPct, {
+      message: 'minHitPct must not be greater than maxHitPct',
+    }),
 });
 export type Balance = z.infer<typeof balanceSchema>;
 

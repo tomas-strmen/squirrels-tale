@@ -9,8 +9,11 @@ record in the JSON, never new code here.
 - `designSecondsSchema` – a design duration in seconds (GDD 5: max. 1 decimal place, >= 0).
 - `enemySchema` / `enemiesSchema` (+ `Enemy` type), `balanceSchema` (+ `Balance` type) –
   schemas for `data/enemies.json` and `data/balance.json`.
+- `designValueSchema`, `percentSchema` – HP/damage/armor (max. 1 decimal) and whole percentages.
 - `parseEnemies(data)`, `parseBalance(data)` – parse + throw a readable `ZodError`
   if the data is invalid.
+- `toEncounterConfigInput(balance, enemy)` (`encounterInput.ts`) – maps validated data to
+  the input of `createEncounterConfig`, used by the game and the content tests.
 
 ## Depends on
-- `zod`.
+- `zod`; `core/encounter` (types only).

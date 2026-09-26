@@ -26,7 +26,7 @@ Status (3–5 points) → propose ONE small step (files touched, what stays unto
 - Before reworking an existing system, write tests for its current behaviour.
 - No features outside the plan – write ideas into `PROGRESS.md` and ask.
 - GDD change: propose exact old → new text + reason; after approval update GDD + Changelog.
-- Keep debug tools working (speed ×1/×4/×20, time skip, add items, reset).
+- Keep debug tools working (speed ×1/×4/×20/×50, time skip, add items, reset).
 - MVP graphics = grey shapes / placeholders.
 - Each `src/core` module has a README (what it does, public API, dependencies).
 

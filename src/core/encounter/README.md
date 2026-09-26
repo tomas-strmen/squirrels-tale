@@ -6,7 +6,7 @@ always gives the same fights.
 
 M2/M3.1 scope: hit/miss and damage via `core/combat`; XP and level-ups via
 `core/progression` (+1.0 max HP per level, healed at once; +0.1 max damage
-every 2nd level; +0.1 min damage every 5th level). When the enemy dies the
+every level; +0.1 min damage every 2nd level). When the enemy dies the
 next search starts automatically and its XP is granted. When the squirrel is
 defeated she is back to full HP in `idle` (placeholder until real death in
 M3.2). No regeneration yet.

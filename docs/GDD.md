@@ -1,7 +1,7 @@
-# Veverička – Game Design Document (GDD) v1.3
+# Veverička – Game Design Document (GDD) v1.8
 
 > **Pracovný názov hry:** *Squirrel's Tale* (dočasný – finálny názov vybrať pred vydaním; nesmie pripomínať „Hero Tale“).
-> **Stav:** v1.6, 26. 9. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
+> **Stav:** v1.8, 26. 9. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
 > **Súvisiace:** `claude/ROADMAP.md` (technológia, architektúra, etapy vydania), `claude/PROMPT-vyvoj.md` (ako má AI pracovať).
 
 ---
@@ -102,7 +102,7 @@
 10. **Boosts** (3 boosty, reklama / Premium), 11. **Store** (Premium).
 12. **Settings** (pravidlá lootu, auto-jedlo, zvuk neskôr, reset hry).
 13. **Dialog overlay** (NPC).
-14. **Debug panel** (len vo vývoji: rýchlosť ×1/×4/×20, posun času, pridať predmety/meny, reset).
+14. **Debug panel** (len vo vývoji: rýchlosť ×1/×4/×20/×50, posun času, pridať predmety/meny, reset).
 
 **HUD na obrazovke boja:**
 ```
@@ -119,9 +119,9 @@
 
 ## 5. Pravidlá pre čísla
 
-- **Dizajnové hodnoty (HP, poškodenie, armor, liečenie) majú najviac 1 desatinné miesto.** Začíname s 5.0 HP, mravec berie 0.2–0.3.
+- **Dizajnové hodnoty v dátach (HP, poškodenie, armor, liečenie) majú najviac 1 desatinné miesto.** Odvodené hodnoty (rast z levelu, percentá) môžu mať 2. Začíname s 5.0 HP, mravec berie 0.2–0.3.
 - **Percentá** (crit, dodge, MF, bonusy) sú celé čísla (napr. 3 %).
-- **Interná reprezentácia:** celé čísla v **stotinách** (5.0 HP = 500) – kvôli percentuálnym bonusom a regenerácii bez chýb s desatinnými číslami. **Zobrazenie vždy zaokrúhlené na 0.1.** Výsledné poškodenie úderu sa zaokrúhli na 0.1 (min. 0.1 pri zásahu).
+- **Interná reprezentácia:** na pozadí sa všetko počíta na **2 desatinné miesta** – celé čísla v **stotinách** (5.0 HP = 500), bez chýb s desatinnými číslami. **Zobrazenie vždy na 1 desatinné miesto nadol (floor)**: 4.99 → 4.9, 0.25 → 0.2. Výsledné poškodenie úderu sa zaokrúhli na 0.01 (min. 0.1 pri zásahu).
 - **Náhoda:** jediný zdroj = `Rng` so seedom (deterministický). Potrebné pre testy, vrátenie v čase a offline výpočet.
 - **Čas boja:** simulácia beží v pevných krokoch **100 ms** nezávisle od FPS (umožní zrýchlenie v debugu, snapshoty, headless testy).
 
@@ -130,27 +130,33 @@
 ## 6. Postava
 
 ### 6.1 Štatistiky
+> **Postava vs. výbava (v1.8):** štatistiky **postavy** (základ + rast z levelu, táto kapitola) a štatistiky **výbavy** (zbrane, brnenie, šperky – kap. 9) sa vedú **oddelene**. Level mení len postavu, predmet má stále svoje hodnoty. Výsledná hodnota v boji = postava + výbava (pevné hodnoty sa **sčítajú**, percentá **násobia**). Príklad: veverička 0.4–0.8 + zbraň 0.2 → pri novom leveli postava 0.4–0.9, zbraň stále 0.2, spolu 0.6–1.1. Zbraň **nenahrádza** poškodenie postavy, len sa k nemu pripočíta: postava 0.4–0.6 + zbraň 0.1–0.7 = **0.5–1.3**. Až nad tým pôsobia perky (strom, afixy, napr. +% poškodenie zbraní).
 | Štatistika | Základ Lv1 | Rast | Strop | Odomknutie |
 |---|---|---|---|---|
 | Max HP | 5.0 | +1.0 / level | – | od začiatku |
 | Regenerácia | 0.1 HP / 2 s | +3 % / level (relatívne) | – | od začiatku |
-| Poškodenie | zo zbrane (bez zbrane 0.3–0.4) | – | – | od začiatku |
-| Rýchlosť útoku | interval zbrane (napr. 2.0 s; bez zbrane 4.0 s) | % bonusy skracujú interval | min. interval 0.5 s | od začiatku |
+| Poškodenie | postava (päste) 0.3–0.4; zbraň pripočíta svoj rozsah | postava: každý level +0.1 max; každý 2. level aj +0.1 min (zbraň sa levelom nemení) | – | od začiatku |
+| Rýchlosť útoku | interval zbrane (napr. 2.0 s; bez zbrane 4.0 s) | +1 % / level zložene (×1.01 oproti predchádzajúcemu levelu, mimo výbavy a vylepšení); % bonusy z výbavy ďalej skracujú interval | min. interval 0.5 s | od začiatku |
 | Armor | 0 | z výbavy | redukcia max 75 % | od začiatku |
-| Presnosť (hit) | 85 % | +% zo skillu zbrane | 5–98 % | od začiatku |
+| Presnosť (hit) | 85 % pri rovnakom leveli ako nepriateľ | +0.5 % za každý level, o ktorý je veverička vyššie ako nepriateľ; −0.5 % za každý level nižšie; +% zo skillu zbrane | 5–98 % | od začiatku |
 | Crit šanca / Crit dmg | 0 % / ×1.5 | výbava, strom, skill | crit max 50 % | **quest Q3** |
 | Magic Find (MF) | 0 % | výbava, strom, Premium | – | **quest Q4** |
 | Dodge (uhnutie) | 0 % | výbava, strom | max 40 % | **quest Q7** |
 | Stun šanca | 0 % | výbava, strom, skill | max 25 % | **quest Q8** |
 
+- **Rast z levelu (L = level veveričky):**
+  - Max HP = `5.0 + 1.0 × (L − 1)`
+  - Poškodenie postavy = 0.3–0.4 + `0.1 × (L − 1)` k max a `0.1 × floor(L / 2)` k min, t. j. min rastie na párnych leveloch 2, 4, 6… (min/max – Lv1: +0.0/+0.0, Lv2: +0.1/+0.1, Lv3: +0.1/+0.2, Lv10: +0.5/+0.9)
+  - Rýchlosť útoku z levelu = `×1.01^(L − 1)` (Lv10 ≈ +9.4 %, Lv20 ≈ +20.8 %)
+  - Presnosť = `85 % + 0.5 % × (L − levelNepriateľa)` + skill/výbava, v rozsahu 5–98 %
 - **Kým štatistika nie je odomknutá**, nezobrazuje sa, nepadá na predmetoch a uzly stromu pre ňu sú zamknuté. (Výnimka: fixná vlastnosť unikátneho predmetu, napr. Haluz s jablkom má stun vždy – „ochutnávka“.)
 
 ### 6.2 Level a XP
 - **Žiadny strop levelov.**
-- XP na ďalší level: `need(L) = round(10 × 1.4^(L−1))` → Lv1: 10, Lv2: 14, Lv3: 20, Lv5: 38, Lv10: 207, Lv15: 1111, Lv20: 5976.
+- XP na ďalší level: `need(L) = round(10 × 1.3^(L−1))` → Lv1: 10, Lv2: 13, Lv3: 17, Lv5: 29, Lv10: 106, Lv15: 394, Lv20: 1462, Lv25: 5428.
 - Za level: **+1.0 max HP (vylieči sa hneď o toľko istá)**, +1 bod do stromu. **Každých 5 levelov** (5, 10, 15…) navyše **1 špeciálny bod**.
-- **Rast poškodenia bez zbrane** (M2/M3, kým nie sú zbrane): **každý druhý level +0.1 k hornej hranici** úderu, **každý piaty level** navyše **+0.1 aj k dolnej hranici**.
-- Cieľ tempa (overené hrubou simuláciou, doladiť v M20): Lv2 ~40 s, Lv10 ~15 min, koniec MVP ~Lv18–21.
+- Rast poškodenia, rýchlosti útoku a presnosti za level – pozri 6.1.
+- Cieľ tempa (doladiť v M20): Lv2 ~40 s. **Pozor (v1.7):** krivka 1.3 je miernejšia – XP, ktoré pri 1.4 stačilo na Lv20, teraz dá ~Lv24. Ciele „Lv10 ~15 min“ a „koniec MVP ~Lv18–21“, počet bodov stromu (13.1) a level podmienky políčok (8.2) treba prepočítať simuláciou v M20.
 
 ### 6.3 Smrť
 - **Online (hra je otvorená):** strata **10 % aktuálneho postupu k ďalšiemu levelu** (10 % XP nazbieraného v aktuálnom leveli, napr. 20/38 → 18/38; level nikdy neklesne). Veverička sa objaví v úkryte (mravce ju odniesli), **plné HP za 10 s** a **zostane v úkryte** – hráč sám vyberie políčko na mape a stlačí *Find enemy* (kap. 7.1).
@@ -165,20 +171,20 @@
 - 1 vs 1 [MVP]. 1 vs 1–3 s voľbou cieľa [NESKÔR].
 - Každý bojovník má časovač útoku (interval). Keď dobehne → útok.
 - **Hľadanie nepriateľa:** po príchode na nové políčko hráč stlačí *Find enemy*; potom sa hľadá automaticky – po každom porazenom nepriateľovi beží bar hľadania 1.0 s. Tlačidlo *Peace!* hľadanie zastaví: veverička zostane na políčku a len regeneruje, kým hráč znova nestlačí *Find enemy*. *Peace!* počas boja boj **hneď ukončí** – nepriateľ odíde, **bez XP a lootu**.
-- **Automatické prepínanie zbraní:** nepriateľ s `flying: true` → len diaľková zbraň; inak zbraň na blízko (ak nie je, diaľková; ak nie je ani tá, päste 0.3–0.4).
+- **Automatické prepínanie zbraní:** nepriateľ s `flying: true` → len diaľková zbraň; inak zbraň na blízko (ak nie je, diaľková; ak nie je ani tá, bojuje len postava – päste, kap. 6.1).
 
 ### 7.2 Vzorec úderu
 ```
-hitChance = clamp(baseHit + hit% + skillHit − defenderDodge, 5 %, 98 %)
+hitChance = clamp(baseHit(levelDiff) + hit% + skillHit − defenderDodge, 5 %, 98 %)   // veverička: 85 % + 0.5 % × (L − levelNepriateľa); nepriateľ: hit z 8.3 + 0.5 % × (levelNepriateľa − L)
 ak miss → "Miss"
-raw  = roll(weaponMin, weaponMax)            // rovnomerne, krok 0.1
+raw  = roll(postavaMin + zbraňMin, postavaMax + zbraňMax)   // rovnomerne, krok 0.01; postava = päste + rast z levelu (6.1)
 raw *= (1 + damage%) × weaponSkillMult × ammoMult (0.5 ak chýba munícia)
 ak crit (šanca crit%) → raw *= (1.5 + critDmg%)
 DR   = armor / (armor + 10)                  // max 0.75
-final = max(0.1, round1(raw × (1 − DR)))
+final = max(0.1, round2(raw × (1 − DR)))   // zobrazí sa floor na 0.1
 ak stun (šanca stun%) → cieľ má ďalší útok oneskorený o 1.5 s (boss 0.5 s), nesčítava sa
 ```
-- `interval = baseInterval / (1 + attackSpeed%)`, min 0.5 s.
+- `interval = baseInterval / (1.01^(L−1) × (1 + attackSpeed%))`, min 0.5 s. Nepriatelia bez člena 1.01^(L−1) (ich rast je v 8.4).
 - Regenerácia tiká počas boja aj medzi súbojmi.
 
 ### 7.3 Munícia
@@ -256,6 +262,19 @@ ak stun (šanca stun%) → cieľ má ďalší útok oneskorený o 1.5 s (boss 0.
 | shrew | Shrew (Piskor) | 8–9 | 12.0 | 1.0–1.5 | 2.5 s | 75 % | 1.5 | 5 % | 21 | |
 | **ant_captain** | **Ant Captain (Mravčí kapitán)** – boss | 4 | 25 | 0.5–0.8 | 2.5 s | 75 % | 1.5 | 0 | 40 | *Rally* každých 20 s: +30 % rýchlosť útoku na 6 s; pod 50 % HP *Shield Wall*: armor +2 na 5 s (každých 15 s) |
 | **grass_snake** | **Grass Snake (Užovka)** – boss | 9 | 90 | 1.2–1.8 | 2.8 s | 78 % | 1.5 | 20 % | 200 | *Venom Bite* každých 15 s: jed 0.1 HP/s na 6 s; pod 50 % HP *Coil*: omráči veveričku na 1.5 s (každých 20 s) |
+
+### 8.4 Levely nepriateľov [MVP]
+| Políčko | T1 | T2 | T3 | T4 | T5 | T6 | T7 | T8 | T9 |
+|---|---|---|---|---|---|---|---|---|---|
+| Levely nepriateľov | 1–2 | 2–4 | 4–6 | 6–8 (boss Ant Captain 9) | 9–11 | 11–13 | 13–15 | 15–17 | 17–19 (boss Grass Snake 21) |
+
+- Level sa pri každom novom nepriateľovi hodí náhodne (Rng) z rozsahu políčka. Hodnoty v tabuľke 8.3 platia pre **najnižší level** rozsahu, na ktorom sa nepriateľ vyskytuje (základný level `b`); boss má pevný level.
+- **Za každý level nad základom (`L − b`):**
+  - Max HP **+10 %**, poškodenie (min aj max) **+5 %**, XP za zabitie **+10 %**,
+  - presnosť = hit z 8.3 **+0.5 %** za každý level, o ktorý je nepriateľ vyšší ako veverička (−0.5 % za každý nižší) – zrkadlo k 6.1,
+  - dodge **+0.5 %** (max 40 %),
+  - crit **0 %** na základnom leveli, **+1 %** za level (max 15 %), crit dmg ×1.5.
+- Level sa zobrazí pri mene („Worker Ant Lv2“). Výsledky sa počítajú na 2 desatinné miesta (kap. 5).
 
 - Kontrola udržateľnosti (hrubá simulácia): na „svojom“ políčku s primeranou výbavou má byť regenerácia + jedlo ≥ prijaté poškodenie. Od T3 treba lepšiu výbavu/jedlo → to je prirodzená brzda postupu (nie počet zabití).
 
@@ -593,7 +612,7 @@ tools/sim/         # headless simulácia tempa (npm run sim) → tabuľka čas/l
 ```
 - Moduly komunikujú cez **verejné API a event bus**. Každý modul má README (čo robí, API, závislosti).
 - Testy: unit (core), validácia dát (odkazy, rozsahy), headless simulácia boja, Playwright smoke (hra sa načíta, prejde menu, screenshot).
-- **Debug nástroje od začiatku:** rýchlosť ×1/×4/×20, posun času (test offline), pridanie predmetov/mien, reset save.
+- **Debug nástroje od začiatku:** rýchlosť ×1/×4/×20/×50, posun času (test offline), pridanie predmetov/mien, reset save.
 
 ---
 
@@ -613,7 +632,7 @@ tools/sim/         # headless simulácia tempa (npm run sim) → tabuľka čas/l
 |---|---|---|---|
 | **M0 Kostra** | repo, Vite+TS+Phaser, Vitest, Playwright smoke, CI, CLAUDE.md, web deploy (GitHub Pages), landscape scéna | CI zelené, odkaz funguje na mobile | otvoríš link v mobile na šírku, vidíš štvorček/nadpis |
 | **M1 Základy core** | `numbers`, `rng`, `clock`, event bus, načítanie dát so zod schémami, `en.json`, debug panel | unit testy, neplatné dáta = chyba testu | debug panel ukáže načítané nepriateľov a texty |
-| **M2 Boj** | simulácia 1v1 (100 ms kroky), hit/miss, armor, poškodenie, HP bary, čísla, Worker Ant v slučke, rýchlosť ×1/×4/×20 | headless test: 100 bojov deterministicky rovnaký výsledok pri rovnakom seede | pozeráš sivú veveričku vs. mravca, zrýchliš |
+| **M2 Boj** | simulácia 1v1 (100 ms kroky), hit/miss, armor, poškodenie, HP bary, čísla, Worker Ant v slučke, rýchlosť ×1/×4/×20/×50 | headless test: 100 bojov deterministicky rovnaký výsledok pri rovnakom seede | pozeráš sivú veveričku vs. mravca, zrýchliš |
 | **M3 Progres** | XP, levely, regenerácia, smrť → úkryt (placeholder, regenerácia 10 s) → hráč vyberie políčko, strata XP | testy XP krivky a smrti | level do ~40 s, necháš ju umrieť (debug) |
 | **M4 Predmety** | základné predmety, vzácnosti, afixy, drop 4 %, hod kockou (jednoduchá animácia), MF, pity, skladanie štatistík z výbavy | test distribúcie vzácností (10 000 hodov) | vidíš padať predmety s farbami a kockou |
 | **M5 Inventár a výbava** | 20 slotov, 7 slotov výbavy, nasadiť/zložiť, porovnanie, zamknutie, zoradenie, stack zásob | testy inventára | nasadíš lepší meč a vidíš rýchlejšie zabíjanie |
@@ -661,6 +680,8 @@ tools/sim/         # headless simulácia tempa (npm run sim) → tabuľka čas/l
 
 - Premium +10 % XP/MF a Mythical +XP/počasie – overiť pri testeroch, či to nepôsobí ako pay-to-win.
 - Finálny názov hry.
+- **Interval útoku so zbraňou (v1.8):** keď veverička drží zbraň, nahrádza interval zbrane interval pästí (4.0 s), alebo sa kombinujú? Rozhodnúť pred M4.
+- **Balans zbraní (v1.8):** zbrane z 9.4 sa teraz **pripočítajú** k poškodeniu postavy – rozsahy zbraní prepočítať v M4/M20.
 - Presné čísla (všetko v kap. 6–18) – ladenie v M20 a pri hraní.
 - Šanca na kúsky setu – overiť v M20, či je celý set dosiahnuteľný okolo T7–T8.
 - Cena Premium a (neskôr) balíčkov ✦.
@@ -679,3 +700,5 @@ tools/sim/         # headless simulácia tempa (npm run sim) → tabuľka čas/l
 | 1.4 | 2026-09-26 | 6.1: interval útoku bez zbrane 3.0 s → 4.0 s (vyváženie tempa M0.1 boja). |
 | 1.5 | 2026-09-26 | 6.1/7.1: poškodenie bez zbrane 0.2–0.3 → 0.3–0.4 (Tomas, M2). |
 | 1.6 | 2026-09-26 | 6.1/6.2: rast max HP za level 0.5 → 1.0 (hneď aj vylieči o toľko). Nové pravidlo (Tomas, M3): poškodenie bez zbrane rastie s levelom – každý 2. level +0.1 max, každý 5. level +0.1 aj min. |
+| 1.7 | 2026-09-26 | 5: výpočty na 2 desatinné miesta, zobrazenie floor na 0.1, poškodenie úderu na 0.01. 6.1: poškodenie +0.1 max každý level a +0.1 min každý 2. level (nahrádza pravidlo z v1.6, platí aj so zbraňou); rýchlosť útoku ×1.01/level; presnosť 85 % pri rovnakom leveli ±0.5 %/level rozdielu. 6.2: need(L) = round(10 × 1.3^(L−1)). 7.2: vzorce upravené. 24: levely nepriateľov – otvorené. Debug rýchlosť rozšírená o ×50. |
+| 1.8 | 2026-09-26 | 6.1: postava a výbava sa vedú oddelene, level mení len postavu, v boji sa sčítajú (percentá násobia). 7.1/7.2: poškodenie = postava + zbraň; presnosť nepriateľa zrkadlí rozdiel levelov. 8.4: nové – levely nepriateľov na políčkach a rast za level (HP +10 %, poškodenie +5 %, XP +10 %, dodge +0.5 %, crit +1 %). 24: nové otvorené otázky (interval so zbraňou, balans zbraní). |

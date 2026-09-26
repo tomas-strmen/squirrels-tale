@@ -2,12 +2,29 @@
 
 ## Aktuálne
 - **Etapa:** M3 Progres (GDD kap. 22)
-- **Posledný krok:** M3.1 – XP, levely, rast štatistík, panel Show stats – **schválené**, zlúčené cez PR #8.
+- **Posledný krok:** GDD v1.7/v1.8 (rozpracované v Cowork relácii) – rast poškodenia zapracovaný do kódu,
+  debug rýchlosť ×50, zvyšok GDD v1.7 (XP krivka 1.3, rýchlosť útoku, presnosť podľa levelu, 2 desatinné
+  miesta) ešte len v dokumente – hotové, čaká na test/schválenie (PR na GitHube)
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model: podľa náročnosti kroku (poviem vopred). Od teraz: AI pripraví vetvu/commit/push a dá Tomasovi presné príkazy/odkaz na PR, test a merge robí Tomas sám (šetrí tokeny oproti ovládaniu prehliadača).
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.
 
 ## Hotové
+### Zmeny z Cowork relácie – GDD v1.7/v1.8 (2026-09-26)
+- **GDD v1.7** (`docs/GDD.md`): výpočty na 2 desatinné miesta + zobrazenie floor na 0.1; poškodenie +0.1 max
+  každý level a +0.1 min každý 2. (párny) level (nahrádza pravidlo z v1.6: +0.1 max každý 2., +0.1 min každý 5.);
+  rýchlosť útoku ×1.01/level; presnosť 85 % ±0.5 %/level rozdielu s nepriateľom; XP krivka 1.3; debug rýchlosť ×50.
+- **GDD v1.8** (Tomas schválil): postava vs. výbava oddelene (level mení len postavu, v boji sa sčítajú);
+  nová kap. 8.4 levely nepriateľov (rozsahy T1–T9, rast HP/poškodenia/XP/dodge/critu za level); presnosť potvrdená.
+  Otvorené (GDD 24): interval útoku so zbraňou, prepočet rozsahov zbraní z 9.4.
+- **Kód zapracovaný zatiaľ len pre nový rast poškodenia** (`core/progression`, `core/encounter` – testy/README/komentáre):
+  Lv2: 0.4–0.5, Lv3: 0.4–0.6, Lv4: 0.5–0.7, Lv10: 0.8–1.3 (bez zbrane, základ 0.3–0.4).
+- **Rýchlosť:** namiesto jedného tlačidla 4 tlačidlá ×1 / ×4 / ×20 / ×50 vpravo hore, aktívne je modré
+  (`Button` dostal `setSelected` a voliteľnú veľkosť). Limit krokov za snímku sa násobí rýchlosťou, aby ×50 nebolo brzdené.
+- 133 testov zelených, typecheck + lint + build OK (overené v Code pred týmto commitom).
+- **Ešte nezapracované do kódu z v1.7/v1.8** (návrh ďalšieho kroku nižšie): XP krivka 1.3, rýchlosť ×1.01/level,
+  presnosť podľa rozdielu levelov, výpočty na 2 desatinné miesta + zobrazenie floor na 0.1, levely nepriateľov (8.4).
+
 ### M3.1 – XP, levely, rast štatistík, Show stats (2026-09-26)
 - Nový modul `core/progression`: XP krivka podľa GDD 6.2 (`need(L) = round(10 × 1.4^(L−1))`),
   levelovanie bez stropu. Bonusy za level (Tomas): **+1.0 max HP** (hneď aj vylieči presne o toľko,
@@ -112,8 +129,13 @@
 - GDD v1.1 a v1.2 zapísané v `docs/GDD.md` aj v projekte (`claude/GDD.md`).
 
 ## Ďalší krok
-1. Tomas otestuje M3.1 (PR) → „schválené" → merge.
-2. **M3.2** – regenerácia HP a skutočná smrť → úkryt (GDD 6.3): online strata 10 % postupu v leveli,
+1. Tomas otestuje vetvu `cowork/gdd-v1.8-speed-damage` (PR) → „schválené" → merge.
+2. **M3.1b – zvyšok GDD v1.7/v1.8 do kódu:** XP krivka 1.3 (`core/progression`), rýchlosť útoku ×1.01/level
+   (`core/encounter`/`combat`, min. interval 0.5 s), presnosť podľa rozdielu levelov veverička↔nepriateľ
+   (potrebuje level nepriateľa – zatiaľ pevne T1, kým nepríde mapa), výpočty na 2 desatinné miesta +
+   zobrazenie floor na 0.1 (`core/numbers`, nahradí terajšie zaokrúhľovanie), a levely nepriateľov (GDD 8.4:
+   rozsah pre Worker Ant na T1 je 1–2, zatiaľ len jeden level pevne). Model: Opus 5.5 (mení vzorec + zaokrúhľovanie).
+3. Potom **M3.2** – regenerácia HP a skutočná smrť → úkryt (GDD 6.3): online strata 10 % postupu v leveli,
    10 s regenerácia, hráč vyberie políčko. Model: Sonnet 5 stačí.
 
 ## Rozhodnutia (2026-09-26)

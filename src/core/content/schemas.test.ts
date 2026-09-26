@@ -110,7 +110,7 @@ describe('balanceSchema / parseBalance', () => {
       hitPctPerLevelDiff: 0.5,
       minAttackIntervalS: 0.5,
     },
-    loot: { dropChancePct: 4, pityKills: 1000, affixTierGrowthPct: 35, upgradeGrowthPct: 8 },
+    loot: { dropChancePct: 4, pityKills: 1000, pityMinRarity: 'rare', affixTierGrowthPct: 35, upgradeGrowthPct: 8 },
     death: { hideoutRegenS: 10.0, xpLossPct: 10 },
   };
 
@@ -162,8 +162,8 @@ describe('items / rarities / affixes schemas (M4.1)', () => {
     affixCount: 0,
     mfScaling: 'none',
     itemKind: 'base',
-    pity: false,
     minTileTier: 1,
+    unlockedBy: null,
     color: '#b8b8b8',
   };
 

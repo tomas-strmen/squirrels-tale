@@ -116,7 +116,10 @@ export const itemsSchema = z
     message: 'item ids must be unique',
   });
 
-/** A rarity (GDD 9.2, 9.6). Weights are per 100; the `isRemainder` one gets 100 - the rest. */
+/**
+ * A rarity (GDD 9.2, 9.6). Weights are per 100; the `isRemainder` one gets 100 - the rest.
+ * Array order = rank (Common first), used by the pity guarantee ("at least X").
+ */
 export const raritySchema = z.object({
   id: idSchema,
   weight: designValueSchema,
@@ -127,10 +130,10 @@ export const raritySchema = z.object({
   mfScaling: z.enum(['none', 'linear', 'diminishing']),
   /** Which base items it draws from; unique/set fall back to Rare +1 affix when none exist (9.5). */
   itemKind: z.enum(['base', 'unique', 'set']),
-  /** Counts as a pity-tier drop (Unique/Set/Legendary, GDD 9.6). */
-  pity: z.boolean(),
   /** Only drops on tiles of this tier or higher (e.g. Set only T3+, GDD 9.6). */
   minTileTier: z.number().int().min(1),
+  /** Quest id that unlocks this rarity (e.g. Legendary, GDD 9.6 v2.1); null = always. */
+  unlockedBy: idSchema.nullable(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'must be a #rrggbb colour'),
 });
 export type RarityData = z.infer<typeof raritySchema>;
@@ -215,8 +218,10 @@ export const balanceSchema = z.object({
   /** Item drops (GDD 9.3, 9.6). */
   loot: z.object({
     dropChancePct: percentSchema,
-    /** Kills without a Unique/Set/Legendary before the next drop is a sure Unique+ (9.6). */
+    /** Kills without a drop of `pityMinRarity` or better before the next drop is guaranteed (9.6). */
     pityKills: z.number().int().min(1),
+    /** The pity guarantee: at least this rarity (v2.1: "rare" for now). */
+    pityMinRarity: idSchema,
     /** Affix value growth per item tier: base x (1 + pct/100 x (tier - 1)) (9.3). */
     affixTierGrowthPct: percentSchema,
     /** Value growth per upgrade level (9.3, 12.2 - used from M16). */

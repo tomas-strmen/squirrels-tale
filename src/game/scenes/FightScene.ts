@@ -29,8 +29,9 @@ import { hitChancePct } from '../../core/combat/combat';
 import { formatHpHundredths, formatHundredths, fromHundredths } from '../../core/numbers/numbers';
 import { regenAmountHundredths, xpToNextLevelHundredths } from '../../core/progression/progression';
 import { createRng } from '../../core/rng/rng';
-import { consumeFrame, DEFAULT_MAX_STEPS_PER_FRAME } from '../../core/time/fixedStep';
-import { itemName, itemSummary } from '../itemText';
+import { killsUntilPity, pityRarity } from '../../core/loot/loot';
+import { consumeFrame, DEFAULT_MAX_STEPS_PER_FRAME, TICK_MS } from '../../core/time/fixedStep';
+import { itemName, itemSummary, rarityName } from '../itemText';
 import { t, tDynamic } from '../text';
 import { Button } from '../ui/Button';
 import { DebugPanel } from '../ui/DebugPanel';
@@ -86,6 +87,10 @@ export class FightScene extends Phaser.Scene {
   private lootButton!: Button;
   private lootPanel!: StatsPanel;
   private rarityColors = new Map<string, string>();
+  /** Simulated game time (counts faster at x4/x20/x50 - it follows the simulation). */
+  private simElapsedMs = 0;
+  private timeText!: Phaser.GameObjects.Text;
+  private pityText!: Phaser.GameObjects.Text;
 
   constructor() {
     super('FightScene');
@@ -241,6 +246,11 @@ export class FightScene extends Phaser.Scene {
     this.lootButton.setScale(0.55);
     this.lootPanel = new StatsPanel(this, 10, 70);
     this.lootPanel.setVisible(false);
+
+    // Bottom-left info: game time (follows the simulation speed) and the pity countdown (GDD 9.6).
+    this.simElapsedMs = 0;
+    this.timeText = this.add.text(10, 640, '', { ...textStyle, fontSize: '16px', color: '#a0a0a0' });
+    this.pityText = this.add.text(10, 662, '', { ...textStyle, fontSize: '16px', color: '#a0a0a0' });
   }
 
   private onToggleLoot(): void {
@@ -304,6 +314,7 @@ export class FightScene extends Phaser.Scene {
       DEFAULT_MAX_STEPS_PER_FRAME * this.currentSpeed(),
     );
     this.accumulatorMs = frame.accumulatorMs;
+    this.simElapsedMs += frame.steps * TICK_MS;
     for (let i = 0; i < frame.steps; i++) {
       const step = tick(this.state, this.config);
       this.state = step.state;
@@ -325,6 +336,12 @@ export class FightScene extends Phaser.Scene {
     this.levelText.setText(`${t('stats.level')} ${this.state.progression.level}`);
     if (this.statsPanel.visible) this.refreshStatsPanel();
     if (this.lootPanel.visible) this.refreshLootPanel();
+    this.timeText.setText(`${t('hud.time')}: ${formatDuration(this.simElapsedMs)}`);
+    this.pityText.setText(
+      t('loot.pityCountdown')
+        .replace('{rarity}', rarityName(pityRarity(this.config.loot).id))
+        .replace('{kills}', String(killsUntilPity(this.state.loot, this.config.loot))),
+    );
     // Keep showing the last enemy HP while it fades out after its defeat.
     if (this.state.phase === 'fighting') {
       this.enemyHpBar.setProgress(hpFraction(this.state, this.config, 'enemy'));
@@ -472,4 +489,11 @@ export class FightScene extends Phaser.Scene {
       yoyo: true,
     });
   }
+}
+
+/** 3723000 ms -> "01:02:03" */
+function formatDuration(ms: number): string {
+  const total = Math.floor(ms / 1000);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(Math.floor(total / 3600))}:${pad(Math.floor((total % 3600) / 60))}:${pad(total % 60)}`;
 }

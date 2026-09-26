@@ -8,13 +8,16 @@
     "unarmedDamageMin": 0.3,
     "unarmedDamageMax": 0.4,
     "hitPct": 85,
-    "armor": 0
+    "armor": 0,
+    "attackSpeedPctPerLevel": 1
   },
   "combat": {
     "minHitPct": 5,
     "maxHitPct": 98,
     "armorConstant": 10.0,
     "maxDamageReductionPct": 75,
-    "minDamage": 0.1
+    "minDamage": 0.1,
+    "hitPctPerLevelDiff": 0.5,
+    "minAttackIntervalS": 0.5
   }
 }

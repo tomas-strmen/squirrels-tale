@@ -16,6 +16,8 @@ const rules = createCombatRules({
   armorConstant: 10.0,
   maxDamageReductionPct: 75,
   minDamage: 0.1,
+  hitPctPerLevelDiff: 0.5,
+  minAttackIntervalS: 0.5,
 });
 
 const squirrel = createFighterStats({
@@ -48,6 +50,8 @@ describe('createCombatRules / createFighterStats', () => {
       armorConstant: 1000,
       maxDamageReductionPct: 75,
       minDamage: 10,
+      hitPctPerLevelDiff: 0.5,
+      minAttackIntervalMs: 500,
     });
     expect(squirrel).toEqual({
       maxHp: 500,
@@ -73,7 +77,14 @@ describe('hitChancePct (GDD 7.2)', () => {
     expect(hitChancePct(squirrel, withStats(ant, { dodgePct: 15 }), rules)).toBe(70);
   });
 
+  it('adds 0.5 % per level the attacker is above the defender, subtracts below (v1.7)', () => {
+    expect(hitChancePct(squirrel, ant, rules, 2)).toBe(86);
+    expect(hitChancePct(squirrel, ant, rules, -3)).toBe(83.5);
+    expect(hitChancePct(squirrel, ant, rules, 0)).toBe(85);
+  });
+
   it('is clamped to 5..98 %', () => {
+    expect(hitChancePct(squirrel, ant, rules, 100)).toBe(98);
     expect(hitChancePct(withStats(squirrel, { hitPct: 100 }), ant, rules)).toBe(98);
     expect(hitChancePct(withStats(squirrel, { hitPct: 10 }), withStats(ant, { dodgePct: 40 }), rules)).toBe(5);
   });
@@ -99,15 +110,15 @@ describe('finalDamage (GDD 5 + 7.2)', () => {
     expect(finalDamage(30, 0, rules)).toBe(30);
   });
 
-  it('rounds the reduced damage to 0.1', () => {
-    // 0.3 × (1 − 1/11) = 0.2727… → 0.3
-    expect(finalDamage(30, 100, rules)).toBe(30);
-    // 0.4 × (1 − 0.5) = 0.2
+  it('rounds the reduced damage to 0.01 (v1.7)', () => {
+    // 0.3 × (1 − 1/11) = 0.2727… → 0.27
+    expect(finalDamage(30, 100, rules)).toBe(27);
+    // 0.4 × (1 − 0.5) = 0.20
     expect(finalDamage(40, 1000, rules)).toBe(20);
   });
 
   it('never goes below 0.1 on a hit', () => {
-    // 0.1 × (1 − 0.75) = 0.025 → 0.0 → min 0.1
+    // 0.1 × (1 − 0.75) = 0.025 → min 0.1
     expect(finalDamage(10, 1_000_000, rules)).toBe(10);
   });
 });
@@ -148,9 +159,24 @@ describe('resolveAttack', () => {
     expect(rate).toBeLessThan(0.88);
   });
 
-  it('hit damage is 0.3 or 0.4 (steps of 0.1, both ends included)', () => {
-    const damages = new Set(many(squirrel, ant, 2000).filter((r) => r.hit).map((r) => r.damage));
-    expect([...damages].sort()).toEqual([30, 40]);
+  it('hit damage is 0.30..0.40 in 0.01 steps, both ends included (v1.7)', () => {
+    const damages = new Set(many(squirrel, ant, 5000).filter((r) => r.hit).map((r) => r.damage));
+    expect([...damages].sort((a, b) => a - b)).toEqual([30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40]);
+  });
+
+  it('a level advantage raises the hit rate', () => {
+    const rate = (levelDiff: number) => {
+      let rng: RngState = createRng(9);
+      let hits = 0;
+      for (let i = 0; i < 20000; i++) {
+        const r = resolveAttack(squirrel, ant, rules, rng, levelDiff);
+        rng = r.rng;
+        if (r.result.hit) hits++;
+      }
+      return hits / 20000;
+    };
+    // 85 % vs 75 % (−20 levels × 0.5 %).
+    expect(rate(0)).toBeGreaterThan(rate(-20) + 0.07);
   });
 
   it('never hits more often than 98 % or less than 5 %', () => {

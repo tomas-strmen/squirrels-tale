@@ -7,15 +7,16 @@ the seeded Rng and returns the advanced one. Values are internal integers
 ## Public API
 - `createCombatRules(input)` – formula constants from `data/balance.json` `combat`.
 - `createFighterStats(input)` – one fighter's stats from design values.
-- `hitChancePct(attacker, defender, rules)` – `clamp(hit − dodge, 5 %, 98 %)`.
+- `hitChancePct(attacker, defender, rules, levelDiff?)` – `clamp(hit + 0.5 % × levelDiff − dodge, 5 %, 98 %)`
+  (GDD 7.2 v1.7; `levelDiff` = attacker level − defender level).
 - `damageReduction(armor, rules)` – `armor / (armor + 10)`, max 75 %.
-- `finalDamage(raw, armor, rules)` – reduced by armor, rounded to 0.1, min 0.1.
-- `resolveAttack(attacker, defender, rules, rng)` – hit roll, damage roll
-  (uniform, 0.1 steps, both ends included), armor → `{ result: { hit, damage }, rng }`.
+- `finalDamage(raw, armor, rules)` – reduced by armor, rounded to 0.01, min 0.1.
+- `resolveAttack(attacker, defender, rules, rng, levelDiff?)` – hit roll (0.01 % steps), damage roll
+  (uniform, 0.01 steps, both ends included), armor → `{ result: { hit, damage }, rng }`.
 
 ## Not yet (later stages)
 hit% / skill bonuses, damage%, weapon skill and ammo multipliers (M4, M7, M12);
 crit and stun are locked until quests Q3 / Q8 (GDD 6.1).
 
 ## Depends on
-- `core/numbers`, `core/rng`.
+- `core/numbers`, `core/rng`, `core/time` (`secondsToMs`).

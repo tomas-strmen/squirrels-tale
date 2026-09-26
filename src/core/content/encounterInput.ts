@@ -11,6 +11,7 @@ export function toEncounterConfigInput(balance: Balance, enemy: Enemy): Encounte
     searchDurationS: balance.encounter.searchDurationS,
     playerAttackIntervalS: balance.player.unarmedAttackIntervalS,
     enemyAttackIntervalS: enemy.attackIntervalS,
+    playerAttackSpeedPctPerLevel: balance.player.attackSpeedPctPerLevel,
     player: {
       maxHp: balance.player.maxHp,
       damageMin: balance.player.unarmedDamageMin,
@@ -28,6 +29,8 @@ export function toEncounterConfigInput(balance: Balance, enemy: Enemy): Encounte
       armor: enemy.armor,
       dodgePct: enemy.dodgePct,
     },
+    // GDD 8.4: fixed at the enemy's base level until the map (M6) rolls it per tile.
+    enemyLevel: enemy.baseLevel,
     enemyXp: enemy.xp,
     rules: balance.combat,
   };

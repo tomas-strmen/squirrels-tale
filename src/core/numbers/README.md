@@ -8,7 +8,8 @@ into floating point rounding drift.
 - `toHundredths(designValue)` – design value → whole hundredths (5.3 → 530). Throws
   on more than 1 decimal place or a non-finite value.
 - `fromHundredths(hundredths)` – hundredths → plain decimal, for further math.
-- `formatHundredths(hundredths)` – hundredths → display string rounded to 0.1 (e.g. `"5.3"`).
+- `formatHundredths(hundredths)` – hundredths → display string rounded **down** to 0.1
+  (GDD 5, v1.7: `499` → `"4.9"`). Internal math keeps 2 decimals.
 
 ## Rules
 - This module is for stats and other non-duration values (HP, damage, armor, ...).

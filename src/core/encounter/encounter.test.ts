@@ -6,6 +6,7 @@ import {
   createEncounterConfig,
   hpFraction,
   makePeace,
+  playerAttackIntervalMs,
   playerStats,
   searchProgress,
   startSearch,
@@ -16,7 +17,15 @@ import {
   type EncounterState,
 } from './encounter';
 
-const rules = { minHitPct: 5, maxHitPct: 98, armorConstant: 10.0, maxDamageReductionPct: 75, minDamage: 0.1 };
+const rules = {
+  minHitPct: 5,
+  maxHitPct: 98,
+  armorConstant: 10.0,
+  maxDamageReductionPct: 75,
+  minDamage: 0.1,
+  hitPctPerLevelDiff: 0.5,
+  minAttackIntervalS: 0.5,
+};
 const squirrelInput = { maxHp: 5.0, damageMin: 0.3, damageMax: 0.4, hitPct: 85, armor: 0, dodgePct: 0 };
 const antInput = { maxHp: 1.2, damageMin: 0.2, damageMax: 0.3, hitPct: 65, armor: 0, dodgePct: 0 };
 
@@ -25,8 +34,10 @@ function makeConfig(patch: Partial<EncounterConfigInput> = {}): EncounterConfig 
     searchDurationS: 1.0,
     playerAttackIntervalS: 2.0,
     enemyAttackIntervalS: 3.0,
+    playerAttackSpeedPctPerLevel: 1,
     player: squirrelInput,
     enemy: antInput,
+    enemyLevel: 1,
     enemyXp: 2,
     rules,
     ...patch,
@@ -114,6 +125,11 @@ describe('createEncounterConfig', () => {
     expect(() => makeConfig({ enemyAttackIntervalS: 0.25 })).toThrow();
   });
 
+  it('rejects an invalid enemy level', () => {
+    expect(() => makeConfig({ enemyLevel: 0 })).toThrow();
+    expect(() => makeConfig({ enemyLevel: 1.5 })).toThrow();
+  });
+
   it('rejects an invalid player base (e.g. 0 HP)', () => {
     expect(() => makeConfig({ player: { ...squirrelInput, maxHp: 0 } })).toThrow();
   });
@@ -146,6 +162,18 @@ describe('playerStats (GDD 6.2 level bonuses)', () => {
     expect(playerStats(config, 2).damageMin).toBe(40);
     expect(playerStats(config, 3).damageMin).toBe(40);
     expect(playerStats(config, 4).damageMin).toBe(50);
+  });
+});
+
+describe('playerAttackIntervalMs (GDD 6.1 v1.7)', () => {
+  it('is the base interval at level 1 and 1 % faster per level, compounding', () => {
+    expect(playerAttackIntervalMs(config, 1)).toBe(2000);
+    expect(playerAttackIntervalMs(config, 2)).toBe(Math.round(2000 / 1.01));
+    expect(playerAttackIntervalMs(config, 10)).toBe(Math.round(2000 / 1.01 ** 9));
+  });
+
+  it('never goes below 0.5 s', () => {
+    expect(playerAttackIntervalMs(config, 500)).toBe(500);
   });
 });
 
@@ -188,6 +216,30 @@ describe('encounter', () => {
     const { log } = run(fighting(tanky), 120, tanky); // 12 s of fighting
     expect(attacks(log, 'player').map((l) => l.tick)).toEqual([20, 40, 60, 80, 100, 120]);
     expect(attacks(log, 'enemy').map((l) => l.tick)).toEqual([30, 60, 90, 120]);
+  });
+
+  it('a higher player level attacks faster (x1.01 per level)', () => {
+    const atLevel = (level: number) => {
+      const start = { ...fighting(tanky), progression: { level, xp: 0 } };
+      return attacks(run(start, 6000, tanky).log, 'player').length; // 10 min of fighting
+    };
+    // Lv1: 2.0 s -> 300 attacks; Lv10: ~1.83 s -> ~328.
+    expect(atLevel(1)).toBe(300);
+    expect(atLevel(10)).toBeGreaterThan(320);
+  });
+
+  it('the level difference shifts hit chance for both sides (GDD 7.2 v1.7)', () => {
+    const hitRate = (cfg: EncounterConfig, who: 'player' | 'enemy') => {
+      const all = attacks(run(fighting(cfg, 5), 20000, cfg).log, who).map((l) => l.event);
+      return all.filter((e) => e.type === 'attack' && e.hit).length / all.length;
+    };
+    const strongEnemy = makeConfig({
+      player: { ...squirrelInput, maxHp: 999.0 },
+      enemy: { ...antInput, maxHp: 999.0 },
+      enemyLevel: 21, // 20 levels above the squirrel: -10 % for her, +10 % for the enemy
+    });
+    expect(hitRate(tanky, 'player') - hitRate(strongEnemy, 'player')).toBeGreaterThan(0.06);
+    expect(hitRate(strongEnemy, 'enemy') - hitRate(tanky, 'enemy')).toBeGreaterThan(0.06);
   });
 
   it('player attacks first when both are due in the same tick', () => {

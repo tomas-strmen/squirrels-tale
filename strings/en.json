@@ -18,6 +18,8 @@
   "stats.maxHp": "Max HP",
   "stats.damage": "Damage",
   "stats.hitChance": "Hit chance",
+  "stats.attackInterval": "Attack interval",
+  "fight.levelShort": "Lv",
   "stats.armor": "Armor",
   "fight.leveledUp": "Level up!",
   "player.name": "Squirrel",

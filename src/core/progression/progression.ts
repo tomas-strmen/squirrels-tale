@@ -1,5 +1,6 @@
 /**
  * XP, levels and the stat bonuses they grant (GDD 6.1/6.2, Changelog v1.7).
+ * Attack speed per level: see `attackIntervalMsAtLevel`.
  *
  * All XP amounts here are internal hundredths (core/numbers), like HP and
  * damage - enemy XP rewards can have 1 decimal place (e.g. 5.5), so plain
@@ -37,11 +38,11 @@ export function createProgression(): ProgressionState {
 }
 
 /**
- * XP needed to go from `level` to `level + 1` (GDD 6.2):
- * need(L) = round(10 x 1.4^(L-1)). Lv1: 10, Lv2: 14, Lv3: 20, Lv5: 38, Lv10: 207.
+ * XP needed to go from `level` to `level + 1` (GDD 6.2 v1.7):
+ * need(L) = round(10 x 1.3^(L-1)). Lv1: 10, Lv2: 13, Lv3: 17, Lv5: 29, Lv10: 106.
  */
 export function xpToNextLevel(level: number): number {
-  return Math.round(10 * 1.4 ** (level - 1));
+  return Math.round(10 * 1.3 ** (level - 1));
 }
 
 /** Same as `xpToNextLevel`, in hundredths (to compare against `ProgressionState.xp`). */
@@ -86,6 +87,21 @@ export function gainXp(state: ProgressionState, amountHundredths: number): GainX
     needed = xpToNextLevelHundredths(level);
   }
   return { state: { level, xp }, levelsGained };
+}
+
+/**
+ * Attack interval at `level` (GDD 6.1/7.2 v1.7): the base interval is divided by
+ * (1 + pct/100)^(level-1) - compounding, e.g. x1.01 per level - rounded to whole
+ * ms and never below `minMs`.
+ */
+export function attackIntervalMsAtLevel(
+  baseMs: number,
+  level: number,
+  speedPctPerLevel: number,
+  minMs: number,
+): number {
+  const factor = (1 + speedPctPerLevel / 100) ** (level - 1);
+  return Math.max(minMs, Math.round(baseMs / factor));
 }
 
 /**

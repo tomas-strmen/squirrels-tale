@@ -18,6 +18,7 @@ describe('idSchema', () => {
 describe('enemiesSchema / parseEnemies', () => {
   const ant = {
     id: 'worker_ant',
+    baseLevel: 1,
     maxHp: 1.2,
     damageMin: 0.2,
     damageMax: 0.3,
@@ -62,6 +63,11 @@ describe('enemiesSchema / parseEnemies', () => {
     expect(enemiesSchema.safeParse([{ ...ant, dodgePct: 120 }]).success).toBe(false);
   });
 
+  it('rejects a base level below 1 or not whole', () => {
+    expect(enemiesSchema.safeParse([{ ...ant, baseLevel: 0 }]).success).toBe(false);
+    expect(enemiesSchema.safeParse([{ ...ant, baseLevel: 1.5 }]).success).toBe(false);
+  });
+
   it('rejects HP with more than 1 decimal place', () => {
     expect(enemiesSchema.safeParse([{ ...ant, maxHp: 1.25 }]).success).toBe(false);
   });
@@ -81,8 +87,17 @@ describe('balanceSchema / parseBalance', () => {
       unarmedDamageMax: 0.4,
       hitPct: 85,
       armor: 0,
+      attackSpeedPctPerLevel: 1,
     },
-    combat: { minHitPct: 5, maxHitPct: 98, armorConstant: 10.0, maxDamageReductionPct: 75, minDamage: 0.1 },
+    combat: {
+      minHitPct: 5,
+      maxHitPct: 98,
+      armorConstant: 10.0,
+      maxDamageReductionPct: 75,
+      minDamage: 0.1,
+      hitPctPerLevelDiff: 0.5,
+      minAttackIntervalS: 0.5,
+    },
   };
 
   it('accepts valid data', () => {

@@ -6,7 +6,9 @@ are internal hundredths (core/numbers), like HP and damage.
 ## Public API
 - `createProgression()` – new state: level 1, 0 XP.
 - `xpToNextLevel(level)` / `xpToNextLevelHundredths(level)` – GDD 6.2 curve:
-  `need(L) = round(10 x 1.4^(L-1))`.
+  `need(L) = round(10 x 1.3^(L-1))` (v1.7).
+- `attackIntervalMsAtLevel(baseMs, level, pctPerLevel, minMs)` – base / (1 + pct/100)^(L−1),
+  whole ms, never below `minMs` (GDD 6.1 v1.7: ×1.01 per level, min 0.5 s).
 - `cumulativeLevelBonuses(level)` – total bonuses (hundredths) earned by that level:
   +1.0 max HP per level, +0.1 max damage every level, +0.1 min damage every 2nd level (GDD v1.7).
 - `levelUpDelta(level)` – bonus gained exactly when reaching `level` (used to heal

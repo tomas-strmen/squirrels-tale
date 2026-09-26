@@ -2,14 +2,26 @@
 
 ## Aktuálne
 - **Etapa:** M3 Progres (GDD kap. 22)
-- **Posledný krok:** GDD v1.7/v1.8 (rozpracované v Cowork relácii) – rast poškodenia zapracovaný do kódu,
-  debug rýchlosť ×50, zvyšok GDD v1.7 (XP krivka 1.3, rýchlosť útoku, presnosť podľa levelu, 2 desatinné
-  miesta) ešte len v dokumente – hotové, čaká na test/schválenie (PR na GitHube)
+- **Posledný krok:** M3.1b – zvyšok GDD v1.7/v1.8 v kóde – hotové, čaká na test/schválenie (PR na GitHube)
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model: podľa náročnosti kroku (poviem vopred). Od teraz: AI pripraví vetvu/commit/push a dá Tomasovi presné príkazy/odkaz na PR, test a merge robí Tomas sám (šetrí tokeny oproti ovládaniu prehliadača).
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.
 
 ## Hotové
+### M3.1b – GDD v1.7/v1.8 v kóde (2026-09-26)
+- `core/numbers`: zobrazenie **floor na 0.1** (4.99 → 4.9); interne 2 desatinné miesta (stotiny).
+- `core/combat`: hod poškodenia po **0.01**, výsledok zaokrúhlený na 0.01 (min 0.1); presnosť
+  `hit + 0.5 % × (level útočníka − level obrancu) − dodge`, hod v krokoch 0.01 %.
+- `core/progression`: XP krivka **1.3** (Lv2: 13, Lv10: 106); `attackIntervalMsAtLevel` – **×1.01/level**, min 0.5 s.
+- `core/encounter`: `enemyLevel` (GDD 8.4, zatiaľ pevne základný level z dát), presnosť oboch strán podľa
+  rozdielu levelov, interval útoku veveričky podľa levelu (`playerAttackIntervalMs`).
+- Dáta: `balance.json` – `attackSpeedPctPerLevel: 1`, `hitPctPerLevelDiff: 0.5`, `minAttackIntervalS: 0.5`;
+  `enemies.json` – `baseLevel: 1` (Worker Ant). Zod schémy rozšírené.
+- `FightScene`: „Worker Ant Lv1“ pri mene; v Show stats pribudol interval útoku a presnosť voči nepriateľovi.
+- **Zámerne neskôr (M6 mapa):** náhodný level nepriateľa z rozsahu políčka a rast nepriateľa za level
+  (HP +10 %, poškodenie +5 %, XP +10 %, dodge +0.5 %, crit +1 %).
+- 144 testov zelených (bolo 133). Overené v prehliadači.
+
 ### Zmeny z Cowork relácie – GDD v1.7/v1.8 (2026-09-26)
 - **GDD v1.7** (`docs/GDD.md`): výpočty na 2 desatinné miesta + zobrazenie floor na 0.1; poškodenie +0.1 max
   každý level a +0.1 min každý 2. (párny) level (nahrádza pravidlo z v1.6: +0.1 max každý 2., +0.1 min každý 5.);
@@ -129,13 +141,8 @@
 - GDD v1.1 a v1.2 zapísané v `docs/GDD.md` aj v projekte (`claude/GDD.md`).
 
 ## Ďalší krok
-1. Tomas otestuje vetvu `cowork/gdd-v1.8-speed-damage` (PR) → „schválené" → merge.
-2. **M3.1b – zvyšok GDD v1.7/v1.8 do kódu:** XP krivka 1.3 (`core/progression`), rýchlosť útoku ×1.01/level
-   (`core/encounter`/`combat`, min. interval 0.5 s), presnosť podľa rozdielu levelov veverička↔nepriateľ
-   (potrebuje level nepriateľa – zatiaľ pevne T1, kým nepríde mapa), výpočty na 2 desatinné miesta +
-   zobrazenie floor na 0.1 (`core/numbers`, nahradí terajšie zaokrúhľovanie), a levely nepriateľov (GDD 8.4:
-   rozsah pre Worker Ant na T1 je 1–2, zatiaľ len jeden level pevne). Model: Opus 5.5 (mení vzorec + zaokrúhľovanie).
-3. Potom **M3.2** – regenerácia HP a skutočná smrť → úkryt (GDD 6.3): online strata 10 % postupu v leveli,
+1. Tomas otestuje M3.1b (PR) → merge.
+2. **M3.2** – regenerácia HP a skutočná smrť → úkryt (GDD 6.3): online strata 10 % postupu v leveli,
    10 s regenerácia, hráč vyberie políčko. Model: Sonnet 5 stačí.
 
 ## Rozhodnutia (2026-09-26)

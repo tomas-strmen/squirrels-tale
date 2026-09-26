@@ -25,6 +25,7 @@ import {
 import { toHundredths } from '../numbers/numbers';
 import {
   addLevelBonus,
+  attackIntervalMsAtLevel,
   createProgression,
   cumulativeLevelBonuses,
   gainXp,
@@ -39,13 +40,17 @@ export type Combatant = 'player' | 'enemy';
 export interface EncounterConfig {
   /** How long the search for an enemy takes (ms). */
   readonly searchMs: number;
-  /** Time between two player attacks (ms). */
+  /** Time between two player attacks at level 1 (ms); faster per level, see playerAttackIntervalMs(). */
   readonly playerAttackIntervalMs: number;
+  /** Attack speed gained per player level, compounding (%, GDD 6.1 v1.7). */
+  readonly playerAttackSpeedPctPerLevel: number;
   /** Time between two enemy attacks (ms). */
   readonly enemyAttackIntervalMs: number;
   /** Player's base stats at level 1, before level bonuses (GDD 6.2). */
   readonly playerBase: FighterStatsInput;
   readonly enemy: FighterStats;
+  /** Enemy level (GDD 8.4). Fixed to its base level until the map (M6) rolls it per tile. */
+  readonly enemyLevel: number;
   /** XP granted when the enemy is defeated (hundredths). */
   readonly enemyXp: number;
   readonly rules: CombatRules;
@@ -56,8 +61,10 @@ export interface EncounterConfigInput {
   readonly searchDurationS: number;
   readonly playerAttackIntervalS: number;
   readonly enemyAttackIntervalS: number;
+  readonly playerAttackSpeedPctPerLevel: number;
   readonly player: FighterStatsInput;
   readonly enemy: FighterStatsInput;
+  readonly enemyLevel: number;
   /** XP granted when the enemy is defeated (design value, GDD 6.2/8.3). */
   readonly enemyXp: number;
   readonly rules: CombatRulesInput;
@@ -116,15 +123,20 @@ export function createEncounterConfig(input: EncounterConfigInput): EncounterCon
   if (playerAttackIntervalMs < TICK_MS || enemyAttackIntervalMs < TICK_MS) {
     throw new Error(`Attack intervals must be at least ${TICK_MS / 1000} s`);
   }
+  if (!Number.isInteger(input.enemyLevel) || input.enemyLevel < 1) {
+    throw new Error('enemyLevel must be a whole number >= 1');
+  }
   // Validates the base stats early (e.g. maxHp > 0); the checked value itself
   // is discarded because effective stats are recomputed per level, see playerStats().
   createFighterStats(input.player);
   return {
     searchMs,
     playerAttackIntervalMs,
+    playerAttackSpeedPctPerLevel: input.playerAttackSpeedPctPerLevel,
     enemyAttackIntervalMs,
     playerBase: input.player,
     enemy: createFighterStats(input.enemy),
+    enemyLevel: input.enemyLevel,
     enemyXp: toHundredths(input.enemyXp),
     rules: createCombatRules(input.rules),
   };
@@ -158,6 +170,16 @@ export function playerStats(config: EncounterConfig, level: number): FighterStat
     damageMax: addLevelBonus(config.playerBase.damageMax, bonus.maxDamageBonus),
     damageMin: addLevelBonus(config.playerBase.damageMin, bonus.minDamageBonus),
   });
+}
+
+/** The player's attack interval at `level` (GDD 6.1 v1.7: x1.01 per level, min 0.5 s). */
+export function playerAttackIntervalMs(config: EncounterConfig, level: number): number {
+  return attackIntervalMsAtLevel(
+    config.playerAttackIntervalMs,
+    level,
+    config.playerAttackSpeedPctPerLevel,
+    config.rules.minAttackIntervalMs,
+  );
 }
 
 /** Player pressed "Find enemy". Only works while idle. */
@@ -225,10 +247,13 @@ function tickFight(state: EncounterState, config: EncounterConfig): EncounterSte
   let playerAttackElapsedMs = state.playerAttackElapsedMs + TICK_MS;
   let enemyAttackElapsedMs = state.enemyAttackElapsedMs + TICK_MS;
   const player = playerStats(config, progression.level);
+  const playerIntervalMs = playerAttackIntervalMs(config, progression.level);
+  // GDD 7.2 v1.7: hit chance shifts 0.5 % per level of difference, mirrored for the enemy.
+  const levelDiff = progression.level - config.enemyLevel;
 
-  if (playerAttackElapsedMs >= config.playerAttackIntervalMs) {
-    playerAttackElapsedMs -= config.playerAttackIntervalMs;
-    const attack = resolveAttack(player, config.enemy, config.rules, rng);
+  if (playerAttackElapsedMs >= playerIntervalMs) {
+    playerAttackElapsedMs -= playerIntervalMs;
+    const attack = resolveAttack(player, config.enemy, config.rules, rng, levelDiff);
     rng = attack.rng;
     enemyHp = Math.max(0, enemyHp - attack.result.damage);
     events.push({ type: 'attack', attacker: 'player', ...attack.result });
@@ -262,7 +287,7 @@ function tickFight(state: EncounterState, config: EncounterConfig): EncounterSte
 
   if (enemyAttackElapsedMs >= config.enemyAttackIntervalMs) {
     enemyAttackElapsedMs -= config.enemyAttackIntervalMs;
-    const attack = resolveAttack(config.enemy, player, config.rules, rng);
+    const attack = resolveAttack(config.enemy, player, config.rules, rng, -levelDiff);
     rng = attack.rng;
     playerHp = Math.max(0, playerHp - attack.result.damage);
     events.push({ type: 'attack', attacker: 'enemy', ...attack.result });
@@ -321,7 +346,9 @@ export function attackProgress(
 ): number {
   if (state.phase !== 'fighting') return 0;
   return who === 'player'
-    ? clamp01((state.playerAttackElapsedMs + extraMs) / config.playerAttackIntervalMs)
+    ? clamp01(
+        (state.playerAttackElapsedMs + extraMs) / playerAttackIntervalMs(config, state.progression.level),
+      )
     : clamp01((state.enemyAttackElapsedMs + extraMs) / config.enemyAttackIntervalMs);
 }
 

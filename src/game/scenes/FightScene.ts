@@ -129,9 +129,15 @@ export class FightScene extends Phaser.Scene {
       this.state = step.state;
       step.events.forEach((e) => this.onEvent(e));
     }
-    this.searchBar.setProgress(searchProgress(this.state, this.config));
-    this.playerBar.setProgress(attackProgress(this.state, this.config, 'player'));
-    this.enemyBar.setProgress(attackProgress(this.state, this.config, 'enemy'));
+    // accumulatorMs (< 1 tick, always > 0) smooths the bars between ticks for
+    // rendering only - it never changes the simulation state itself.
+    this.searchBar.setProgress(searchProgress(this.state, this.config, this.accumulatorMs));
+    this.playerBar.setProgress(
+      attackProgress(this.state, this.config, 'player', this.accumulatorMs),
+    );
+    this.enemyBar.setProgress(
+      attackProgress(this.state, this.config, 'enemy', this.accumulatorMs),
+    );
   }
 
   private onFindEnemy(): void {

@@ -11,7 +11,10 @@ Pure TypeScript, no Phaser. M0.1 scope: no HP or damage, the fight repeats forev
   (event `peaceMade { from }`; the enemy leaves, no XP/loot). Does nothing while `idle`.
 - `tick(state, config)` – advances one 100 ms step, returns new state + events
   (`searchStarted`, `enemyFound`, `attack { attacker }`).
-- `searchProgress(...)`, `attackProgress(...)` – 0..1 values for UI bars.
+- `searchProgress(state, config, extraMs?)`, `attackProgress(state, config, who, extraMs?)` – 0..1 values
+  for UI bars. `extraMs` (default 0) is real time since the last tick (< 100 ms, from
+  `consumeFrame`'s leftover `accumulatorMs`); it only smooths rendering between ticks
+  and never changes the simulation.
 
 ## Rules
 - All functions are pure (input state is never modified).

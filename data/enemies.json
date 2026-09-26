@@ -1,6 +1,12 @@
 [
   {
     "id": "worker_ant",
-    "attackIntervalS": 2.0
+    "maxHp": 1.2,
+    "damageMin": 0.2,
+    "damageMax": 0.3,
+    "attackIntervalS": 2.0,
+    "hitPct": 65,
+    "armor": 0,
+    "dodgePct": 0
   }
 ]

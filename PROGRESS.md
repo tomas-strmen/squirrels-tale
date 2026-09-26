@@ -1,13 +1,26 @@
 # PROGRESS – stav vývoja
 
 ## Aktuálne
-- **Etapa:** M1 Základy core (GDD kap. 22) – **M1 hotové** ✅ (numbers, rng, clock, event bus, zod validácia dát, debug panel)
-- **Posledný krok:** M1.3 – debug panel – hotové, zlúčené cez PR #5. Tomas dal na toto sedenie voľnú ruku (~1 h) – PR #3, #4, #5 som otvoril aj zmergoval sám cez jeho prihlásené Chrome (rozšírenie „Claude in Chrome“), keďže `gh` CLI nebolo prihlásené.
-- **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model Claude Sonnet 5 (Opus 5.5 len pre náročnejšie etapy – povie sa vopred). AI spúšťa npm/git sama.
+- **Etapa:** M2 Boj (GDD kap. 22)
+- **Posledný krok:** M2.1 – boj s HP, zásahom/minutím, armorom a poškodením – hotové, čaká na test a schválenie Tomasa (PR na GitHube)
+- **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model: Opus 5.5 na M2.1, na M2.2 stačí Sonnet 5. AI spúšťa npm/git sama; PR otvára a merguje cez Tomasovo Chrome (rozšírenie Claude in Chrome).
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.
 
 ## Hotové
+### M2.1 – boj s HP (2026-09-26)
+- `data/enemies.json`: Worker Ant 1.2 HP, úder 0.2–0.3, zásah 65 %, armor 0, dodge 0 (GDD 8.3).
+  `data/balance.json`: veverička 5.0 HP, úder bez zbrane **0.3–0.4** (Tomas; GDD v1.5), zásah 85 %,
+  armor 0; konštanty vzorca `combat` (zásah 5–98 %, armor + 10, max. redukcia 75 %, min. 0.1).
+- Nový modul `core/combat`: jeden úder podľa GDD 7.2 (hit − dodge, rovnomerný hod po 0.1, armor,
+  zaokrúhlenie na 0.1, min. 0.1). Crit/stun/dodge veveričky zamknuté (GDD 6.1), bonusy zo zbraní/skillov neskôr.
+- `core/encounter`: HP oboch, seedovaný Rng v stave; po zabití mravca hneď nové hľadanie 1.0 s (GDD 7.1);
+  keď veverička padne → späť do čakania s plným HP (dočasné do M3). Peace! HP nemení.
+- `core/content/encounterInput.ts`: jedno miesto, ktoré z dát skladá konfiguráciu boja (hra aj testy).
+- `FightScene`: HP bary + čísla HP, vyskakujúce poškodenie / „Miss“, mravec po smrti zmizne, „Knocked out!“.
+- Test bez prehliadača: 100 bojov s rovnakým seedom = presne rovnaký výsledok (GDD M2). 109 testov zelených.
+- Tempo (len na vedomie, ladí sa v M20): ~20 s na mravca, bez regenerácie (M3) veverička padne približne pri 3. mravcovi.
+
 ### M1.3 – debug panel (2026-09-26)
 - `src/game/ui/DebugPanel.ts`: prekryv v ľavom hornom rohu, zapína/vypína klávesou **D**.
   Ukazuje zoznam načítaných nepriateľov (id + interval útoku) a počet načítaných textov
@@ -75,18 +88,9 @@
 - GDD v1.1 a v1.2 zapísané v `docs/GDD.md` aj v projekte (`claude/GDD.md`).
 
 ## Ďalší krok
-**M1 Základy core je celá hotová.** Ďalej podľa GDD kap. 22: **M2 Boj** – simulácia 1v1 v 100 ms
-krokoch s HP, hit/miss, armor a poškodením (presný vzorec v GDD 7.2), HP bary, Worker Ant
-v slučke, debug rýchlosť ×1/×4/×20.
-- **Zámerne som M2 nezačal sám**, hoci som mal na toto sedenie voľnú ruku – je to väčšia etapa,
-  ktorá mení dátovú schému (`data/enemies.json` potrebuje pridať HP/damage/armor) a herný pocit
-  (ako rýchlo sa umiera), preto si to podľa dohodnutého postupu zaslúži tvoje „ok" k rozdeleniu
-  na kroky, nie len tichý PR.
-- Návrh rozdelenia (poviem podrobne na budúcom sedení): **M2.1** – rozšíriť `data/enemies.json`
-  o `hp`, `damageMin`/`damageMax`, `armor` (zatiaľ len Worker Ant) + `core/combat` (čisté HP/damage
-  bez crit/stun/dodge – tie sú podľa GDD 12/13 zamknuté až do M12); **M2.2** – HP bary vo
-  `FightScene`, smrť/víťazstvo, debug rýchlosť ×1/×4/×20.
-- Ešte treba: otestovať hru na mobile (na šírku) na https://tomas-strmen.github.io/squirrels-tale/ – jediné, čo AI z počítača nevie sama overiť.
+1. Tomas otestuje M2.1 (PR) → „schválené" → merge.
+2. **M2.2** – rýchlosť ×1/×4/×20 (tlačidlo vpravo hore, funguje aj na mobile). Model: Sonnet 5.
+3. Potom **M3 Progres** (XP, levely, regenerácia, smrť → úkryt). Model: Sonnet 5 stačí, Opus pri XP krivke/smrti len ak sa zasekneme.
 
 ## Rozhodnutia (2026-09-26)
 - Find enemy po príchode na políčko, potom automatické hľadanie po každom zabití; Peace! zastaví a ukončí boj hneď (bez XP/lootu).

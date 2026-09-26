@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import balance from '../data/balance.json';
 import enemies from '../data/enemies.json';
 import en from '../strings/en.json';
+import { toEncounterConfigInput } from './core/content/encounterInput';
 import { parseBalance, parseEnemies } from './core/content/schemas';
 import { createEncounterConfig } from './core/encounter/encounter';
 
@@ -30,11 +31,7 @@ describe('data + strings', () => {
     const validBalance = parseBalance(balance);
     for (const enemy of parseEnemies(enemies)) {
       expect(() =>
-        createEncounterConfig({
-          searchDurationS: validBalance.encounter.searchDurationS,
-          playerAttackIntervalS: validBalance.player.unarmedAttackIntervalS,
-          enemyAttackIntervalS: enemy.attackIntervalS,
-        }),
+        createEncounterConfig(toEncounterConfigInput(validBalance, enemy)),
       ).not.toThrow();
     }
   });

@@ -2,11 +2,14 @@ import Phaser from 'phaser';
 import balanceData from '../../../data/balance.json';
 import enemiesData from '../../../data/enemies.json';
 import en from '../../../strings/en.json';
+import { now } from '../../core/clock/clock';
+import { toEncounterConfigInput } from '../../core/content/encounterInput';
 import { parseBalance, parseEnemies } from '../../core/content/schemas';
 import {
   attackProgress,
   createEncounter,
   createEncounterConfig,
+  hpFraction,
   makePeace,
   searchProgress,
   startSearch,
@@ -16,6 +19,8 @@ import {
   type EncounterEvent,
   type EncounterState,
 } from '../../core/encounter/encounter';
+import { formatHundredths } from '../../core/numbers/numbers';
+import { createRng } from '../../core/rng/rng';
 import { consumeFrame } from '../../core/time/fixedStep';
 import { t, tDynamic } from '../text';
 import { Button } from '../ui/Button';
@@ -31,10 +36,13 @@ const FIGHTER_SIZE = 120;
 const LUNGE_PX = 40;
 const PEACE_X = 1080;
 const BUTTON_Y = 620;
+const HP_BAR_Y = FIGHTER_Y - 95;
 
 /**
  * M0.1: squirrel waits, "Find enemy" → search bar → enemy appears → attack bars loop.
  * M0.1b: "Peace!" (while searching or fighting) → back to waiting.
+ * M2.1: HP bars, damage numbers / "Miss", enemy dies → next search; squirrel
+ * knocked out → back to waiting at full HP (placeholder until M3).
  */
 export class FightScene extends Phaser.Scene {
   private config!: EncounterConfig;
@@ -52,6 +60,11 @@ export class FightScene extends Phaser.Scene {
   private findButton!: Button;
   private peaceButton!: Button;
   private debugPanel!: DebugPanel;
+  private playerHpBar!: ProgressBar;
+  private playerHpText!: Phaser.GameObjects.Text;
+  private enemyHpBar!: ProgressBar;
+  private enemyHpText!: Phaser.GameObjects.Text;
+  private textStyle = { fontFamily: 'Arial, sans-serif', color: '#e0e0e0' };
 
   constructor() {
     super('FightScene');
@@ -65,15 +78,12 @@ export class FightScene extends Phaser.Scene {
     const enemyData = enemies[0];
     if (!enemyData) throw new Error('data/enemies.json has no enemies');
 
-    this.config = createEncounterConfig({
-      searchDurationS: balance.encounter.searchDurationS,
-      playerAttackIntervalS: balance.player.unarmedAttackIntervalS,
-      enemyAttackIntervalS: enemyData.attackIntervalS,
-    });
-    this.state = createEncounter();
+    this.config = createEncounterConfig(toEncounterConfigInput(balance, enemyData));
+    // Seeded Rng (GDD 5); a new seed per session until saves arrive in M8.
+    this.state = createEncounter(this.config, createRng(now()));
     this.accumulatorMs = 0;
 
-    const textStyle = { fontFamily: 'Arial, sans-serif', color: '#e0e0e0' };
+    const textStyle = this.textStyle;
 
     this.add.text(W / 2, 60, t('game.title'), { ...textStyle, fontSize: '44px' }).setOrigin(0.5);
 
@@ -89,6 +99,15 @@ export class FightScene extends Phaser.Scene {
       width: 200,
       height: 22,
       fillColor: 0xdddddd,
+    });
+    // HP (always visible for the squirrel)
+    this.playerHpText = this.add
+      .text(PLAYER_X, HP_BAR_Y - 24, '', { ...textStyle, fontSize: '18px' })
+      .setOrigin(0.5);
+    this.playerHpBar = new ProgressBar(this, PLAYER_X, HP_BAR_Y, {
+      width: 160,
+      height: 16,
+      fillColor: 0x8fbf8f,
     });
     // Attack bar only makes sense while fighting.
     this.playerAttackGroup = this.add.container(0, 0, [playerAttackLabel, this.playerBar]);
@@ -112,7 +131,22 @@ export class FightScene extends Phaser.Scene {
       height: 22,
       fillColor: 0x9a9a9a,
     });
-    this.enemyGroup = this.add.container(0, 0, [this.enemy, enemyName, enemyAttackLabel, this.enemyBar]);
+    this.enemyHpText = this.add
+      .text(ENEMY_X, HP_BAR_Y - 24, '', { ...textStyle, fontSize: '18px' })
+      .setOrigin(0.5);
+    this.enemyHpBar = new ProgressBar(this, ENEMY_X, HP_BAR_Y, {
+      width: 160,
+      height: 16,
+      fillColor: 0xbf8f8f,
+    });
+    this.enemyGroup = this.add.container(0, 0, [
+      this.enemy,
+      enemyName,
+      enemyAttackLabel,
+      this.enemyBar,
+      this.enemyHpText,
+      this.enemyHpBar,
+    ]);
     this.enemyGroup.setVisible(false);
 
     // Find enemy button + search bar (same spot, one visible at a time)
@@ -159,6 +193,17 @@ export class FightScene extends Phaser.Scene {
     this.enemyBar.setProgress(
       attackProgress(this.state, this.config, 'enemy', this.accumulatorMs),
     );
+    this.playerHpBar.setProgress(hpFraction(this.state, this.config, 'player'));
+    this.playerHpText.setText(
+      `${formatHundredths(this.state.playerHp)} / ${formatHundredths(this.config.player.maxHp)}`,
+    );
+    // Keep showing the last enemy HP while it fades out after its defeat.
+    if (this.state.phase === 'fighting') {
+      this.enemyHpBar.setProgress(hpFraction(this.state, this.config, 'enemy'));
+      this.enemyHpText.setText(
+        `${formatHundredths(this.state.enemyHp)} / ${formatHundredths(this.config.enemy.maxHp)}`,
+      );
+    }
   }
 
   private onFindEnemy(): void {
@@ -182,12 +227,31 @@ export class FightScene extends Phaser.Scene {
         break;
       case 'enemyFound':
         this.searchGroup.setVisible(false);
+        this.tweens.killTweensOf(this.enemyGroup);
+        this.enemy.setAlpha(1);
         this.enemyGroup.setVisible(true).setAlpha(0);
         this.tweens.add({ targets: this.enemyGroup, alpha: 1, duration: 250 });
         this.playerAttackGroup.setVisible(true);
         break;
       case 'attack':
-        this.lunge(event.attacker);
+        this.lunge(event.attacker, event.hit);
+        this.popup(event.attacker === 'player' ? ENEMY_X : PLAYER_X, event.hit, event.damage);
+        break;
+      case 'enemyDefeated':
+        // Enemy bar shows 0 before it fades; next search starts in the same tick.
+        this.enemyHpBar.setProgress(0);
+        this.enemyHpText.setText(`0.0 / ${formatHundredths(this.config.enemy.maxHp)}`);
+        this.playerAttackGroup.setVisible(false);
+        this.tweens.add({
+          targets: this.enemyGroup,
+          alpha: 0,
+          duration: 400,
+          onComplete: () => this.enemyGroup.setVisible(false),
+        });
+        break;
+      case 'playerDefeated':
+        this.resetToIdle();
+        this.floatingText(PLAYER_X, FIGHTER_Y - 70, t('fight.knockedOut'), '#ff9f9f', 1500);
         break;
       case 'peaceMade':
         this.resetToIdle();
@@ -212,8 +276,31 @@ export class FightScene extends Phaser.Scene {
     this.findButton.setVisible(true);
   }
 
-  /** Short hop towards the opponent + flash of the target (visual only). */
-  private lunge(attacker: Combatant): void {
+  /** Damage number or "Miss" rising above the target. */
+  private popup(x: number, hit: boolean, damage: number): void {
+    if (hit) {
+      this.floatingText(x, FIGHTER_Y - 70, `-${formatHundredths(damage)}`, '#ffffff', 700);
+    } else {
+      this.floatingText(x, FIGHTER_Y - 70, t('fight.miss'), '#a0a0a0', 700);
+    }
+  }
+
+  private floatingText(x: number, y: number, text: string, color: string, durationMs: number): void {
+    const label = this.add
+      .text(x, y, text, { ...this.textStyle, fontSize: '28px', color })
+      .setOrigin(0.5);
+    this.tweens.add({
+      targets: label,
+      y: y - 40,
+      alpha: 0,
+      duration: durationMs,
+      ease: 'Quad.easeOut',
+      onComplete: () => label.destroy(),
+    });
+  }
+
+  /** Short hop towards the opponent + flash of the target on a hit (visual only). */
+  private lunge(attacker: Combatant, hit: boolean): void {
     const [shape, target, dir, baseX] =
       attacker === 'player'
         ? [this.player, this.enemy, 1, PLAYER_X]
@@ -227,6 +314,7 @@ export class FightScene extends Phaser.Scene {
       yoyo: true,
       ease: 'Quad.easeOut',
     });
+    if (!hit) return;
     this.tweens.add({
       targets: target,
       alpha: 0.4,

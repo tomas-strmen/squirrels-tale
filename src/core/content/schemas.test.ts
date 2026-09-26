@@ -16,7 +16,17 @@ describe('idSchema', () => {
 });
 
 describe('enemiesSchema / parseEnemies', () => {
-  const valid = [{ id: 'worker_ant', attackIntervalS: 2.0 }];
+  const ant = {
+    id: 'worker_ant',
+    maxHp: 1.2,
+    damageMin: 0.2,
+    damageMax: 0.3,
+    attackIntervalS: 2.0,
+    hitPct: 65,
+    armor: 0,
+    dodgePct: 0,
+  };
+  const valid = [ant];
 
   it('accepts valid data', () => {
     expect(() => parseEnemies(valid)).not.toThrow();
@@ -27,27 +37,52 @@ describe('enemiesSchema / parseEnemies', () => {
   });
 
   it('rejects duplicate ids', () => {
-    const dup = [...valid, { id: 'worker_ant', attackIntervalS: 3.0 }];
+    const dup = [ant, { ...ant, attackIntervalS: 3.0 }];
     expect(enemiesSchema.safeParse(dup).success).toBe(false);
   });
 
   it('rejects more than 1 decimal place', () => {
-    const bad = [{ id: 'worker_ant', attackIntervalS: 2.25 }];
+    const bad = [{ ...ant, attackIntervalS: 2.25 }];
     expect(enemiesSchema.safeParse(bad).success).toBe(false);
   });
 
   it('rejects a negative attack interval', () => {
-    const bad = [{ id: 'worker_ant', attackIntervalS: -1 }];
+    const bad = [{ ...ant, attackIntervalS: -1 }];
     expect(enemiesSchema.safeParse(bad).success).toBe(false);
   });
 
+  it('rejects damageMin greater than damageMax', () => {
+    expect(enemiesSchema.safeParse([{ ...ant, damageMin: 0.5, damageMax: 0.3 }]).success).toBe(false);
+  });
+
+  it('rejects zero HP, non-integer or out-of-range percentages', () => {
+    expect(enemiesSchema.safeParse([{ ...ant, maxHp: 0 }]).success).toBe(false);
+    expect(enemiesSchema.safeParse([{ ...ant, hitPct: 65.5 }]).success).toBe(false);
+    expect(enemiesSchema.safeParse([{ ...ant, dodgePct: 120 }]).success).toBe(false);
+  });
+
+  it('rejects HP with more than 1 decimal place', () => {
+    expect(enemiesSchema.safeParse([{ ...ant, maxHp: 1.25 }]).success).toBe(false);
+  });
+
   it('throws a readable error for bad data', () => {
-    expect(() => parseEnemies([{ id: 'Bad Id', attackIntervalS: 2.0 }])).toThrow(/snake_case/);
+    expect(() => parseEnemies([{ ...ant, id: 'Bad Id' }])).toThrow(/snake_case/);
   });
 });
 
 describe('balanceSchema / parseBalance', () => {
-  const valid = { encounter: { searchDurationS: 1.0 }, player: { unarmedAttackIntervalS: 4.0 } };
+  const valid = {
+    encounter: { searchDurationS: 1.0 },
+    player: {
+      maxHp: 5.0,
+      unarmedAttackIntervalS: 4.0,
+      unarmedDamageMin: 0.3,
+      unarmedDamageMax: 0.4,
+      hitPct: 85,
+      armor: 0,
+    },
+    combat: { minHitPct: 5, maxHitPct: 98, armorConstant: 10.0, maxDamageReductionPct: 75, minDamage: 0.1 },
+  };
 
   it('accepts valid data', () => {
     expect(() => parseBalance(valid)).not.toThrow();
@@ -58,7 +93,12 @@ describe('balanceSchema / parseBalance', () => {
   });
 
   it('rejects more than 1 decimal place', () => {
-    const bad = { ...valid, player: { unarmedAttackIntervalS: 4.05 } };
+    const bad = { ...valid, player: { ...valid.player, unarmedAttackIntervalS: 4.05 } };
+    expect(balanceSchema.safeParse(bad).success).toBe(false);
+  });
+
+  it('rejects minHitPct greater than maxHitPct', () => {
+    const bad = { ...valid, combat: { ...valid.combat, minHitPct: 99 } };
     expect(balanceSchema.safeParse(bad).success).toBe(false);
   });
 });

@@ -2,12 +2,20 @@
 
 ## Aktuálne
 - **Etapa:** M0 Kostra (GDD kap. 22) – **M0 hotové** ✅
-- **Posledný krok:** M0.3 – Playwright smoke test + GitHub Pages – **schválené** Tomasom (2026-09-26), zlúčené do `main` cez PR #1
+- **Posledný krok:** vyhladenie barov hľadania/útoku (mimo plánu, na žiadosť Tomasa) – zlúčené do `main` cez PR #2
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model Claude Sonnet 5 (Opus 5.5 len pre náročnejšie etapy – povie sa vopred). AI spúšťa npm/git sama.
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.
 
 ## Hotové
+### Vyhladenie barov hľadania/útoku (2026-09-26)
+- `searchProgress`/`attackProgress` v `core/encounter` majú nový voliteľný parameter `extraMs`
+  (reálny čas od posledného 100 ms kroku) – bary sa vykresľujú plynulo medzi krokmi, samotná
+  simulácia stále beží len v pevných 100 ms krokoch (GDD 5, nezmenené).
+- Dôvod: Tomas si všimol "poskakovanie" barov; simuláciu na 30 FPS/33 ms sme nemenili
+  (rozbilo by to determinizmus a čísla v dátach) – vyriešené len vo vykresľovaní.
+- 2 nové testy, PR #2, CI zelené, zlúčené do `main`.
+
 ### M0.3 – Playwright smoke test + GitHub Pages (2026-09-26) – schválené
 - `e2e/smoke.spec.ts` (Playwright): zbuildí produkčnú verziu, otvorí ju v reálnom prehliadači, overí že Phaser canvas sa vykreslí bez chýb, uloží screenshot. Beží v CI (`npm run test:e2e`).
 - Nový `.github/workflows/deploy.yml`: po push na `main` zbuildí hru a nahrá na GitHub Pages (Settings → Pages → Source: GitHub Actions – nastavené).

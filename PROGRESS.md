@@ -1,12 +1,18 @@
 # PROGRESS – stav vývoja
 
 ## Aktuálne
-- **Etapa:** M0 Kostra (GDD kap. 22)
-- **Posledný krok:** M0.2 – GitHub repozitár + CI – hotové, čaká na test Tomasa
+- **Etapa:** M0 Kostra (GDD kap. 22) – **M0 hotové** ✅
+- **Posledný krok:** M0.3 – Playwright smoke test + GitHub Pages – **schválené** Tomasom (2026-09-26), zlúčené do `main` cez PR #1
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model Claude Sonnet 5 (Opus 5.5 len pre náročnejšie etapy – povie sa vopred). AI spúšťa npm/git sama.
-- **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené.
+- **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
+- **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.
 
 ## Hotové
+### M0.3 – Playwright smoke test + GitHub Pages (2026-09-26) – schválené
+- `e2e/smoke.spec.ts` (Playwright): zbuildí produkčnú verziu, otvorí ju v reálnom prehliadači, overí že Phaser canvas sa vykreslí bez chýb, uloží screenshot. Beží v CI (`npm run test:e2e`).
+- Nový `.github/workflows/deploy.yml`: po push na `main` zbuildí hru a nahrá na GitHub Pages (Settings → Pages → Source: GitHub Actions – nastavené).
+- Prvý PR (#1) na tomto repozitári, CI aj deploy beh zelené, overené naostro na verejnej adrese (AI aj Tomas).
+
 ### M0.2 – GitHub repozitár + CI (2026-09-26)
 - Repozitár `squirrels-tale` založený a nahraný (`git push`), zatiaľ priamo do `main` (PR workflow začne od ďalšieho kroku).
 - `.github/workflows/ci.yml`: `npm ci` + `npm run check` pri push na `main` a pri každom PR. Prvý beh (#1) je zelený.
@@ -30,7 +36,8 @@
 - GDD v1.1 a v1.2 zapísané v `docs/GDD.md` aj v projekte (`claude/GDD.md`).
 
 ## Ďalší krok
-1. **M0.3:** Playwright smoke test + GitHub Pages → test na mobile na šírku. Od tohto kroku zmeny cez Pull Request (nie priamo do `main`).
+**M0 Kostra je celá hotová.** Ďalej podľa GDD kap. 22: **M1 Základy core** – `numbers`, `rng`, `clock`, event bus, načítanie dát so zod schémami, debug panel. Navrhnem konkrétny prvý krok na budúcom sedení.
+- Ešte treba: otestovať hru na mobile (na šírku) na https://tomas-strmen.github.io/squirrels-tale/ – jediné, čo AI z počítača nevie sama overiť.
 
 ## Rozhodnutia (2026-09-26)
 - Find enemy po príchode na políčko, potom automatické hľadanie po každom zabití; Peace! zastaví a ukončí boj hneď (bez XP/lootu).

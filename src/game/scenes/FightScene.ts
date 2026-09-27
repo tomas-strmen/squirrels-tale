@@ -53,6 +53,8 @@ const PEACE_X = 1080;
 const BUTTON_Y = 620;
 const HP_BAR_Y = FIGHTER_Y - 95;
 const SPEED_OPTIONS = [1, 4, 20, 50] as const;
+// Debug tool (Tomas): faster item drops for testing, not real game balance.
+const DROP_RATE_OPTIONS = [1, 10, 100] as const;
 
 /**
  * M0.1: squirrel waits, "Find enemy" → search bar → enemy appears → attack bars loop.
@@ -65,6 +67,8 @@ export class FightScene extends Phaser.Scene {
   private state!: EncounterState;
   private accumulatorMs = 0;
   private speedIndex = 0;
+  private dropRateIndex = 0;
+  private baseDropChanceBp = 0;
 
   private player!: Phaser.GameObjects.Rectangle;
   private enemy!: Phaser.GameObjects.Rectangle;
@@ -85,6 +89,7 @@ export class FightScene extends Phaser.Scene {
   private enemyHpText!: Phaser.GameObjects.Text;
   private textStyle = { fontFamily: 'Arial, sans-serif', color: '#e0e0e0' };
   private speedButtons: Button[] = [];
+  private dropRateButtons: Button[] = [];
   private levelText!: Phaser.GameObjects.Text;
   private statsButton!: Button;
   private statsPanel!: StatsPanel;
@@ -117,6 +122,7 @@ export class FightScene extends Phaser.Scene {
         affixes: parseAffixes(affixesData),
       }),
     );
+    this.baseDropChanceBp = this.config.loot.dropChanceBp;
     // Seeded Rng (GDD 5); a new seed per session until saves arrive in M8.
     this.state = createEncounter(this.config, createRng(now()));
     this.accumulatorMs = 0;
@@ -239,6 +245,20 @@ export class FightScene extends Phaser.Scene {
     );
     this.refreshSpeedButtons();
 
+    // Debug tool (Tomas): drop rate ×1/×10/100 % for faster item testing.
+    this.add
+      .text(W - 370, 90, t('debug.dropRate'), { ...textStyle, fontSize: '20px' })
+      .setOrigin(1, 0.5);
+    const dropRateLabels = ['×1', '×10', '100%'];
+    this.dropRateButtons = DROP_RATE_OPTIONS.map((_, index) =>
+      new Button(this, W - 320 + index * 88, 90, dropRateLabels[index] ?? '', () => this.onSelectDropRate(index), {
+        width: 80,
+        height: 40,
+        fontSize: 20,
+      }),
+    );
+    this.refreshDropRateButtons();
+
     // Player-facing stats panel (Tomas, M3.1): level, XP, HP, damage, hit%, armor.
     this.statsButton = new Button(this, 150, 40, t('stats.button'), () => this.onToggleStats());
     this.statsButton.setScale(0.55);
@@ -285,6 +305,18 @@ export class FightScene extends Phaser.Scene {
 
   private refreshSpeedButtons(): void {
     this.speedButtons.forEach((button, index) => button.setSelected(index === this.speedIndex));
+  }
+
+  private onSelectDropRate(index: number): void {
+    this.dropRateIndex = index;
+    const multiplier = DROP_RATE_OPTIONS[index] ?? 1;
+    const dropChanceBp = multiplier === 100 ? 10000 : Math.min(10000, this.baseDropChanceBp * multiplier);
+    this.config = { ...this.config, loot: { ...this.config.loot, dropChanceBp } };
+    this.refreshDropRateButtons();
+  }
+
+  private refreshDropRateButtons(): void {
+    this.dropRateButtons.forEach((button, index) => button.setSelected(index === this.dropRateIndex));
   }
 
   private onToggleStats(): void {

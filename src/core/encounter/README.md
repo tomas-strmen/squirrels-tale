@@ -4,15 +4,19 @@ Searching for an enemy and a 1v1 fight with HP, XP and levels (GDD 7.1, 7.2, 6.2
 Pure TypeScript, no Phaser. The seeded Rng lives in the state, so the same seed
 always gives the same fights.
 
-M2/M3.1/M3.2 scope: hit/miss and damage via `core/combat`; XP and level-ups via
-`core/progression` (+1.0 max HP per level, healed at once; +0.1 max damage
-every level; +0.1 min damage every 2nd level). When the enemy dies the next
-search starts automatically and its XP is granted. HP regenerates passively
-over time in `idle`/`searching`/`fighting` (GDD 6.1/7.1). When the squirrel is
-defeated (GDD 6.3, online death): she loses a % of her current level's XP
-progress and spends a fixed time in the `hideout` phase, returning to `idle`
-at full HP. M3.2 placeholder: no map yet, so she just reappears - the player
-cannot pick a tile.
+M2/M3.1/M3.2/M6.1 scope: hit/miss and damage via `core/combat`; XP and level-ups
+via `core/progression` (+1.0 max HP per level, healed at once; +0.1 max damage
+every level; +0.1 min damage every 2nd level). Each enemy's level is rolled
+within its range (GDD 8.4) on its own Rng stream (`enemyLevelRng`, like loot);
+its stats and XP scale with levels above the range's base (`enemyStats`,
+`enemyXpAt`). When the enemy dies the next search starts automatically and its
+(scaled) XP is granted. HP regenerates passively over time in
+`idle`/`searching`/`fighting` (GDD 6.1/7.1). When the squirrel is defeated
+(GDD 6.3, online death): she loses a % of her current level's XP progress and
+spends a fixed time in the `hideout` phase, returning to `idle` at full HP.
+M3.2/M6.1 placeholder: no map yet, so she just reappears - the player cannot
+pick a tile, and every enemy uses one fixed level range (M6.2 will add
+per-tile ranges via `data/tiles.json`).
 
 ## Public API
 - `createEncounterConfig(input)` – validated config from design values (seconds,
@@ -20,8 +24,12 @@ cannot pick a tile.
 - `createEncounter(config, rng)` – new state in phase `idle`, squirrel at full HP, level 1.
 - `playerStats(config, level)` – the player's effective stats at `level` (base + level bonuses).
 - `playerAttackIntervalMs(config, level)` – attack interval at `level` (×1.01 per level, min 0.5 s).
-- `config.enemyLevel` – enemy level (GDD 8.4), fixed to its base level until the map (M6);
-  hit chance of both sides shifts 0.5 % per level of difference (GDD 7.2 v1.7).
+- `state.enemyLevel` – level of the current (or next, while searching) enemy, rolled within
+  `[config.enemyLevelMin, config.enemyLevelMax]` (GDD 8.4); hit chance of both sides shifts
+  0.5 % per level of difference (GDD 7.2 v1.7).
+- `enemyStats(config, level)` / `enemyXpAt(config, level)` – the enemy's effective stats/XP at
+  `level` (GDD 8.4: +hpPctPerLevel/damagePctPerLevel/xpPctPerLevel/dodgePctPerLevel per level
+  above `enemyLevelMin`, dodge capped at `maxDodgePct`; crit is locked, not implemented yet).
 - `hideoutProgress(state, config, extraMs?)` – 0..1 for a hideout recovery bar (0 outside `hideout`).
 - `startSearch(state)` – player pressed **Find enemy** (only from `idle`).
 - `makePeace(state)` – player pressed **Peace!**: from `searching` or `fighting` straight back to

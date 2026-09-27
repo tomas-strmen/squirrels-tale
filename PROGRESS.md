@@ -1,15 +1,24 @@
 # PROGRESS – stav vývoja
 
 ## Aktuálne
-- **Etapa:** M5 Inventár a výbava (GDD kap. 22) – M4 Predmety hotová ✅
-- **Posledný krok:** M5.2b3 – hromadné zahodenie predmetov podľa vzácnosti – hotové, čaká na test (PR)
-- **Ďalší krok:** M5 je hotová (9 slotov, boj s výbavou, batoh 20, porovnanie, zámok, triedenie,
-  hromadné zahodenie). Ďalej M6 Mapa (GDD kap. 22).
+- **Etapa:** M6 Mapa (GDD kap. 8, 22) – M5 Inventár a výbava hotová ✅
+- **Posledný krok:** M6.1 – levely nepriateľov podľa GDD 8.4 – hotové, čaká na test (PR)
+- **Ďalší krok:** M6.2 – viac políčok (`data/tiles.json`, výber políčka, odomykanie podľa počtu zabití)
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model: podľa náročnosti kroku (poviem vopred). Od teraz: AI pripraví vetvu/commit/push a dá Tomasovi presné príkazy/odkaz na PR, test a merge robí Tomas sám (šetrí tokeny oproti ovládaniu prehliadača).
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.
 
 ## Hotové
+### M6.1 – levely nepriateľov (2026-09-28)
+- Worker Ant má na T1 rozsah levelu 1–2 (`data/enemies.json` `levelMax`); level sa hodí náhodne
+  pri každom stretnutí (vlastný Rng stream, ako loot - nemení priebeh boja).
+- Za každý level nad základom: +10 % max HP, +5 % poškodenie, +10 % XP, +0.5 % dodge (max 40 %).
+  Presnosť rieši už existujúci vzorec rozdielu levelov (GDD 7.2), nemenil sa. Crit zatiaľ preskočený
+  (odomkne sa neskôr questom). Konštanty v `balance.json` `enemyLeveling`.
+- `core/encounter`: nové `enemyStats(config, level)`, `enemyXpAt(config, level)`; `EncounterState`
+  má nové `enemyLevel`/`enemyLevelRng`. V hre sa mení len meno („Worker Ant Lv2“) a HP/poškodenie/XP.
+- 227 testov zelených. Overené v prehliadači: level sa mení pri nových nepriateľoch, HP 1.2→1.3 pri Lv2.
+
 ### M5.2b3 – hromadné zahodenie podľa vzácnosti (2026-09-27)
 - Nad zoznamom batohu je tlačidlo pre každú vzácnosť, ktorá sa tam nachádza a nie je celá
   zamknutá: „Discard Common (12)“ atď. Klik zahodí naraz všetky nezamknuté predmety tej vzácnosti,

@@ -29,12 +29,13 @@ import { hitChancePct } from '../../core/combat/combat';
 import { formatHpHundredths, formatHundredths, fromHundredths } from '../../core/numbers/numbers';
 import { regenAmountHundredths, xpToNextLevelHundredths } from '../../core/progression/progression';
 import { createRng } from '../../core/rng/rng';
-import { pityCountdowns } from '../../core/loot/loot';
+import { diceFaces, pityCountdowns, type Item } from '../../core/loot/loot';
 import { consumeFrame, DEFAULT_MAX_STEPS_PER_FRAME, TICK_MS } from '../../core/time/fixedStep';
 import { itemName, itemSummary, rarityName } from '../itemText';
 import { t, tDynamic } from '../text';
 import { Button } from '../ui/Button';
 import { DebugPanel } from '../ui/DebugPanel';
+import { Dice } from '../ui/Dice';
 import { ProgressBar } from '../ui/ProgressBar';
 import { StatsPanel } from '../ui/StatsPanel';
 
@@ -402,13 +403,7 @@ export class FightScene extends Phaser.Scene {
         });
         break;
       case 'itemFound':
-        this.floatingText(
-          PLAYER_X,
-          FIGHTER_Y - 130,
-          `${t('loot.found')}: ${itemName(event.item)}`,
-          this.rarityColors.get(event.item.rarityId) ?? '#ffffff',
-          1800,
-        );
+        this.rollDice(event.item);
         break;
       case 'leveledUp':
         this.floatingText(PLAYER_X, FIGHTER_Y - 100, t('fight.leveledUp'), '#ffe08a', 1200);
@@ -447,6 +442,31 @@ export class FightScene extends Phaser.Scene {
     this.searchGroup.setVisible(false);
     this.peaceButton.setVisible(false);
     this.findButton.setVisible(false);
+  }
+
+  /** GDD 9.6: one d20 (two for Unique/Set/Legendary), then the "Found: ..." popup. */
+  private rollDice(item: Item): void {
+    const faces = diceFaces(item, this.config.loot);
+    const dice: Dice[] = [faces.second === null ? new Dice(this, W / 2, 220) : new Dice(this, W / 2 - 40, 220)];
+    let remaining = 1;
+    const onAllDone = () => {
+      remaining -= 1;
+      if (remaining > 0) return;
+      dice.forEach((d) => d.destroyDelayed(400));
+      this.floatingText(
+        PLAYER_X,
+        FIGHTER_Y - 130,
+        `${t('loot.found')}: ${itemName(item)}`,
+        this.rarityColors.get(item.rarityId) ?? '#ffffff',
+        1800,
+      );
+    };
+    if (faces.second !== null) {
+      remaining = 2;
+      dice.push(new Dice(this, W / 2 + 40, 220, true));
+      dice[1]?.roll(faces.second, onAllDone);
+    }
+    dice[0]?.roll(faces.first, onAllDone);
   }
 
   /** Damage number or "Miss" rising above the target. */

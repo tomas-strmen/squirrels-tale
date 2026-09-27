@@ -8,6 +8,7 @@ import { createRng, type RngState } from '../rng/rng';
 import {
   createLootConfig,
   createLootState,
+  diceFaces,
   effectiveMagicFind,
   generateItem,
   pityCountdowns,
@@ -280,5 +281,43 @@ describe('rollKillDrop (GDD 9.6)', () => {
     const copy = structuredClone(state);
     rollKillDrop(state, config, createRng(14), t1);
     expect(state).toEqual(copy);
+  });
+});
+
+describe('diceFaces (GDD 9.6)', () => {
+  it('lands within the rarity\'s dice range: 1-14 common, 15-18 uncommon, 19 rare', () => {
+    let rng: RngState = createRng(30);
+    for (let i = 0; i < 300; i++) {
+      const gen = generateItem(config, rng, t1, rarity('common'), i);
+      rng = gen.rng;
+      const faces = diceFaces(gen.item, config);
+      expect(faces.first).toBeGreaterThanOrEqual(1);
+      expect(faces.first).toBeLessThanOrEqual(14);
+      expect(faces.second).toBeNull();
+    }
+  });
+
+  it('rolls a "20" plus a gold die for Unique/Set/Legendary (its own face range)', () => {
+    const gen = generateItem(config, createRng(31), t1, rarity('unique'), 1);
+    // On T1 this falls back to Rare (no unique items) - force the rarity directly for the dice check.
+    const item = { ...gen.item, rarityId: 'unique' as const };
+    const faces = diceFaces(item, config);
+    expect(faces.first).toBe(20);
+    expect(faces.second).toBeGreaterThanOrEqual(1);
+    expect(faces.second).toBeLessThanOrEqual(7);
+  });
+
+  it('is deterministic: the same item always shows the same face(s)', () => {
+    const gen = generateItem(config, createRng(32), t1, rarity('rare'), 42);
+    expect(diceFaces(gen.item, config)).toEqual(diceFaces(gen.item, config));
+  });
+
+  it('different items (uids) tend to land on different faces within a range', () => {
+    const faces = new Set<number>();
+    for (let uid = 1; uid <= 50; uid++) {
+      const gen = generateItem(config, createRng(1), t1, rarity('common'), uid);
+      faces.add(diceFaces(gen.item, config).first);
+    }
+    expect(faces.size).toBeGreaterThan(1);
   });
 });

@@ -10,7 +10,7 @@
  */
 import type { AffixData, ItemData, ItemSlot, RarityData, StatId } from '../content/schemas';
 import { toHundredths } from '../numbers/numbers';
-import { next, nextInt, type RngState } from '../rng/rng';
+import { branch, createRng, next, nextInt, type RngState } from '../rng/rng';
 import { secondsToMs } from '../time/fixedStep';
 
 export interface LootBalanceInput {
@@ -230,6 +230,33 @@ export function generateItem(
     },
     rng: affixRoll.rng,
   };
+}
+
+export interface DiceFaces {
+  /** 1-20. Always 20 when `second` is set (GDD 9.6: a "20" triggers the gold die). */
+  readonly first: number;
+  /** The gold d20, only for Unique/Set/Legendary. */
+  readonly second: number | null;
+}
+
+/**
+ * Die faces for the drop animation (GDD 9.6): the outcome (rarity) is already
+ * decided, this just picks which face(s) match it, for the roll to land on.
+ * Purely cosmetic and deterministic (from the item's uid), not a source of
+ * randomness for game logic - it never touches the fight's own Rng stream.
+ */
+export function diceFaces(item: Item, config: LootConfig): DiceFaces {
+  const rarity = config.rarities.find((r) => r.id === item.rarityId);
+  if (!rarity) throw new Error(`Unknown rarity "${item.rarityId}"`);
+  const seed = createRng(item.uid);
+  const first = pickFace(seed, rarity.diceRange);
+  const second = rarity.goldDiceRange ? pickFace(branch(seed, 'gold-die'), rarity.goldDiceRange) : null;
+  return { first, second };
+}
+
+function pickFace(seed: RngState, [min, max]: readonly [number, number]): number {
+  const draw = next(seed);
+  return min + Math.floor(draw.value * (max - min + 1));
 }
 
 /**

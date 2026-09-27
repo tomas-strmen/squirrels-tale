@@ -2,12 +2,22 @@
 
 ## Aktuálne
 - **Etapa:** M4 Predmety (GDD kap. 22) – M3 Progres hotová ✅
-- **Posledný krok:** M4.1c – pity podľa vzácnosti (Rare 1000 / Unique 5000 / Legendary 20 000) – hotové, čaká na test (PR)
+- **Posledný krok:** M4.2 – kocka k20 pri drope – hotové, čaká na test (PR)
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model: podľa náročnosti kroku (poviem vopred). Od teraz: AI pripraví vetvu/commit/push a dá Tomasovi presné príkazy/odkaz na PR, test a merge robí Tomas sám (šetrí tokeny oproti ovládaniu prehliadača).
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.
 
 ## Hotové
+### M4.2 – kocka k20 (2026-09-26)
+- `data/rarities.json`: pridané `diceRange`/`goldDiceRange` (1–14 Common, 15–18 Uncommon, 19 Rare,
+  20 → zlatá kocka s vlastným rozsahom pre Unique/Set/Legendary). Zod schéma (`diceRangeSchema`).
+- `core/loot.diceFaces(item, config)`: vyberie stenu(y) kocky podľa vzácnosti predmetu – deterministicky
+  z ID predmetu (kozmetické, nepoužíva boj. Rng stream).
+- `src/game/ui/Dice.ts`: kocka sa krátko zatočí a zastaví na danom čísle (Phaser timer, čisto vizuál).
+- `FightScene`: pri drope sa zobrazí kocka (+ zlatá druhá pri Unique/Set/Legendary), potom „Found: …“.
+- 194 testov zelených (bolo 189). Overené v prehliadači: kocka padla na 17 (Uncommon rozsah), sedelo
+  to s nasledujúcim „Found: Leaf Cap“.
+
 ### M4.1c – pity podľa vzácnosti (2026-09-26)
 - Samostatné počítadlá: Rare 1000, Unique 5000, Legendary 20 000 zabití (`balance.json` `loot.pity`).
   Drop vynuluje počítadlá svojej a nižších vzácností. Počíta sa len keď vzácnosť môže padnúť
@@ -192,9 +202,10 @@
 - GDD v1.1 a v1.2 zapísané v `docs/GDD.md` aj v projekte (`claude/GDD.md`).
 
 ## Ďalší krok
-1. Tomas otestuje M4.1 (PR) → merge.
-2. **M4.2** – animácia k20 kocky, pity počítadlo „Lucky acorn“, `core/stats` (postava + výbava:
-   pevné hodnoty sa sčítajú, percentá násobia). Model: Sonnet 5 stačí (kocka/UI), Opus pri `core/stats`.
+1. Tomas otestuje M4.2 (PR) → merge. **M4 Predmety bude tým celá hotová.**
+2. Potom **M5 Inventár a výbava**: 20 slotov, 7 slotov výbavy, nasadiť/zložiť, `core/stats`
+   (postava + výbava: pevné hodnoty sa sčítajú, percentá násobia – GDD 6.1 v1.8), interval útoku
+   so zbraňou vylepšuje základ postavy (GDD v2.0, Tomas). Model: Opus 5.5 (skladanie štatistík).
 
 ## Rozhodnutia (2026-09-26)
 - Find enemy po príchode na políčko, potom automatické hľadanie po každom zabití; Peace! zastaví a ukončí boj hneď (bez XP/lootu).

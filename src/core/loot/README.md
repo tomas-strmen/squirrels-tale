@@ -18,6 +18,11 @@ and returns the advanced one. Values are internal hundredths (percentages too:
   tile becomes a Rare with one extra affix (GDD 9.5).
 - `rollAffixes(config, rng, ctx, tier, count)` – distinct, unlocked only, value × (1 + 0.35 × (tier − 1)).
 - `effectiveMagicFind(mf)`, `eligibleItems(config, tier, kind)`.
+- `diceFaces(item, config)` – d20 face(s) for the drop animation (GDD 9.6): 1-14 Common,
+  15-18 Uncommon, 19 Rare, 20 → a gold d20 for Unique/Set/Legendary (each rarity's own face
+  range, from `data/rarities.json` `diceRange`/`goldDiceRange`). The rarity is already decided;
+  this only picks which face matches it. Deterministic from the item's uid - cosmetic only,
+  never touches the fight's own Rng stream.
 
 ## Rules
 - Pity guarantee is "at least Unique": it only picks Unique/Set when such items exist on the

@@ -87,6 +87,11 @@ export type StatId = z.infer<typeof statIdSchema>;
 export const itemSlotSchema = z.enum(['melee', 'ranged', 'head', 'body', 'legs', 'ring', 'amulet']);
 export type ItemSlot = z.infer<typeof itemSlotSchema>;
 
+/** A d20 face range, both ends inclusive within 1-20 (GDD 9.6 dice roll). */
+const diceRangeSchema = z
+  .tuple([z.number().int().min(1).max(20), z.number().int().min(1).max(20)])
+  .refine(([min, max]) => min <= max, { message: 'min must not be greater than max' });
+
 const statRangeSchema = z
   .object({ stat: statIdSchema, min: designValueSchema, max: designValueSchema })
   .refine((r) => r.min <= r.max, { message: 'min must not be greater than max' });
@@ -135,6 +140,10 @@ export const raritySchema = z.object({
   /** Quest id that unlocks this rarity (e.g. Legendary, GDD 9.6 v2.1); null = always. */
   unlockedBy: idSchema.nullable(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'must be a #rrggbb colour'),
+  /** Face range (1-20) the d20 lands on for this rarity (GDD 9.6 dice roll). */
+  diceRange: diceRangeSchema,
+  /** Face range on the second, gold d20 - only unique/set/legendary (a "20" on the first die). */
+  goldDiceRange: diceRangeSchema.nullable(),
 });
 export type RarityData = z.infer<typeof raritySchema>;
 

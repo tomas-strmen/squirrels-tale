@@ -165,6 +165,8 @@ describe('items / rarities / affixes schemas (M4.1)', () => {
     minTileTier: 1,
     unlockedBy: null,
     color: '#b8b8b8',
+    diceRange: [1, 14] as [number, number],
+    goldDiceRange: null,
   };
 
   it('needs exactly one remainder rarity and weights <= 100', () => {
@@ -174,6 +176,12 @@ describe('items / rarities / affixes schemas (M4.1)', () => {
       raritiesSchema.safeParse([rarity, { ...rarity, id: 'uncommon', isRemainder: false, weight: 100.1 }]).success,
     ).toBe(false);
     expect(raritiesSchema.safeParse([{ ...rarity, color: 'grey' }]).success).toBe(false);
+  });
+
+  it('rejects a dice range outside 1-20 or with min > max', () => {
+    expect(raritiesSchema.safeParse([{ ...rarity, diceRange: [0, 14] }]).success).toBe(false);
+    expect(raritiesSchema.safeParse([{ ...rarity, diceRange: [15, 14] }]).success).toBe(false);
+    expect(raritiesSchema.safeParse([{ ...rarity, goldDiceRange: [1, 21] }]).success).toBe(false);
   });
 
   it('rejects affixes with min > max or unknown stats', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Item } from '../loot/loot';
-import { addToBag, createInventory, equip, equippedItems, slotsFor, unequip } from './inventory';
+import { addToBag, BAG_CAPACITY, createInventory, equip, equippedItems, slotsFor, unequip } from './inventory';
 
 function item(uid: number, slot: Item['slot'], baseId = 'sharp_twig'): Item {
   return { uid, baseId, slot, tier: 1, rarityId: 'common', weapon: null, stats: [], affixes: [] };
@@ -55,5 +55,16 @@ describe('equip / unequip', () => {
     const copy = structuredClone(bagged);
     equip(bagged, 1, 'rightPaw');
     expect(bagged).toEqual(copy);
+  });
+});
+
+describe('bag capacity (GDD 22, M5.2a)', () => {
+  it('addToBag drops the item once the bag is full', () => {
+    let s = createInventory();
+    for (let i = 0; i < BAG_CAPACITY; i++) s = addToBag(s, item(i, 'head'));
+    expect(s.bag).toHaveLength(BAG_CAPACITY);
+    const full = addToBag(s, item(999, 'head'));
+    expect(full).toBe(s); // unchanged: no room
+    expect(full.bag).toHaveLength(BAG_CAPACITY);
   });
 });

@@ -336,6 +336,10 @@ export class FightScene extends Phaser.Scene {
       `${t('stats.damage')}: ${formatHundredths(stats.damageMin)} - ${formatHundredths(stats.damageMax)}`,
       // Explicit 2 decimals here (not the usual floor-to-0.1) so small per-level changes show up.
       `${t('stats.attackInterval')}: ${(playerAttackIntervalMs(this.config, level, gear) / 1000).toFixed(2)} s`,
+      // DPS = damage / attack interval (no crit yet, GDD 5 range display).
+      `${t('stats.dps')}: ${(fromHundredths(stats.damageMin) / (playerAttackIntervalMs(this.config, level, gear) / 1000)).toFixed(1)} - ${(
+        fromHundredths(stats.damageMax) / (playerAttackIntervalMs(this.config, level, gear) / 1000)
+      ).toFixed(1)}`,
       `${t('stats.regen')}: ${formatHundredths(
         regenAmountHundredths(fromHundredths(this.config.regenAmount), level, this.config.regenGrowthPctPerLevel),
       )} / ${(this.config.regenIntervalMs / 1000).toFixed(1)} s`,
@@ -442,7 +446,7 @@ export class FightScene extends Phaser.Scene {
         });
         break;
       case 'itemFound':
-        this.rollDice(event.item);
+        this.rollDice(event.item, event.bagFull);
         break;
       case 'leveledUp':
         this.floatingText(PLAYER_X, FIGHTER_Y - 100, t('fight.leveledUp'), '#ffe08a', 1200);
@@ -484,7 +488,7 @@ export class FightScene extends Phaser.Scene {
   }
 
   /** GDD 9.6: one d20 (two for Unique/Set/Legendary), then the "Found: ..." popup. */
-  private rollDice(item: Item): void {
+  private rollDice(item: Item, bagFull: boolean): void {
     const faces = diceFaces(item, this.config.loot);
     const dice: Dice[] = [faces.second === null ? new Dice(this, W / 2, 220) : new Dice(this, W / 2 - 40, 220)];
     let remaining = 1;
@@ -492,13 +496,9 @@ export class FightScene extends Phaser.Scene {
       remaining -= 1;
       if (remaining > 0) return;
       dice.forEach((d) => d.destroyDelayed(400));
-      this.floatingText(
-        PLAYER_X,
-        FIGHTER_Y - 130,
-        `${t('loot.found')}: ${itemName(item)}`,
-        this.rarityColors.get(item.rarityId) ?? '#ffffff',
-        1800,
-      );
+      // M5.2a: bag was at BAG_CAPACITY, the item was rolled but not kept.
+      const label = bagFull ? `${t('loot.found')}: ${itemName(item)} (${t('loot.bagFull')})` : `${t('loot.found')}: ${itemName(item)}`;
+      this.floatingText(PLAYER_X, FIGHTER_Y - 130, label, bagFull ? '#ff9f9f' : this.rarityColors.get(item.rarityId) ?? '#ffffff', 1800);
     };
     if (faces.second !== null) {
       remaining = 2;

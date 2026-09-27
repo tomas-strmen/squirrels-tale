@@ -2,8 +2,9 @@
  * Bag + equipment slots (GDD 9.1 v2.3, 10). Pure: every function returns a new
  * state and never modifies the one passed in.
  *
- * M5.1 scope: 9 equipment slots, equip/unequip. Not yet (M5.2): the 20-slot
- * bag limit, comparison, locking, sorting, "Keep only upgrades", stacks.
+ * M5.1 scope: 9 equipment slots, equip/unequip.
+ * M5.2a: 20-slot bag limit. Not yet (M5.2b+): comparison, locking, sorting,
+ * "Keep only upgrades", stacks.
  */
 import type { ItemSlot } from '../content/schemas';
 import type { Item } from '../loot/loot';
@@ -23,6 +24,9 @@ export const EQUIP_SLOTS = [
 export type EquipSlot = (typeof EQUIP_SLOTS)[number];
 
 export type Equipment = Readonly<Record<EquipSlot, Item | null>>;
+
+/** GDD 22 (M5.2a): max unequipped items carried at once. */
+export const BAG_CAPACITY = 20;
 
 export interface InventoryState {
   /** Unequipped items, oldest first. */
@@ -65,7 +69,9 @@ export function slotsFor(slot: ItemSlot): readonly EquipSlot[] {
   }
 }
 
+/** Adds `item` to the bag, or drops it silently if the bag is already full (GDD 22, M5.2a). */
 export function addToBag(state: InventoryState, item: Item): InventoryState {
+  if (state.bag.length >= BAG_CAPACITY) return state;
   return { ...state, bag: [...state.bag, item] };
 }
 

@@ -1,8 +1,8 @@
 [
-  {"id": "common", "weight": 0, "isRemainder": true, "statMultPct": 100, "affixCount": 0, "mfScaling": "none", "itemKind": "base", "minTileTier": 1, "unlockedBy": null, "color": "#b8b8b8"},
-  {"id": "uncommon", "weight": 22.0, "isRemainder": false, "statMultPct": 115, "affixCount": 1, "mfScaling": "linear", "itemKind": "base", "minTileTier": 1, "unlockedBy": null, "color": "#6fcf6f"},
-  {"id": "rare", "weight": 6.0, "isRemainder": false, "statMultPct": 135, "affixCount": 2, "mfScaling": "linear", "itemKind": "base", "minTileTier": 1, "unlockedBy": null, "color": "#6f9fef"},
-  {"id": "unique", "weight": 0.9, "isRemainder": false, "statMultPct": 160, "affixCount": 2, "mfScaling": "diminishing", "itemKind": "unique", "minTileTier": 1, "unlockedBy": null, "color": "#f0a040"},
-  {"id": "set", "weight": 0.8, "isRemainder": false, "statMultPct": 140, "affixCount": 0, "mfScaling": "diminishing", "itemKind": "set", "minTileTier": 3, "unlockedBy": null, "color": "#40cfcf"},
-  {"id": "legendary", "weight": 0.3, "isRemainder": false, "statMultPct": 200, "affixCount": 3, "mfScaling": "diminishing", "itemKind": "base", "minTileTier": 1, "unlockedBy": "legendary_quest", "color": "#b070ef"}
+  {"id": "common", "weight": 0, "isRemainder": true, "statMultPct": 100, "affixCount": 0, "mfScaling": "none", "itemKind": "base", "minTileTier": 1, "unlockedBy": null, "color": "#b8b8b8", "diceRange": [1, 14], "goldDiceRange": null},
+  {"id": "uncommon", "weight": 22.0, "isRemainder": false, "statMultPct": 115, "affixCount": 1, "mfScaling": "linear", "itemKind": "base", "minTileTier": 1, "unlockedBy": null, "color": "#6fcf6f", "diceRange": [15, 18], "goldDiceRange": null},
+  {"id": "rare", "weight": 6.0, "isRemainder": false, "statMultPct": 135, "affixCount": 2, "mfScaling": "linear", "itemKind": "base", "minTileTier": 1, "unlockedBy": null, "color": "#6f9fef", "diceRange": [19, 19], "goldDiceRange": null},
+  {"id": "unique", "weight": 0.9, "isRemainder": false, "statMultPct": 160, "affixCount": 2, "mfScaling": "diminishing", "itemKind": "unique", "minTileTier": 1, "unlockedBy": null, "color": "#f0a040", "diceRange": [20, 20], "goldDiceRange": [1, 7]},
+  {"id": "set", "weight": 0.8, "isRemainder": false, "statMultPct": 140, "affixCount": 0, "mfScaling": "diminishing", "itemKind": "set", "minTileTier": 3, "unlockedBy": null, "color": "#40cfcf", "diceRange": [20, 20], "goldDiceRange": [8, 13]},
+  {"id": "legendary", "weight": 0.3, "isRemainder": false, "statMultPct": 200, "affixCount": 3, "mfScaling": "diminishing", "itemKind": "base", "minTileTier": 1, "unlockedBy": "legendary_quest", "color": "#b070ef", "diceRange": [20, 20], "goldDiceRange": [14, 20]}
 ]

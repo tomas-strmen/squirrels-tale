@@ -289,6 +289,38 @@ export function playerAttackIntervalMs(
   return composedPlayer(config, level, equipment).attackIntervalMs;
 }
 
+/** Stat deltas from putting `item` into `slot`, vs the current `equipment` (M5.2b1). */
+export interface EquipComparison {
+  readonly maxHp: number;
+  readonly damageMin: number;
+  readonly damageMax: number;
+  readonly armor: number;
+  /** Percentage points (not hundredths - matches FighterStats.hitPct). */
+  readonly hitPct: number;
+  /** Negative = faster. */
+  readonly attackIntervalMs: number;
+}
+
+/** Compares equipping `item` into `slot` against the current `equipment` (M5.2b1). Pure, no state change. */
+export function compareEquip(
+  config: EncounterConfig,
+  level: number,
+  equipment: Equipment,
+  item: Item,
+  slot: EquipSlot,
+): EquipComparison {
+  const before = composedPlayer(config, level, equipment);
+  const after = composedPlayer(config, level, { ...equipment, [slot]: item });
+  return {
+    maxHp: after.fighter.maxHp - before.fighter.maxHp,
+    damageMin: after.fighter.damageMin - before.fighter.damageMin,
+    damageMax: after.fighter.damageMax - before.fighter.damageMax,
+    armor: after.fighter.armor - before.fighter.armor,
+    hitPct: after.fighter.hitPct - before.fighter.hitPct,
+    attackIntervalMs: after.attackIntervalMs - before.attackIntervalMs,
+  };
+}
+
 /**
  * Equips a bag item (GDD 9.1 v2.3). Works in any phase. Current HP never
  * exceeds the new max HP (e.g. after taking off a +HP amulet).

@@ -6,6 +6,7 @@ import { parseAffixes, parseItems, parseRarities } from '../content/schemas';
 import { createRng } from '../rng/rng';
 import {
   attackProgress,
+  compareEquip,
   createEncounter,
   createEncounterConfig,
   hpFraction,
@@ -362,6 +363,24 @@ describe('encounter', () => {
     const off = unequipItem(withTwig, tanky, 'rightPaw');
     expect(off.inventory.equipment.rightPaw).toBeNull();
     expect(off.inventory.bag.map((i) => i.uid)).toEqual([1]);
+  });
+
+  it('compareEquip reports the stat deltas of putting a weapon into a slot (GDD 9.1/9.4 v2.3, M5.2b1)', () => {
+    const twig = {
+      uid: 1,
+      baseId: 'sharp_twig',
+      slot: 'melee' as const,
+      tier: 1,
+      rarityId: 'common',
+      weapon: { damageMin: 30, damageMax: 50, attackIntervalModMs: -400 },
+      stats: [],
+      affixes: [],
+    };
+    const bare = fresh(tanky).inventory.equipment;
+    const diff = compareEquip(tanky, 1, bare, twig, 'rightPaw');
+    expect(diff.damageMax).toBe(90 - playerStats(tanky, 1, bare).damageMax);
+    expect(diff.attackIntervalMs).toBe(1600 - playerAttackIntervalMs(tanky, 1, bare));
+    expect(diff.maxHp).toBe(0);
   });
 
   it('taking off +HP gear never leaves current HP above the new max', () => {

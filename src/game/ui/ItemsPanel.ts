@@ -15,12 +15,16 @@ export interface ItemsPanelActions {
   readonly onEquip: (uid: number, slot: EquipSlot) => void;
   readonly onUnequip: (slot: EquipSlot) => void;
   readonly colorOf: (item: Item) => string;
+  /** M5.2b1: one-line stat diff of putting `item` into `slot`, already formatted. */
+  readonly compareToSlot: (item: Item, slot: EquipSlot) => string;
 }
 
 /**
  * M5.1: equipped gear (9 slots, GDD 9.1 v2.3) + bag items (M5.2a: capped at
- * BAG_CAPACITY, scrollable with ▲/▼), with Equip / Unequip buttons.
- * Redrawn when the inventory changes, or when the bag is scrolled.
+ * BAG_CAPACITY, scrollable with ▲/▼).
+ * M5.2b1: tap a bag item to compare it against what's worn, then Equip
+ * (works the same on touch and mouse - no hover). Redrawn when the
+ * inventory changes, the bag is scrolled, or the comparison is toggled.
  */
 export class ItemsPanel extends Phaser.GameObjects.Container {
   private readonly bg: Phaser.GameObjects.Rectangle;
@@ -28,6 +32,15 @@ export class ItemsPanel extends Phaser.GameObjects.Container {
   private shown: InventoryState | null = null;
   /** How many bag rows are scrolled past (0 = showing the newest first, M5.2a). */
   private scrollOffset = 0;
+  /** Bag item currently expanded for comparison (M5.2b1), or null. */
+  private expandedUid: number | null = null;
+  /**
+   * Set by scroll/expand clicks so `show()` re-renders on the *next* frame -
+   * never call render() directly from inside a row's own click handler, since
+   * render() destroys that row (and Phaser dislikes a GameObject destroying
+   * itself mid pointerup dispatch).
+   */
+  private dirty = false;
 
   constructor(
     scene: Phaser.Scene,
@@ -43,15 +56,23 @@ export class ItemsPanel extends Phaser.GameObjects.Container {
 
   /** Call every frame; only redraws when `inventory` is a different object (core states are immutable). */
   show(inventory: InventoryState): void {
-    if (inventory === this.shown) return;
-    this.shown = inventory;
-    this.scrollOffset = 0;
-    this.render();
+    if (inventory !== this.shown) {
+      this.shown = inventory;
+      this.scrollOffset = 0;
+      this.dirty = true;
+    }
+    if (this.dirty) {
+      this.dirty = false;
+      this.render();
+    }
   }
 
   private render(): void {
     const inventory = this.shown;
     if (!inventory) return;
+    if (this.expandedUid !== null && !inventory.bag.some((i) => i.uid === this.expandedUid)) {
+      this.expandedUid = null;
+    }
     this.rows.forEach((r) => r.destroy());
     this.rows = [];
     let y = PAD;
@@ -103,16 +124,29 @@ export class ItemsPanel extends Phaser.GameObjects.Container {
       y += ROW_H;
     }
     for (const item of visible) {
-      let x = PAD;
-      for (const slot of slotsFor(item.slot)) {
-        // Melee weapons get two buttons (right / left paw), everything else one.
-        addButton(x, slot === 'leftPaw' ? t('items.equipLeft') : slot === 'rightPaw' ? t('items.equipRight') : t('items.equip'), () =>
-          this.actions.onEquip(item.uid, slot),
-        );
-        x += 50;
-      }
-      addText(Math.max(x, 104), itemSummary(item), this.actions.colorOf(item));
+      const expanded = item.uid === this.expandedUid;
+      // Tap the summary to compare (M5.2b1); tap again (or another item) to switch/close.
+      const label = addText(PAD, `${expanded ? '▾' : '▸'} ${itemSummary(item)}`, this.actions.colorOf(item));
+      label.setInteractive({ useHandCursor: true }).on('pointerup', () => {
+        this.expandedUid = expanded ? null : item.uid;
+        this.dirty = true;
+      });
       y += ROW_H;
+      if (expanded) {
+        for (const slot of slotsFor(item.slot)) {
+          addText(PAD + 12, this.actions.compareToSlot(item, slot), '#9fd7ff');
+          y += ROW_H;
+          addButton(
+            PAD + 12,
+            slot === 'leftPaw' ? t('items.equipLeft') : slot === 'rightPaw' ? t('items.equipRight') : t('items.equip'),
+            () => {
+              this.expandedUid = null;
+              this.actions.onEquip(item.uid, slot);
+            },
+          );
+          y += ROW_H;
+        }
+      }
     }
     this.bg.setSize(width, y + PAD - 4);
   }
@@ -121,6 +155,6 @@ export class ItemsPanel extends Phaser.GameObjects.Container {
     if (!this.shown) return;
     const maxOffset = Math.max(0, this.shown.bag.length - BAG_ROWS);
     this.scrollOffset = Math.max(0, Math.min(maxOffset, this.scrollOffset + delta * BAG_ROWS));
-    this.render();
+    this.dirty = true;
   }
 }

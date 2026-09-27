@@ -1,7 +1,7 @@
-# Veverička – Game Design Document (GDD) v2.1
+# Veverička – Game Design Document (GDD) v2.2
 
 > **Pracovný názov hry:** *Squirrel's Tale* (dočasný – finálny názov vybrať pred vydaním; nesmie pripomínať „Hero Tale“).
-> **Stav:** v2.1, 26. 9. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
+> **Stav:** v2.2, 26. 9. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
 > **Súvisiace:** `claude/ROADMAP.md` (technológia, architektúra, etapy vydania), `claude/PROMPT-vyvoj.md` (ako má AI pracovať).
 
 ---
@@ -368,7 +368,7 @@ ak stun (šanca stun%) → cieľ má ďalší útok oneskorený o 1.5 s (boss 0.
 - Kontrola: pri ~4 000 zabitiach do T7 (vrátane farmenia) padne ~160 predmetov, z toho zo šampiónov (~80 × 10× váhy) ~6–10 kúskov setu + pity každých 1000 zabití → celý Leaf Guardian set je reálny okolo T7–T8.
 - **Magic Find:** váhy Uncommon a Rare × (1 + MF/100); váhy Unique/Set/Legendary × (1 + MF_eff/100), kde `MF_eff = MF × 100 / (MF + 100)` (klesajúci účinok). Common = zvyšok do 100 (min. 0).
 - **Hod kockou (vizuál):** k20 kocka sa zakotúľa, výsledok je určený vopred z tabuľky; animácia vyberie stenu, ktorá zodpovedá vzácnosti (1–14 common, 15–18 uncommon, 19 rare, 20 → druhá zlatá kocka pre unique/set/legendary). Počas offline sa kocky ukážu až v súhrne (len pre rare+).
-- **Pity (garantovaný progres):** počítadlo zabití od posledného predmetu aspoň **Rare** (v2.1, zatiaľ; neskôr sa môže zvýšiť). Pri **1000** je ďalší drop istý a aspoň Rare. V UI je odpočet („Lucky acorn: Rare guaranteed in 266 kills“). Keystone stromu ho zníži na 800.
+- **Pity (garantovaný progres, v2.2):** samostatné počítadlo pre každú vzácnosť – **Rare 1000**, **Unique 5000**, **Legendary 20 000** zabití. Keď počítadlo dobehne, ďalší drop je istý a aspoň danej vzácnosti. Keď padne predmet, vynulujú sa počítadlá jeho vzácnosti a nižších (Legendary vynuluje aj Rare a Unique). Počítadlo beží, len keď daná vzácnosť môže padnúť (odomknutá, predmety na políčku). V UI je odpočet („Lucky acorn: Rare in 266 kills“). Keystone stromu skráti Rare na 800.
 - **Legendary je zamknutý** (v2.1), kým ho neodomkne quest (ktorý – otvorené, kap. 24); dovtedy jeho váha pripadne Common.
 
 ---
@@ -707,3 +707,4 @@ tools/sim/         # headless simulácia tempa (npm run sim) → tabuľka čas/l
 | 1.9 | 2026-09-26 | 6.1: regenerácia 0.1 HP / 2 s → 0.1 HP / 3 s (Tomas, M3.2). |
 | 2.0 | 2026-09-26 | 9.3: hodnoty predmetov na 0.01 (zobrazenie floor 0.1); zbraň má rozsah × rarityMult. 24: interval pästí je základ postavy, zbraň ho vylepšuje (vzorec v M5). |
 | 2.1 | 2026-09-26 | 9.6: pity garantuje aspoň Rare (bolo Unique+), UI odpočet; Legendary zamknutý do questu (24: ktorý – otvorené). |
+| 2.2 | 2026-09-26 | 9.6: pity samostatne pre Rare 1000 / Unique 5000 / Legendary 20 000 zabití; drop vynuluje počítadlá svojej a nižších vzácností. |

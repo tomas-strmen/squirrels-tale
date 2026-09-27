@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { BAG_CAPACITY, EQUIP_SLOTS, slotsFor, type EquipSlot, type InventoryState } from '../../core/inventory/inventory';
 import type { Item } from '../../core/loot/loot';
-import { itemSummary } from '../itemText';
+import { itemSummary, type EquipComparisonLine } from '../itemText';
 import { t, tDynamic } from '../text';
 import { Button } from './Button';
 
@@ -15,13 +15,14 @@ export interface ItemsPanelActions {
   readonly onEquip: (uid: number, slot: EquipSlot) => void;
   readonly onUnequip: (slot: EquipSlot) => void;
   readonly colorOf: (item: Item) => string;
-  /** M5.2b1: one-line stat diff of putting `item` into `slot`, already formatted. */
-  readonly compareToSlot: (item: Item, slot: EquipSlot) => string;
-  /** M5.2b1: 'better'/'worse' tints the bag row; 'mixed'/'none' leaves it plain. */
-  readonly verdictForItem: (item: Item) => 'better' | 'worse' | 'mixed' | 'none';
+  /** M5.2b1: per-stat diff of putting `item` into `slot`, tagged better/worse for coloring. */
+  readonly compareToSlot: (item: Item, slot: EquipSlot) => readonly EquipComparisonLine[];
+  /** M5.2b1: true if `item` beats what's worn in at least one visible stat, for any fitting slot. */
+  readonly hasUpgrade: (item: Item) => boolean;
 }
 
-const VERDICT_TINT: Record<'better' | 'worse', number> = { better: 0x2ecc71, worse: 0xe74c3c };
+const LINE_COLOR: Record<EquipComparisonLine['verdict'], string> = { better: '#5fd97a', worse: '#e0605f' };
+const UPGRADE_TINT = 0x2f6fb0; // faint blue: this item has at least one better stat than what's worn
 
 /**
  * M5.1: equipped gear (9 slots, GDD 9.1 v2.3) + bag items (M5.2a: capped at
@@ -130,11 +131,10 @@ export class ItemsPanel extends Phaser.GameObjects.Container {
     const rowTints: Phaser.GameObjects.Rectangle[] = [];
     for (const item of visible) {
       const expanded = item.uid === this.expandedUid;
-      // Faint green/red row tint (M5.2b1): upgrade/downgrade vs what's worn. Sized to the
-      // panel's final width once that's known (see the loop below).
-      const verdict = this.actions.verdictForItem(item);
-      if (verdict === 'better' || verdict === 'worse') {
-        const tint = this.scene.add.rectangle(PAD - 4, y - 2, 10, ROW_H, VERDICT_TINT[verdict], 0.18).setOrigin(0, 0);
+      // Faint blue row tint (M5.2b1): this item beats what's worn in at least one stat.
+      // Sized to the panel's final width once that's known (see the loop below).
+      if (!expanded && this.actions.hasUpgrade(item)) {
+        const tint = this.scene.add.rectangle(PAD - 4, y - 2, 10, ROW_H, UPGRADE_TINT, 0.25).setOrigin(0, 0);
         this.add(tint);
         this.rows.push(tint);
         rowTints.push(tint);
@@ -148,8 +148,15 @@ export class ItemsPanel extends Phaser.GameObjects.Container {
       y += ROW_H;
       if (expanded) {
         for (const slot of slotsFor(item.slot)) {
-          addText(PAD + 12, this.actions.compareToSlot(item, slot), '#9fd7ff');
-          y += ROW_H;
+          const lines = this.actions.compareToSlot(item, slot);
+          if (lines.length === 0) {
+            addText(PAD + 12, t('compare.none'), '#909090');
+            y += ROW_H;
+          }
+          for (const line of lines) {
+            addText(PAD + 12, line.text, LINE_COLOR[line.verdict]);
+            y += ROW_H;
+          }
           addButton(
             PAD + 12,
             slot === 'leftPaw' ? t('items.equipLeft') : slot === 'rightPaw' ? t('items.equipRight') : t('items.equip'),

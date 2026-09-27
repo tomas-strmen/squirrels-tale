@@ -2,7 +2,7 @@
 
 ## Aktuálne
 - **Etapa:** M5 Inventár a výbava (GDD kap. 22) – M4 Predmety hotová ✅
-- **Posledný krok:** M5.2b1 – porovnanie predmetu pred nasadením (tap-to-compare) – hotové, čaká na test (PR)
+- **Posledný krok:** M5.2b1 (dizajn podfarbenia podľa Tomasa) – hotové, čaká na test (PR)
 - **Ďalší krok:** M5.2b2 – zamknutie predmetov + triedenie batohu (newest / rarity)
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model: podľa náročnosti kroku (poviem vopred). Od teraz: AI pripraví vetvu/commit/push a dá Tomasovi presné príkazy/odkaz na PR, test a merge robí Tomas sám (šetrí tokeny oproti ovládaniu prehliadača).
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
@@ -20,6 +20,14 @@
   mätúce „-0.0“ - taký rozdiel sa ráta ako „bez zmeny“ (`core/encounter.classifyEquip`, nové).
 - Nové: predmety v batohu majú jemné podfarbenie - zelené, ak je predmet pre aspoň jeden vhodný
   slot vylepšenie, červené, ak je vo všetkých horší (zmiešané zmeny sa nefarbia).
+- **Redizajn podfarbenia (Tomas, po teste):** zbalený riadok v batohu má jemné **modré** podfarbenie,
+  ak má predmet aspoň jeden lepší atribut než čo je nasadené (bez ohľadu na horšie atribúty).
+  Po rozkliknutí sa každý riadok porovnania farbí zvlášť - **zeleno** čo je lepšie, **červeno** čo
+  je horšie (napr. pri zbrani môže byť poškodenie zelené a interval červený naraz).
+- Vysvetlenie k „rovnaký predmet, ale +0.1 Armor“: Common predmety sa rolujú v rozsahu 0.01 (GDD 9.3),
+  napr. Pebble Pendant má armor 0.10-0.20 - dva kusy môžu vyzerať v zozname rovnako („+Armor 0.1“,
+  floor na 1 desatinné miesto), no v skutočnosti majú inú hodnotu. Porovnanie ukazuje skutočný
+  (skrytý) rozdiel správne - nie je to bug, len displej predmetu má menšiu presnosť než porovnanie.
 - 215 testov zelených.
 
 ### M5.2a – limit batohu 20 + DPS (2026-09-27)

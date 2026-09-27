@@ -12,6 +12,7 @@
   "debug.enemiesLoaded": "Enemies loaded",
   "debug.textsLoaded": "Texts loaded",
   "debug.speed": "Speed",
+  "debug.dropRate": "Drop rate",
   "stats.button": "Show stats",
   "stats.title": "STATS",
   "stats.level": "Level",

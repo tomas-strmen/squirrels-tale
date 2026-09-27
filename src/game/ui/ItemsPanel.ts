@@ -23,6 +23,9 @@ export interface ItemsPanelActions {
   readonly onToggleLock: (uid: number) => void;
   /** M5.2b2: higher = more valuable, for the Rarity sort mode. */
   readonly rarityRank: (item: Item) => number;
+  /** M5.2b3: unlocked bag items grouped by rarity, for the bulk-discard buttons. */
+  readonly discardGroups: () => readonly { readonly rarityId: string; readonly name: string; readonly count: number }[];
+  readonly onDiscardRarity: (rarityId: string) => void;
 }
 
 type SortMode = 'newest' | 'rarity';
@@ -141,6 +144,16 @@ export class ItemsPanel extends Phaser.GameObjects.Container {
       80,
     );
     y += ROW_H;
+    // Bulk discard by rarity (M5.2b3): one button per rarity with unlocked bag items.
+    for (const group of this.actions.discardGroups()) {
+      addButton(
+        PAD,
+        `${t('items.discard')} ${group.name} (${group.count})`,
+        () => this.actions.onDiscardRarity(group.rarityId),
+        150,
+      );
+      y += ROW_H;
+    }
     const newestFirst = [...inventory.bag].reverse();
     const sorted =
       this.sortMode === 'rarity'

@@ -23,6 +23,7 @@ import {
   searchProgress,
   startSearch,
   tick,
+  discardBagRarity,
   toggleItemLock,
   unequipItem,
   type Combatant,
@@ -301,6 +302,19 @@ export class FightScene extends Phaser.Scene {
         this.state = toggleItemLock(this.state, this.config, uid);
       },
       rarityRank: (item) => this.rarityRanks.get(item.rarityId) ?? 0,
+      discardGroups: () => {
+        const counts = new Map<string, number>();
+        for (const item of this.state.inventory.bag) {
+          if (item.locked) continue;
+          counts.set(item.rarityId, (counts.get(item.rarityId) ?? 0) + 1);
+        }
+        return [...counts.entries()]
+          .sort((a, b) => (this.rarityRanks.get(a[0]) ?? 0) - (this.rarityRanks.get(b[0]) ?? 0))
+          .map(([rarityId, count]) => ({ rarityId, count, name: rarityName(rarityId) }));
+      },
+      onDiscardRarity: (rarityId) => {
+        this.state = discardBagRarity(this.state, this.config, rarityId);
+      },
     });
     this.lootPanel.setVisible(false);
 

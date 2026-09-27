@@ -30,6 +30,7 @@ import {
   BAG_CAPACITY,
   createInventory,
   EMPTY_EQUIPMENT,
+  discardRarity,
   equip,
   toggleLock,
   unequip,
@@ -374,6 +375,11 @@ export function unequipItem(state: EncounterState, config: EncounterConfig, slot
  * future bulk actions (M5.2b3 discard, M16 disassembly), not from equip/unequip. */
 export function toggleItemLock(state: EncounterState, config: EncounterConfig, uid: number): EncounterState {
   return withInventory(state, config, toggleLock(state.inventory, uid));
+}
+
+/** Removes every unlocked bag item of `rarityId` (M5.2b3, e.g. "Discard Common"). */
+export function discardBagRarity(state: EncounterState, config: EncounterConfig, rarityId: string): EncounterState {
+  return withInventory(state, config, discardRarity(state.inventory, rarityId));
 }
 
 function withInventory(state: EncounterState, config: EncounterConfig, inventory: InventoryState): EncounterState {

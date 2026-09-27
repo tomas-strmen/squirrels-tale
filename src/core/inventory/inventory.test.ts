@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import type { Item } from '../loot/loot';
-import { addToBag, BAG_CAPACITY, createInventory, equip, equippedItems, slotsFor, toggleLock, unequip } from './inventory';
+import {
+  addToBag,
+  BAG_CAPACITY,
+  createInventory,
+  discardRarity,
+  equip,
+  equippedItems,
+  slotsFor,
+  toggleLock,
+  unequip,
+} from './inventory';
 
 function item(uid: number, slot: Item['slot'], baseId = 'sharp_twig'): Item {
   return { uid, baseId, slot, tier: 1, rarityId: 'common', weapon: null, stats: [], affixes: [] };
@@ -72,6 +82,34 @@ describe('toggleLock (M5.2b2)', () => {
   it('does nothing for a uid not in the bag', () => {
     const bagged = addToBag(createInventory(), item(1, 'melee'));
     expect(toggleLock(bagged, 99)).toBe(bagged);
+  });
+});
+
+describe('discardRarity (M5.2b3)', () => {
+  const withRarity = (uid: number, rarityId: string, locked = false): Item => ({
+    ...item(uid, 'head'),
+    rarityId,
+    locked,
+  });
+
+  it('removes every unlocked item of that rarity, keeps the rest', () => {
+    const bagged = [withRarity(1, 'common'), withRarity(2, 'common'), withRarity(3, 'uncommon')].reduce(
+      addToBag,
+      createInventory(),
+    );
+    const s = discardRarity(bagged, 'common');
+    expect(s.bag.map((i) => i.uid)).toEqual([3]);
+  });
+
+  it('keeps a locked item of that rarity', () => {
+    const bagged = [withRarity(1, 'common', true), withRarity(2, 'common')].reduce(addToBag, createInventory());
+    const s = discardRarity(bagged, 'common');
+    expect(s.bag.map((i) => i.uid)).toEqual([1]);
+  });
+
+  it('returns the same state when nothing matches', () => {
+    const bagged = addToBag(createInventory(), withRarity(1, 'uncommon'));
+    expect(discardRarity(bagged, 'common')).toBe(bagged);
   });
 });
 

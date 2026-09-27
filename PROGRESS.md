@@ -2,13 +2,22 @@
 
 ## Aktuálne
 - **Etapa:** M5 Inventár a výbava (GDD kap. 22) – M4 Predmety hotová ✅
-- **Posledný krok:** M5.2b2 – zamknutie predmetov + triedenie batohu (newest / rarity) – hotové, čaká na test (PR)
-- **Ďalší krok:** M5.2b3 – hromadné zahodenie predmetov podľa vzácnosti (napr. „Discard Common“)
+- **Posledný krok:** M5.2b3 – hromadné zahodenie predmetov podľa vzácnosti – hotové, čaká na test (PR)
+- **Ďalší krok:** M5 je hotová (9 slotov, boj s výbavou, batoh 20, porovnanie, zámok, triedenie,
+  hromadné zahodenie). Ďalej M6 Mapa (GDD kap. 22).
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model: podľa náročnosti kroku (poviem vopred). Od teraz: AI pripraví vetvu/commit/push a dá Tomasovi presné príkazy/odkaz na PR, test a merge robí Tomas sám (šetrí tokeny oproti ovládaniu prehliadača).
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.
 
 ## Hotové
+### M5.2b3 – hromadné zahodenie podľa vzácnosti (2026-09-27)
+- Nad zoznamom batohu je tlačidlo pre každú vzácnosť, ktorá sa tam nachádza a nie je celá
+  zamknutá: „Discard Common (12)“ atď. Klik zahodí naraz všetky nezamknuté predmety tej vzácnosti,
+  zamknuté (🔒) ostanú.
+- `core/inventory.discardRarity` (nový, testovaný), `core/encounter.discardBagRarity`.
+- 220 testov zelených. V prehliadači overené len rozloženie (bez predmetov v batohu sa tlačidlá
+  správne nezobrazujú); samotné zahadzovanie over ty.
+
 ### M5.2b2 – zamknutie + triedenie batohu (2026-09-27)
 - Každý predmet v batohu má zámok 🔓/🔒 (tlačidlo pri riadku) - zatiaľ len príznak, nič nerobí
   navyše (blokovanie predaja/rozoberania príde s M16 kováčom / budúcim hromadným zahadzovaním).

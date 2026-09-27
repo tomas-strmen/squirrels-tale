@@ -4,8 +4,8 @@
  *
  * M5.1 scope: 9 equipment slots, equip/unequip.
  * M5.2a: 20-slot bag limit. M5.2b1: comparison (core/encounter.compareEquip).
- * M5.2b2: locking. Not yet: sorting UI state (lives in the panel, not here),
- * "Keep only upgrades", stacks.
+ * M5.2b2: locking. M5.2b3: bulk discard by rarity. Not yet: sorting UI state
+ * (lives in the panel, not here), "Keep only upgrades", stacks.
  */
 import type { ItemSlot } from '../content/schemas';
 import type { Item } from '../loot/loot';
@@ -98,6 +98,13 @@ export function toggleLock(state: InventoryState, uid: number): InventoryState {
   const bag = [...state.bag];
   const item = bag[index]!;
   bag[index] = { ...item, locked: !item.locked };
+  return { ...state, bag };
+}
+
+/** Removes every unlocked bag item of `rarityId` (M5.2b3). Locked items are kept. */
+export function discardRarity(state: InventoryState, rarityId: string): InventoryState {
+  const bag = state.bag.filter((i) => i.rarityId !== rarityId || i.locked);
+  if (bag.length === state.bag.length) return state;
   return { ...state, bag };
 }
 

@@ -2,13 +2,26 @@
 
 ## Aktuálne
 - **Etapa:** M5 Inventár a výbava (GDD kap. 22) – M4 Predmety hotová ✅
-- **Posledný krok:** M5.2a – limit 20 predmetov v batohu + DPS v Stats – hotové, čaká na test (PR)
-- **Ďalší krok:** M5.2b – porovnanie, zamykanie, triedenie, „Keep only upgrades“ (stack zásob zatiaľ netreba, žiadne stackovateľné predmety)
+- **Posledný krok:** M5.2b1 – porovnanie predmetu pred nasadením (tap-to-compare) – hotové, čaká na test (PR)
+- **Ďalší krok:** M5.2b2 – zamknutie predmetov + triedenie batohu (newest / rarity)
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model: podľa náročnosti kroku (poviem vopred). Od teraz: AI pripraví vetvu/commit/push a dá Tomasovi presné príkazy/odkaz na PR, test a merge robí Tomas sám (šetrí tokeny oproti ovládaniu prehliadača).
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.
 
 ## Hotové
+### M5.2b1 – porovnanie pred nasadením (2026-09-27)
+- Funguje rovnako na telefóne aj PC (žiadny hover): klik na predmet v batohu rozbalí porovnanie
+  oproti nasadenému kusu (dmg, armor, max HP, hit%, interval útoku), pri zbrani zvlášť pre R aj L paw.
+  Druhý klik (na Equip/R paw/L paw) až potom reálne nasadí.
+- `core/encounter.compareEquip` (nový, testovaný): čistá funkcia, porovná dve zloženia výbavy.
+- Oprava chyby: klik na riadok v batohu vedel panel „zaseknúť“ (neviditeľný) - Phaser objekt sa
+  nesmie zničiť sám vo vlastnom onClick; teraz sa prekreslenie panelu odkladá na ďalší frame.
+- Oprava po teste (Tomas): rozdiel menší než 0.1 (pod presnosť zobrazenia) sa už neukazuje ako
+  mätúce „-0.0“ - taký rozdiel sa ráta ako „bez zmeny“ (`core/encounter.classifyEquip`, nové).
+- Nové: predmety v batohu majú jemné podfarbenie - zelené, ak je predmet pre aspoň jeden vhodný
+  slot vylepšenie, červené, ak je vo všetkých horší (zmiešané zmeny sa nefarbia).
+- 215 testov zelených.
+
 ### M5.2a – limit batohu 20 + DPS (2026-09-27)
 - `core/inventory`: `BAG_CAPACITY = 20`, `addToBag` ďalší predmet zahodí, keď je batoh plný.
 - `itemFound` event má `bagFull`; keď je batoh plný, popup pri drope ukáže „(bag full, lost)“ červenou.

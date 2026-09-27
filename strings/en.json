@@ -36,6 +36,7 @@
   "items.equipRight": "R paw",
   "items.equipLeft": "L paw",
   "items.unequip": "Off",
+  "compare.none": "No change",
   "slot.rightPaw.name": "Right paw",
   "slot.leftPaw.name": "Left paw",
   "slot.ranged.name": "Ranged",

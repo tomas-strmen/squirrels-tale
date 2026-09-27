@@ -10,6 +10,8 @@ import { toEncounterConfigInput } from '../../core/content/encounterInput';
 import { parseAffixes, parseBalance, parseEnemies, parseItems, parseRarities } from '../../core/content/schemas';
 import {
   attackProgress,
+  classifyEquip,
+  compareEquip,
   createEncounter,
   createEncounterConfig,
   equipItem,
@@ -31,9 +33,10 @@ import { hitChancePct } from '../../core/combat/combat';
 import { formatHpHundredths, formatHundredths, fromHundredths } from '../../core/numbers/numbers';
 import { regenAmountHundredths, xpToNextLevelHundredths } from '../../core/progression/progression';
 import { createRng } from '../../core/rng/rng';
+import { slotsFor } from '../../core/inventory/inventory';
 import { diceFaces, pityCountdowns, type Item } from '../../core/loot/loot';
 import { consumeFrame, DEFAULT_MAX_STEPS_PER_FRAME, TICK_MS } from '../../core/time/fixedStep';
-import { itemName, rarityName } from '../itemText';
+import { equipComparisonText, itemName, rarityName } from '../itemText';
 import { t, tDynamic } from '../text';
 import { Button } from '../ui/Button';
 import { DebugPanel } from '../ui/DebugPanel';
@@ -277,6 +280,19 @@ export class FightScene extends Phaser.Scene {
         this.state = unequipItem(this.state, this.config, slot);
       },
       colorOf: (item) => this.rarityColors.get(item.rarityId) ?? '#ffffff',
+      compareToSlot: (item, slot) =>
+        equipComparisonText(
+          compareEquip(this.config, this.state.progression.level, this.state.inventory.equipment, item, slot),
+        ),
+      // M5.2b1: green/red bag row tint - "better"/"worse" for at least one fitting slot.
+      verdictForItem: (item) => {
+        const verdicts = slotsFor(item.slot).map((slot) =>
+          classifyEquip(compareEquip(this.config, this.state.progression.level, this.state.inventory.equipment, item, slot)),
+        );
+        if (verdicts.includes('better')) return 'better';
+        if (verdicts.length > 0 && verdicts.every((v) => v === 'worse')) return 'worse';
+        return 'none';
+      },
     });
     this.lootPanel.setVisible(false);
 

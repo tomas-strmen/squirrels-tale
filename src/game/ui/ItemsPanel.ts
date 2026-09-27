@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { EQUIP_SLOTS, slotsFor, type EquipSlot, type InventoryState } from '../../core/inventory/inventory';
+import { BAG_CAPACITY, EQUIP_SLOTS, slotsFor, type EquipSlot, type InventoryState } from '../../core/inventory/inventory';
 import type { Item } from '../../core/loot/loot';
 import { itemSummary } from '../itemText';
 import { t, tDynamic } from '../text';
@@ -8,7 +8,7 @@ import { Button } from './Button';
 const ROW_H = 20;
 const PAD = 8;
 const FONT = { fontFamily: 'monospace', fontSize: '13px', color: '#dddddd' };
-/** How many bag items to list (newest first) - the full inventory screen is M5.2. */
+/** How many bag rows to show at once (newest first); scroll buttons reach the rest (GDD 22, M5.2a). */
 const BAG_ROWS = 8;
 
 export interface ItemsPanelActions {
@@ -18,13 +18,16 @@ export interface ItemsPanelActions {
 }
 
 /**
- * M5.1: equipped gear (9 slots, GDD 9.1 v2.3) + the newest bag items, with
- * Equip / Unequip buttons. Rebuilt only when the inventory changes.
+ * M5.1: equipped gear (9 slots, GDD 9.1 v2.3) + bag items (M5.2a: capped at
+ * BAG_CAPACITY, scrollable with ▲/▼), with Equip / Unequip buttons.
+ * Redrawn when the inventory changes, or when the bag is scrolled.
  */
 export class ItemsPanel extends Phaser.GameObjects.Container {
   private readonly bg: Phaser.GameObjects.Rectangle;
   private rows: Phaser.GameObjects.GameObject[] = [];
   private shown: InventoryState | null = null;
+  /** How many bag rows are scrolled past (0 = showing the newest first, M5.2a). */
+  private scrollOffset = 0;
 
   constructor(
     scene: Phaser.Scene,
@@ -38,10 +41,17 @@ export class ItemsPanel extends Phaser.GameObjects.Container {
     scene.add.existing(this);
   }
 
-  /** Redraws only when `inventory` is a different object (core states are immutable). */
+  /** Call every frame; only redraws when `inventory` is a different object (core states are immutable). */
   show(inventory: InventoryState): void {
     if (inventory === this.shown) return;
     this.shown = inventory;
+    this.scrollOffset = 0;
+    this.render();
+  }
+
+  private render(): void {
+    const inventory = this.shown;
+    if (!inventory) return;
     this.rows.forEach((r) => r.destroy());
     this.rows = [];
     let y = PAD;
@@ -75,14 +85,24 @@ export class ItemsPanel extends Phaser.GameObjects.Container {
     }
 
     y += 4;
-    addText(PAD, t('items.bag').replace('{n}', String(inventory.bag.length)));
+    const maxOffset = Math.max(0, inventory.bag.length - BAG_ROWS);
+    this.scrollOffset = Math.min(this.scrollOffset, maxOffset);
+    addText(
+      PAD,
+      t('items.bag').replace('{n}', String(inventory.bag.length)).replace('{cap}', String(BAG_CAPACITY)),
+    );
+    if (maxOffset > 0) {
+      addButton(220, '▲', () => this.scroll(-1));
+      addButton(272, '▼', () => this.scroll(1));
+    }
     y += ROW_H;
-    const latest = [...inventory.bag].reverse().slice(0, BAG_ROWS);
-    if (latest.length === 0) {
+    const newestFirst = [...inventory.bag].reverse();
+    const visible = newestFirst.slice(this.scrollOffset, this.scrollOffset + BAG_ROWS);
+    if (visible.length === 0) {
       addText(PAD, t('loot.none'), '#909090');
       y += ROW_H;
     }
-    for (const item of latest) {
+    for (const item of visible) {
       let x = PAD;
       for (const slot of slotsFor(item.slot)) {
         // Melee weapons get two buttons (right / left paw), everything else one.
@@ -95,5 +115,12 @@ export class ItemsPanel extends Phaser.GameObjects.Container {
       y += ROW_H;
     }
     this.bg.setSize(width, y + PAD - 4);
+  }
+
+  private scroll(delta: number): void {
+    if (!this.shown) return;
+    const maxOffset = Math.max(0, this.shown.bag.length - BAG_ROWS);
+    this.scrollOffset = Math.max(0, Math.min(maxOffset, this.scrollOffset + delta * BAG_ROWS));
+    this.render();
   }
 }

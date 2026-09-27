@@ -27,6 +27,7 @@ import {
 import { fromHundredths, toHundredths } from '../numbers/numbers';
 import {
   addToBag,
+  BAG_CAPACITY,
   createInventory,
   EMPTY_EQUIPMENT,
   equip,
@@ -151,8 +152,8 @@ export type EncounterEvent =
       readonly damage: number;
     }
   | { readonly type: 'enemyDefeated' }
-  /** A killed enemy dropped an item (GDD 9.6). */
-  | { readonly type: 'itemFound'; readonly item: Item }
+  /** A killed enemy dropped an item (GDD 9.6). `bagFull`: bag was at capacity, item was lost (M5.2a). */
+  | { readonly type: 'itemFound'; readonly item: Item; readonly bagFull: boolean }
   /** Player leveled up (GDD 6.2): +1.0 max HP (healed at once), +0.1 max damage, and +0.1 min damage on even levels. */
   | { readonly type: 'leveledUp'; readonly level: number }
   /** Squirrel was defeated (GDD 6.3, online death): fight over, she goes to the hideout. */
@@ -439,8 +440,9 @@ function tickFight(state: EncounterState, config: EncounterConfig): EncounterSte
       });
       const loot = drop.state;
       const lootRng = drop.rng;
+      const bagFull = drop.item !== null && state.inventory.bag.length >= BAG_CAPACITY;
       const inventory = drop.item ? addToBag(state.inventory, drop.item) : state.inventory;
-      if (drop.item) events.push({ type: 'itemFound', item: drop.item });
+      if (drop.item) events.push({ type: 'itemFound', item: drop.item, bagFull });
       const gain = gainXp(progression, config.enemyXp);
       progression = gain.state;
       // Every level gained heals by exactly its HP bonus (GDD 6.2) - never a full heal.

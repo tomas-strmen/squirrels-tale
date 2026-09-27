@@ -2,13 +2,24 @@
 
 ## Aktuálne
 - **Etapa:** M5 Inventár a výbava (GDD kap. 22) – M4 Predmety hotová ✅
-- **Posledný krok:** M5.1 – výbava ovplyvňuje boj – hotové, čaká na test (PR)
-- **Ďalší krok:** M5.2 – plný inventár (limit 20, porovnanie, zamykanie, triedenie, „Keep only upgrades“)
+- **Posledný krok:** M5.2a – limit 20 predmetov v batohu + DPS v Stats – hotové, čaká na test (PR)
+- **Ďalší krok:** M5.2b – porovnanie, zamykanie, triedenie, „Keep only upgrades“ (stack zásob zatiaľ netreba, žiadne stackovateľné predmety)
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model: podľa náročnosti kroku (poviem vopred). Od teraz: AI pripraví vetvu/commit/push a dá Tomasovi presné príkazy/odkaz na PR, test a merge robí Tomas sám (šetrí tokeny oproti ovládaniu prehliadača).
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.
 
 ## Hotové
+### M5.2a – limit batohu 20 + DPS (2026-09-27)
+- `core/inventory`: `BAG_CAPACITY = 20`, `addToBag` ďalší predmet zahodí, keď je batoh plný.
+- `itemFound` event má `bagFull`; keď je batoh plný, popup pri drope ukáže „(bag full, lost)“ červenou.
+- Panel Found items: hlavička „FOUND ITEMS (n/20, newest first)“, pri viac než 8 predmetoch pribudnú
+  šípky ▲/▼ na prehŕňanie (posun po 8).
+- Stats: nový riadok **DPS** (poškodenie / interval útoku, bez critu zatiaľ) ako rozsah min-max.
+- Debug: pod „Speed“ pribudlo „Drop rate“ ×1/×10/100 % na rýchle testovanie (nemení balans).
+- 213 testov zelených. Overené v prehliadači: DPS riadok, počítadlo n/20, drop a Equip tlačidlá;
+  presné dosiahnutie limitu 20 a scroll šípky overené len testom (batoh sa v prehliadači naplnil
+  len po 7, simulácia pri ×50 v testovacom prehliadači beží nerovnomerne).
+
 ### M5.1 – výbava (2026-09-27)
 - 9 slotov: pravá/ľavá labka, ranged, head, body, legs, ring, amulet, tail (tail zatiaľ bez predmetov).
 - Ľavá labka: druhá zbraň pridá 50 % poškodenia (`balance.json` `offHandDamagePct`), interval nemení.

@@ -32,25 +32,45 @@ function signedHundredths(hundredths: number): string {
   return hundredths < 0 ? `-${v}` : `+${v}`;
 }
 
+/** One comparison line, tagged so the UI can color it (M5.2b1: green = better, red = worse). */
+export interface EquipComparisonLine {
+  readonly text: string;
+  readonly verdict: 'better' | 'worse';
+}
+
 /**
- * One-line stat diff for tap-to-compare (M5.2b1): only fields with a visible
- * (>= 0.1 at display) change, e.g. "Damage: +0.3/+0.5, Attack interval: -0.40 s".
+ * Per-stat diff for tap-to-compare (M5.2b1): one line per field with a visible
+ * (>= 0.1 at display) change, each tagged better/worse so the panel can color
+ * it green/red - e.g. "Damage: +0.3/+0.5" (better), "Attack interval: +0.20 s" (worse).
  */
-export function equipComparisonText(diff: EquipComparison): string {
-  const parts: string[] = [];
+export function equipComparisonLines(diff: EquipComparison): readonly EquipComparisonLine[] {
+  const lines: EquipComparisonLine[] = [];
   if (Math.abs(diff.damageMin) >= HUNDREDTHS_DISPLAY_THRESHOLD || Math.abs(diff.damageMax) >= HUNDREDTHS_DISPLAY_THRESHOLD) {
-    parts.push(`${t('stats.damage')}: ${signedHundredths(diff.damageMin)}/${signedHundredths(diff.damageMax)}`);
+    lines.push({
+      text: `${t('stats.damage')}: ${signedHundredths(diff.damageMin)}/${signedHundredths(diff.damageMax)}`,
+      verdict: diff.damageMin + diff.damageMax >= 0 ? 'better' : 'worse',
+    });
   }
   if (Math.abs(diff.attackIntervalMs) >= MS_DISPLAY_THRESHOLD) {
     const s = (Math.abs(diff.attackIntervalMs) / 1000).toFixed(2);
-    parts.push(`${t('stats.attackInterval')}: ${diff.attackIntervalMs < 0 ? '-' : '+'}${s} s`);
+    lines.push({
+      text: `${t('stats.attackInterval')}: ${diff.attackIntervalMs < 0 ? '-' : '+'}${s} s`,
+      verdict: diff.attackIntervalMs < 0 ? 'better' : 'worse', // shorter = better
+    });
   }
-  if (Math.abs(diff.maxHp) >= HUNDREDTHS_DISPLAY_THRESHOLD) parts.push(`${t('stats.maxHp')}: ${signedHundredths(diff.maxHp)}`);
-  if (Math.abs(diff.armor) >= HUNDREDTHS_DISPLAY_THRESHOLD) parts.push(`${t('stats.armor')}: ${signedHundredths(diff.armor)}`);
+  if (Math.abs(diff.maxHp) >= HUNDREDTHS_DISPLAY_THRESHOLD) {
+    lines.push({ text: `${t('stats.maxHp')}: ${signedHundredths(diff.maxHp)}`, verdict: diff.maxHp > 0 ? 'better' : 'worse' });
+  }
+  if (Math.abs(diff.armor) >= HUNDREDTHS_DISPLAY_THRESHOLD) {
+    lines.push({ text: `${t('stats.armor')}: ${signedHundredths(diff.armor)}`, verdict: diff.armor > 0 ? 'better' : 'worse' });
+  }
   if (Math.abs(diff.hitPct) >= HIT_PCT_DISPLAY_THRESHOLD) {
-    parts.push(`${t('stats.hitChance')}: ${diff.hitPct > 0 ? '+' : '-'}${Math.abs(diff.hitPct).toFixed(1)} %`);
+    lines.push({
+      text: `${t('stats.hitChance')}: ${diff.hitPct > 0 ? '+' : '-'}${Math.abs(diff.hitPct).toFixed(1)} %`,
+      verdict: diff.hitPct > 0 ? 'better' : 'worse',
+    });
   }
-  return parts.length ? parts.join(', ') : t('compare.none');
+  return lines;
 }
 
 /** One-line summary: "Sharp Twig [Uncommon] - Damage 0.3-0.5, +Armor 0.1" */

@@ -36,7 +36,7 @@ import { createRng } from '../../core/rng/rng';
 import { slotsFor } from '../../core/inventory/inventory';
 import { diceFaces, pityCountdowns, type Item } from '../../core/loot/loot';
 import { consumeFrame, DEFAULT_MAX_STEPS_PER_FRAME, TICK_MS } from '../../core/time/fixedStep';
-import { equipComparisonText, itemName, rarityName } from '../itemText';
+import { equipComparisonLines, itemName, rarityName } from '../itemText';
 import { t, tDynamic } from '../text';
 import { Button } from '../ui/Button';
 import { DebugPanel } from '../ui/DebugPanel';
@@ -281,18 +281,18 @@ export class FightScene extends Phaser.Scene {
       },
       colorOf: (item) => this.rarityColors.get(item.rarityId) ?? '#ffffff',
       compareToSlot: (item, slot) =>
-        equipComparisonText(
+        equipComparisonLines(
           compareEquip(this.config, this.state.progression.level, this.state.inventory.equipment, item, slot),
         ),
-      // M5.2b1: green/red bag row tint - "better"/"worse" for at least one fitting slot.
-      verdictForItem: (item) => {
-        const verdicts = slotsFor(item.slot).map((slot) =>
-          classifyEquip(compareEquip(this.config, this.state.progression.level, this.state.inventory.equipment, item, slot)),
-        );
-        if (verdicts.includes('better')) return 'better';
-        if (verdicts.length > 0 && verdicts.every((v) => v === 'worse')) return 'worse';
-        return 'none';
-      },
+      // M5.2b1: faint blue bag row - true if `item` beats what's worn in at least one stat,
+      // for at least one fitting slot ('better' or 'mixed' both mean "some upgrade in there").
+      hasUpgrade: (item) =>
+        slotsFor(item.slot).some((slot) => {
+          const verdict = classifyEquip(
+            compareEquip(this.config, this.state.progression.level, this.state.inventory.equipment, item, slot),
+          );
+          return verdict === 'better' || verdict === 'mixed';
+        }),
     });
     this.lootPanel.setVisible(false);
 

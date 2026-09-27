@@ -16,7 +16,11 @@
 - `core/encounter.compareEquip` (nový, testovaný): čistá funkcia, porovná dve zloženia výbavy.
 - Oprava chyby: klik na riadok v batohu vedel panel „zaseknúť“ (neviditeľný) - Phaser objekt sa
   nesmie zničiť sám vo vlastnom onClick; teraz sa prekreslenie panelu odkladá na ďalší frame.
-- 214 testov zelených.
+- Oprava po teste (Tomas): rozdiel menší než 0.1 (pod presnosť zobrazenia) sa už neukazuje ako
+  mätúce „-0.0“ - taký rozdiel sa ráta ako „bez zmeny“ (`core/encounter.classifyEquip`, nové).
+- Nové: predmety v batohu majú jemné podfarbenie - zelené, ak je predmet pre aspoň jeden vhodný
+  slot vylepšenie, červené, ak je vo všetkých horší (zmiešané zmeny sa nefarbia).
+- 215 testov zelených.
 
 ### M5.2a – limit batohu 20 + DPS (2026-09-27)
 - `core/inventory`: `BAG_CAPACITY = 20`, `addToBag` ďalší predmet zahodí, keď je batoh plný.

@@ -20,29 +20,35 @@ export function statText(stat: ItemStat): string {
   return `+${tDynamic(`stat.${stat.stat}.name`)} ${formatHundredths(stat.value)}${suffix}`;
 }
 
-/** Signed delta for display, e.g. -130 -> "-1.3", 0 -> "0" (not the design-value floor rule - this is a diff). */
+// GDD 5: stats always display rounded to 0.1. A delta smaller than that would
+// show as a confusing "-0.0"/"+0.0", so it counts as "no visible change" here.
+const HUNDREDTHS_DISPLAY_THRESHOLD = 5; // 0.05 design units
+const HIT_PCT_DISPLAY_THRESHOLD = 0.05; // hitPct is already plain percent, not hundredths
+const MS_DISPLAY_THRESHOLD = 5; // 0.005 s
+
+/** Signed delta for display, e.g. -130 -> "-1.3" (not the design-value floor rule - this is a diff). */
 function signedHundredths(hundredths: number): string {
   const v = fromHundredths(Math.abs(hundredths)).toFixed(1);
-  return hundredths < 0 ? `-${v}` : hundredths > 0 ? `+${v}` : '0';
+  return hundredths < 0 ? `-${v}` : `+${v}`;
 }
 
 /**
- * One-line stat diff for tap-to-compare (M5.2b1): only non-zero fields, e.g.
- * "Damage: +0.3/+0.5, Attack interval: -0.40 s, Hit chance: +1.9 %".
+ * One-line stat diff for tap-to-compare (M5.2b1): only fields with a visible
+ * (>= 0.1 at display) change, e.g. "Damage: +0.3/+0.5, Attack interval: -0.40 s".
  */
 export function equipComparisonText(diff: EquipComparison): string {
   const parts: string[] = [];
-  if (diff.damageMin !== 0 || diff.damageMax !== 0) {
+  if (Math.abs(diff.damageMin) >= HUNDREDTHS_DISPLAY_THRESHOLD || Math.abs(diff.damageMax) >= HUNDREDTHS_DISPLAY_THRESHOLD) {
     parts.push(`${t('stats.damage')}: ${signedHundredths(diff.damageMin)}/${signedHundredths(diff.damageMax)}`);
   }
-  if (diff.attackIntervalMs !== 0) {
-    const s = (diff.attackIntervalMs / 1000).toFixed(2);
-    parts.push(`${t('stats.attackInterval')}: ${diff.attackIntervalMs > 0 ? '+' : ''}${s} s`);
+  if (Math.abs(diff.attackIntervalMs) >= MS_DISPLAY_THRESHOLD) {
+    const s = (Math.abs(diff.attackIntervalMs) / 1000).toFixed(2);
+    parts.push(`${t('stats.attackInterval')}: ${diff.attackIntervalMs < 0 ? '-' : '+'}${s} s`);
   }
-  if (diff.maxHp !== 0) parts.push(`${t('stats.maxHp')}: ${signedHundredths(diff.maxHp)}`);
-  if (diff.armor !== 0) parts.push(`${t('stats.armor')}: ${signedHundredths(diff.armor)}`);
-  if (diff.hitPct !== 0) {
-    parts.push(`${t('stats.hitChance')}: ${diff.hitPct > 0 ? '+' : ''}${diff.hitPct.toFixed(1)} %`);
+  if (Math.abs(diff.maxHp) >= HUNDREDTHS_DISPLAY_THRESHOLD) parts.push(`${t('stats.maxHp')}: ${signedHundredths(diff.maxHp)}`);
+  if (Math.abs(diff.armor) >= HUNDREDTHS_DISPLAY_THRESHOLD) parts.push(`${t('stats.armor')}: ${signedHundredths(diff.armor)}`);
+  if (Math.abs(diff.hitPct) >= HIT_PCT_DISPLAY_THRESHOLD) {
+    parts.push(`${t('stats.hitChance')}: ${diff.hitPct > 0 ? '+' : '-'}${Math.abs(diff.hitPct).toFixed(1)} %`);
   }
   return parts.length ? parts.join(', ') : t('compare.none');
 }

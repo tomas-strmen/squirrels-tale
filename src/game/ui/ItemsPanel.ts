@@ -17,7 +17,11 @@ export interface ItemsPanelActions {
   readonly colorOf: (item: Item) => string;
   /** M5.2b1: one-line stat diff of putting `item` into `slot`, already formatted. */
   readonly compareToSlot: (item: Item, slot: EquipSlot) => string;
+  /** M5.2b1: 'better'/'worse' tints the bag row; 'mixed'/'none' leaves it plain. */
+  readonly verdictForItem: (item: Item) => 'better' | 'worse' | 'mixed' | 'none';
 }
+
+const VERDICT_TINT: Record<'better' | 'worse', number> = { better: 0x2ecc71, worse: 0xe74c3c };
 
 /**
  * M5.1: equipped gear (9 slots, GDD 9.1 v2.3) + bag items (M5.2a: capped at
@@ -123,8 +127,18 @@ export class ItemsPanel extends Phaser.GameObjects.Container {
       addText(PAD, t('loot.none'), '#909090');
       y += ROW_H;
     }
+    const rowTints: Phaser.GameObjects.Rectangle[] = [];
     for (const item of visible) {
       const expanded = item.uid === this.expandedUid;
+      // Faint green/red row tint (M5.2b1): upgrade/downgrade vs what's worn. Sized to the
+      // panel's final width once that's known (see the loop below).
+      const verdict = this.actions.verdictForItem(item);
+      if (verdict === 'better' || verdict === 'worse') {
+        const tint = this.scene.add.rectangle(PAD - 4, y - 2, 10, ROW_H, VERDICT_TINT[verdict], 0.18).setOrigin(0, 0);
+        this.add(tint);
+        this.rows.push(tint);
+        rowTints.push(tint);
+      }
       // Tap the summary to compare (M5.2b1); tap again (or another item) to switch/close.
       const label = addText(PAD, `${expanded ? '▾' : '▸'} ${itemSummary(item)}`, this.actions.colorOf(item));
       label.setInteractive({ useHandCursor: true }).on('pointerup', () => {
@@ -148,6 +162,7 @@ export class ItemsPanel extends Phaser.GameObjects.Container {
         }
       }
     }
+    for (const tint of rowTints) tint.setSize(width - (PAD - 4) * 2, ROW_H);
     this.bg.setSize(width, y + PAD - 4);
   }
 

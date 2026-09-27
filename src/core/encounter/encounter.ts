@@ -301,6 +301,37 @@ export interface EquipComparison {
   readonly attackIntervalMs: number;
 }
 
+// GDD 5: stats display rounded to 0.1, so a delta below that isn't a visible
+// difference - it should count as neither an upgrade nor a downgrade.
+const HUNDREDTHS_THRESHOLD = 5; // 0.05 design units
+const HIT_PCT_THRESHOLD = 0.05; // hitPct is already plain percent, not hundredths
+const MS_THRESHOLD = 5; // 0.005 s
+
+export type EquipVerdict = 'better' | 'worse' | 'mixed' | 'none';
+
+/**
+ * Overall verdict for a comparison (M5.2b1, for the bag list's green/red tint):
+ * 'better' if every visible-sized stat change is an upgrade, 'worse' if every
+ * one is a downgrade, 'mixed' if some go each way, 'none' if nothing visible changed.
+ */
+export function classifyEquip(diff: EquipComparison): EquipVerdict {
+  const signs: number[] = [];
+  const push = (delta: number, threshold: number, goodWhenPositive: boolean) => {
+    if (Math.abs(delta) < threshold) return;
+    signs.push(goodWhenPositive === (delta > 0) ? 1 : -1);
+  };
+  push(diff.maxHp, HUNDREDTHS_THRESHOLD, true);
+  push(diff.damageMin, HUNDREDTHS_THRESHOLD, true);
+  push(diff.damageMax, HUNDREDTHS_THRESHOLD, true);
+  push(diff.armor, HUNDREDTHS_THRESHOLD, true);
+  push(diff.hitPct, HIT_PCT_THRESHOLD, true);
+  push(diff.attackIntervalMs, MS_THRESHOLD, false); // lower interval = better
+  if (signs.length === 0) return 'none';
+  if (signs.every((s) => s > 0)) return 'better';
+  if (signs.every((s) => s < 0)) return 'worse';
+  return 'mixed';
+}
+
 /** Compares equipping `item` into `slot` against the current `equipment` (M5.2b1). Pure, no state change. */
 export function compareEquip(
   config: EncounterConfig,

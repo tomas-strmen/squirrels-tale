@@ -2,7 +2,7 @@
 
 ## Aktuálne
 - **Etapa:** M6 Mapa (GDD kap. 8, 22) – M5 Inventár a výbava hotová ✅
-- **Posledný krok:** M6.1 – levely nepriateľov podľa GDD 8.4 – hotové, čaká na test (PR)
+- **Posledný krok:** M6.1 – levely nepriateľov podľa GDD 8.4 – hotové a otestované, mergnuté
 - **Ďalší krok:** M6.2 – viac políčok (`data/tiles.json`, výber políčka, odomykanie podľa počtu zabití)
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model: podľa náročnosti kroku (poviem vopred). Od teraz: AI pripraví vetvu/commit/push a dá Tomasovi presné príkazy/odkaz na PR, test a merge robí Tomas sám (šetrí tokeny oproti ovládaniu prehliadača).
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.

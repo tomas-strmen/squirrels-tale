@@ -18,6 +18,7 @@ export function toEncounterConfigInput(balance: Balance, enemy: Enemy, lootData:
     playerAttackIntervalS: balance.player.unarmedAttackIntervalS,
     enemyAttackIntervalS: enemy.attackIntervalS,
     playerAttackSpeedPctPerLevel: balance.player.attackSpeedPctPerLevel,
+    offHandDamagePct: balance.player.offHandDamagePct,
     player: {
       maxHp: balance.player.maxHp,
       damageMin: balance.player.unarmedDamageMin,

@@ -1,7 +1,7 @@
-# Veverička – Game Design Document (GDD) v2.2
+# Veverička – Game Design Document (GDD) v2.3
 
 > **Pracovný názov hry:** *Squirrel's Tale* (dočasný – finálny názov vybrať pred vydaním; nesmie pripomínať „Hero Tale“).
-> **Stav:** v2.2, 26. 9. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
+> **Stav:** v2.3, 26. 9. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
 > **Súvisiace:** `claude/ROADMAP.md` (technológia, architektúra, etapy vydania), `claude/PROMPT-vyvoj.md` (ako má AI pracovať).
 
 ---
@@ -184,7 +184,7 @@ DR   = armor / (armor + 10)                  // max 0.75
 final = max(0.1, round2(raw × (1 − DR)))   // zobrazí sa floor na 0.1
 ak stun (šanca stun%) → cieľ má ďalší útok oneskorený o 1.5 s (boss 0.5 s), nesčítava sa
 ```
-- `interval = baseInterval / (1.01^(L−1) × (1 + attackSpeed%))`, min 0.5 s. Nepriatelia bez člena 1.01^(L−1) (ich rast je v 8.4).
+- `interval = (4.0 s + posun zbrane v pravej labke) / (1.01^(L−1) × Π(1 + attackSpeed%))`, min 0.5 s (v2.3). Nepriatelia bez člena 1.01^(L−1) (ich rast je v 8.4).
 - Regenerácia tiká počas boja aj medzi súbojmi.
 
 ### 7.3 Munícia
@@ -283,8 +283,8 @@ ak stun (šanca stun%) → cieľ má ďalší útok oneskorený o 1.5 s (boss 0.
 ## 9. Predmety
 
 ### 9.1 Sloty
-**[MVP]:** melee weapon, ranged weapon, head, body, legs, ring, amulet (7).
-**[PO-MVP]:** shield, **tail** (zbraň pre aktívny útok chvostom).
+**[MVP] (v2.3, Tomas) – 9 slotov:** **pravá labka** (zbraň na blízko), **ľavá labka** (štít alebo druhá zbraň – druhá zbraň pridá **50 %** svojho poškodenia a interval útoku nemení), ranged weapon, head, body, legs, ring, amulet, **tail** (zbraň pre aktívny útok chvostom – slot existuje, predmety a útok chvostom neskôr).
+**[PO-MVP]:** štíty (predmety do ľavej labky).
 
 ### 9.2 Vzácnosti
 | Vzácnosť | Farba | Násobok základných hodnôt | Afixy | Poznámka |
@@ -321,7 +321,7 @@ ak stun (šanca stun%) → cieľ má ďalší útok oneskorený o 1.5 s (boss 0.
 | +Stun chance % | +1–2 % | Q8 |
 
 ### 9.4 Zoznam 30 predmetov [MVP]
-| # | ID | Meno | Slot | Typ | Tier | Základ | Interval |
+| # | ID | Meno | Slot | Typ | Tier | Základ | Interval (pôvodný) |
 |---|---|---|---|---|---|---|---|
 | 1 | sharp_twig | Sharp Twig (Špicatá vetvička) | melee | bodná | 1 | 0.3–0.5 | 2.0 s |
 | 2 | pebble_club | Pebble Club (Kamenná palica) | melee | úderová | 1 | 0.4–0.7 | 2.6 s |
@@ -353,6 +353,8 @@ ak stun (šanca stun%) → cieľ má ďalší útok oneskorený o 1.5 s (boss 0.
 | 28 | guardian_leaf_vest | Leaf Guardian's Vest | body | set | 3+ | 0.4–0.7 | |
 | 29 | guardian_leaf_leggings | Leaf Guardian's Leggings | legs | set | 3+ | 0.3–0.5 | |
 | 30 | guardian_leaf_charm | Leaf Guardian's Charm | amulet | set | 3+ | +0.5 HP | |
+
+- **Interval útoku zbrane (v2.3, Tomas):** zbraň **posúva interval postavy** o pevné sekundy (záporné = rýchlejšie). Pravidlo pre tabuľku: posun = interval v stĺpci − 2.4 s (Sharp Twig 2.0 → **−0.4 s**, postava 4.0 → 3.6 s; Pebble Club 2.6 → **+0.2 s**). V UI sa to volá „Attack interval ±“, nie „rýchlosť“. Interval určuje len zbraň v pravej labke.
 
 ### 9.5 Unikátne predmety (fixné vlastnosti)
 - **Apple Branch:** vždy +8 % stun (aj pred odomknutím stunu).
@@ -681,7 +683,7 @@ tools/sim/         # headless simulácia tempa (npm run sim) → tabuľka čas/l
 
 - Premium +10 % XP/MF a Mythical +XP/počasie – overiť pri testeroch, či to nepôsobí ako pay-to-win.
 - Finálny názov hry.
-- **Interval útoku so zbraňou (v2.0, Tomas):** interval pästí (4.0 s) je **základ postavy**; zbraň ho **vylepšuje** (nenahrádza), rovnako ako ostatné bonusy. Presný vzorec (ako interval zbrane z 9.4 skráti základ) doladiť v M5 pri nasadzovaní.
+- ~~Interval útoku so zbraňou~~ – rozhodnuté v2.3 (9.4: posun v sekundách).
 - **Balans zbraní (v1.8):** zbrane z 9.4 sa teraz **pripočítajú** k poškodeniu postavy – rozsahy zbraní prepočítať v M4/M20.
 - **Ktorý quest odomkne Legendary predmety (v2.1)?** Rozhodnúť pri M13 (questy).
 - Presné čísla (všetko v kap. 6–18) – ladenie v M20 a pri hraní.
@@ -708,3 +710,4 @@ tools/sim/         # headless simulácia tempa (npm run sim) → tabuľka čas/l
 | 2.0 | 2026-09-26 | 9.3: hodnoty predmetov na 0.01 (zobrazenie floor 0.1); zbraň má rozsah × rarityMult. 24: interval pästí je základ postavy, zbraň ho vylepšuje (vzorec v M5). |
 | 2.1 | 2026-09-26 | 9.6: pity garantuje aspoň Rare (bolo Unique+), UI odpočet; Legendary zamknutý do questu (24: ktorý – otvorené). |
 | 2.2 | 2026-09-26 | 9.6: pity samostatne pre Rare 1000 / Unique 5000 / Legendary 20 000 zabití; drop vynuluje počítadlá svojej a nižších vzácností. |
+| 2.3 | 2026-09-27 | 9.1: 9 slotov (pravá/ľavá labka, ranged, head, body, legs, ring, amulet, tail); ľavá labka = štít alebo druhá zbraň (50 % poškodenia, interval nemení). 9.4/7.2: zbraň posúva interval postavy o pevné sekundy (posun = pôvodný interval − 2.4 s). 24: otázka intervalu uzavretá. |

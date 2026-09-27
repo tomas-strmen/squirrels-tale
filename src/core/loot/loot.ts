@@ -55,8 +55,8 @@ export interface Item {
   readonly slot: ItemSlot;
   readonly tier: number;
   readonly rarityId: string;
-  /** Weapons only: damage range (hundredths) and attack interval (ms). */
-  readonly weapon: { readonly damageMin: number; readonly damageMax: number; readonly attackIntervalMs: number } | null;
+  /** Weapons only: damage range (hundredths) and attack interval shift (ms; negative = faster). */
+  readonly weapon: { readonly damageMin: number; readonly damageMax: number; readonly attackIntervalModMs: number } | null;
   readonly stats: readonly ItemStat[];
   readonly affixes: readonly ItemAffix[];
 }
@@ -205,7 +205,7 @@ export function generateItem(
     ? {
         damageMin: Math.round(toHundredths(base.weapon.damageMin) * mult),
         damageMax: Math.round(toHundredths(base.weapon.damageMax) * mult),
-        attackIntervalMs: secondsToMs(base.weapon.attackIntervalS),
+        attackIntervalModMs: Math.sign(base.weapon.attackIntervalModS) * secondsToMs(Math.abs(base.weapon.attackIntervalModS)),
       }
     : null;
 

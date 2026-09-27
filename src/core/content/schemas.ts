@@ -36,6 +36,15 @@ export const designValueSchema = z
     'must have at most 1 decimal place',
   );
 
+/** Like `designValueSchema` but may be negative (e.g. a weapon's attack interval shift). */
+export const signedDesignValueSchema = z
+  .number()
+  .finite()
+  .refine(
+    (value) => Math.abs(Math.round(value * 10) - value * 10) < 1e-9,
+    'must have at most 1 decimal place',
+  );
+
 /** A whole percentage 0..100 (GDD 5: percentages are whole numbers). */
 export const percentSchema = z.number().int().min(0).max(100);
 
@@ -106,7 +115,11 @@ export const itemSchema = z.object({
     .object({
       damageMin: designValueSchema,
       damageMax: designValueSchema,
-      attackIntervalS: designSecondsSchema.refine((v) => v > 0, 'must be greater than 0'),
+      /**
+       * Shift of the character's attack interval in seconds (GDD 9.4 v2.3): negative = faster
+       * (Sharp Twig -0.4: 4.0 -> 3.6 s), positive = slower but heavier.
+       */
+      attackIntervalModS: signedDesignValueSchema,
     })
     .refine(damageRangeValid, { message: 'damageMin must not be greater than damageMax' })
     .nullable(),
@@ -199,6 +212,8 @@ export const balanceSchema = z.object({
       armor: designValueSchema,
       /** Attack speed gained per level, compounding (GDD 6.1 v1.7: 1 % -> x1.01). */
       attackSpeedPctPerLevel: percentSchema,
+      /** Damage of a weapon in the left paw, as % of its own (GDD 9.1 v2.3). */
+      offHandDamagePct: percentSchema,
       /** HP regenerated every `regenIntervalS`, before the per-level growth (GDD 6.1). */
       regenAmount: designValueSchema,
       regenIntervalS: designSecondsSchema.refine((v) => v > 0, 'must be greater than 0'),

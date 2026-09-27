@@ -12,10 +12,12 @@ import {
   makePeace,
   playerAttackIntervalMs,
   playerStats,
+  equipItem,
   hideoutProgress,
   searchProgress,
   startSearch,
   tick,
+  unequipItem,
   type EncounterConfig,
   type EncounterConfigInput,
   type EncounterEvent,
@@ -47,6 +49,7 @@ function makeConfig(patch: Partial<EncounterConfigInput> = {}): EncounterConfig 
     playerAttackIntervalS: 2.0,
     enemyAttackIntervalS: 3.0,
     playerAttackSpeedPctPerLevel: 1,
+    offHandDamagePct: 50,
     player: squirrelInput,
     enemy: antInput,
     enemyLevel: 1,
@@ -332,8 +335,51 @@ describe('encounter', () => {
     const defeatTick = log.find((l) => l.event.type === 'enemyDefeated')?.tick;
     const types = log.filter((l) => l.tick === defeatTick).map((l) => l.event.type);
     expect(types).toEqual(['attack', 'enemyDefeated', 'itemFound', 'searchStarted']);
-    expect(state.foundItems).toHaveLength(1);
-    expect(state.foundItems[0]?.tier).toBe(1);
+    expect(state.inventory.bag).toHaveLength(1);
+    expect(state.inventory.bag[0]?.tier).toBe(1);
+  });
+
+  it('equipping a weapon changes the fight: more damage, shorter interval (GDD 9.1/9.4 v2.3)', () => {
+    const twig = {
+      uid: 1,
+      baseId: 'sharp_twig',
+      slot: 'melee' as const,
+      tier: 1,
+      rarityId: 'common',
+      weapon: { damageMin: 30, damageMax: 50, attackIntervalModMs: -400 },
+      stats: [],
+      affixes: [],
+    };
+    const base = fresh(tanky);
+    const withTwig = equipItem({ ...base, inventory: { ...base.inventory, bag: [twig] } }, tanky, 1, 'rightPaw');
+    expect(withTwig.inventory.equipment.rightPaw?.uid).toBe(1);
+    expect(playerAttackIntervalMs(tanky, 1, withTwig.inventory.equipment)).toBe(1600); // 2.0 s fists - 0.4
+    expect(playerStats(tanky, 1, withTwig.inventory.equipment).damageMax).toBe(90);
+    // More player attacks over the same time than bare-pawed.
+    const count = (s: EncounterState) => attacks(run(run(startSearch(s).state, 10, tanky).state, 600, tanky).log, 'player').length;
+    expect(count(withTwig)).toBeGreaterThan(count(base));
+    // Unequip puts it back in the bag.
+    const off = unequipItem(withTwig, tanky, 'rightPaw');
+    expect(off.inventory.equipment.rightPaw).toBeNull();
+    expect(off.inventory.bag.map((i) => i.uid)).toEqual([1]);
+  });
+
+  it('taking off +HP gear never leaves current HP above the new max', () => {
+    const amulet = {
+      uid: 2,
+      baseId: 'pebble_pendant',
+      slot: 'amulet' as const,
+      tier: 1,
+      rarityId: 'common',
+      weapon: null,
+      stats: [{ stat: 'maxHp' as const, value: 100 }],
+      affixes: [],
+    };
+    const base = fresh();
+    const worn = equipItem({ ...base, inventory: { ...base.inventory, bag: [amulet] } }, config, 2, 'amulet');
+    const full = { ...worn, playerHp: playerStats(config, 1, worn.inventory.equipment).maxHp }; // 6.0
+    expect(full.playerHp).toBe(600);
+    expect(unequipItem(full, config, 'amulet').playerHp).toBe(500);
   });
 
   it('loot uses its own Rng stream: drops never change how the fight plays out', () => {

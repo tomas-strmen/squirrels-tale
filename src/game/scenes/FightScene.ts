@@ -12,6 +12,7 @@ import {
   attackProgress,
   createEncounter,
   createEncounterConfig,
+  equipItem,
   hideoutProgress,
   hpFraction,
   makePeace,
@@ -20,6 +21,7 @@ import {
   searchProgress,
   startSearch,
   tick,
+  unequipItem,
   type Combatant,
   type EncounterConfig,
   type EncounterEvent,
@@ -31,12 +33,13 @@ import { regenAmountHundredths, xpToNextLevelHundredths } from '../../core/progr
 import { createRng } from '../../core/rng/rng';
 import { diceFaces, pityCountdowns, type Item } from '../../core/loot/loot';
 import { consumeFrame, DEFAULT_MAX_STEPS_PER_FRAME, TICK_MS } from '../../core/time/fixedStep';
-import { itemName, itemSummary, rarityName } from '../itemText';
+import { itemName, rarityName } from '../itemText';
 import { t, tDynamic } from '../text';
 import { Button } from '../ui/Button';
 import { DebugPanel } from '../ui/DebugPanel';
 import { Dice } from '../ui/Dice';
 import { ProgressBar } from '../ui/ProgressBar';
+import { ItemsPanel } from '../ui/ItemsPanel';
 import { StatsPanel } from '../ui/StatsPanel';
 
 // Layout only (not game balance) – placeholder grey shapes.
@@ -86,7 +89,7 @@ export class FightScene extends Phaser.Scene {
   private statsButton!: Button;
   private statsPanel!: StatsPanel;
   private lootButton!: Button;
-  private lootPanel!: StatsPanel;
+  private lootPanel!: ItemsPanel;
   private rarityColors = new Map<string, string>();
   /** Simulated game time (counts faster at x4/x20/x50 - it follows the simulation). */
   private simElapsedMs = 0;
@@ -239,13 +242,22 @@ export class FightScene extends Phaser.Scene {
     // Player-facing stats panel (Tomas, M3.1): level, XP, HP, damage, hit%, armor.
     this.statsButton = new Button(this, 150, 40, t('stats.button'), () => this.onToggleStats());
     this.statsButton.setScale(0.55);
-    this.statsPanel = new StatsPanel(this, 10, 70);
+    // Bottom-left, above "Time" (Tomas, M5.1) - can be open together with Found items.
+    this.statsPanel = new StatsPanel(this, 10, 0).anchorBottom(632);
     this.statsPanel.setVisible(false);
 
     // M4.1: items found so far (placeholder until the inventory in M5). Shares the spot with Stats.
     this.lootButton = new Button(this, 340, 40, t('loot.button'), () => this.onToggleLoot());
     this.lootButton.setScale(0.55);
-    this.lootPanel = new StatsPanel(this, 10, 70);
+    this.lootPanel = new ItemsPanel(this, 10, 70, {
+      onEquip: (uid, slot) => {
+        this.state = equipItem(this.state, this.config, uid, slot);
+      },
+      onUnequip: (slot) => {
+        this.state = unequipItem(this.state, this.config, slot);
+      },
+      colorOf: (item) => this.rarityColors.get(item.rarityId) ?? '#ffffff',
+    });
     this.lootPanel.setVisible(false);
 
     // Bottom-left info: game time (follows the simulation speed) and the pity countdown (GDD 9.6).
@@ -256,15 +268,10 @@ export class FightScene extends Phaser.Scene {
 
   private onToggleLoot(): void {
     this.lootPanel.setVisible(!this.lootPanel.visible);
-    if (this.lootPanel.visible) this.statsPanel.setVisible(false);
   }
 
   private refreshLootPanel(): void {
-    const latest = [...this.state.foundItems].reverse().slice(0, 10);
-    this.lootPanel.setLines([
-      t('loot.title'),
-      ...(latest.length ? latest.map(itemSummary) : [t('loot.none')]),
-    ]);
+    this.lootPanel.show(this.state.inventory);
   }
 
   private currentSpeed(): number {
@@ -282,11 +289,11 @@ export class FightScene extends Phaser.Scene {
 
   private onToggleStats(): void {
     this.statsPanel.setVisible(!this.statsPanel.visible);
-    if (this.statsPanel.visible) this.lootPanel.setVisible(false);
   }
 
   private refreshStatsPanel(): void {
-    const stats = playerStats(this.config, this.state.progression.level);
+    const gear = this.state.inventory.equipment;
+    const stats = playerStats(this.config, this.state.progression.level, gear);
     const { level, xp } = this.state.progression;
     const needed = xpToNextLevelHundredths(level);
     this.statsPanel.setLines([
@@ -296,7 +303,7 @@ export class FightScene extends Phaser.Scene {
       `${t('stats.maxHp')}: ${formatHundredths(stats.maxHp)}`,
       `${t('stats.damage')}: ${formatHundredths(stats.damageMin)} - ${formatHundredths(stats.damageMax)}`,
       // Explicit 2 decimals here (not the usual floor-to-0.1) so small per-level changes show up.
-      `${t('stats.attackInterval')}: ${(playerAttackIntervalMs(this.config, level) / 1000).toFixed(2)} s`,
+      `${t('stats.attackInterval')}: ${(playerAttackIntervalMs(this.config, level, gear) / 1000).toFixed(2)} s`,
       `${t('stats.regen')}: ${formatHundredths(
         regenAmountHundredths(fromHundredths(this.config.regenAmount), level, this.config.regenGrowthPctPerLevel),
       )} / ${(this.config.regenIntervalMs / 1000).toFixed(1)} s`,
@@ -332,7 +339,7 @@ export class FightScene extends Phaser.Scene {
       attackProgress(this.state, this.config, 'enemy', this.accumulatorMs),
     );
     this.playerHpBar.setProgress(hpFraction(this.state, this.config, 'player'));
-    const playerMaxHp = playerStats(this.config, this.state.progression.level).maxHp;
+    const playerMaxHp = playerStats(this.config, this.state.progression.level, this.state.inventory.equipment).maxHp;
     this.playerHpText.setText(`${formatHpHundredths(this.state.playerHp)} / ${formatHundredths(playerMaxHp)}`);
     this.levelText.setText(`${t('stats.level')} ${this.state.progression.level}`);
     if (this.statsPanel.visible) this.refreshStatsPanel();

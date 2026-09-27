@@ -37,5 +37,12 @@
   "death": {
     "hideoutRegenS": 10.0,
     "xpLossPct": 10
+  },
+  "enemyLeveling": {
+    "hpPctPerLevel": 10,
+    "damagePctPerLevel": 5,
+    "xpPctPerLevel": 10,
+    "dodgePctPerLevel": 0.5,
+    "maxDodgePct": 40
   }
 }

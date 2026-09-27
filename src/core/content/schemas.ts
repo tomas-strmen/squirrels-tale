@@ -54,8 +54,10 @@ const damageRangeValid = (v: { damageMin: number; damageMax: number }) =>
 export const enemySchema = z
   .object({
     id: idSchema,
-    /** Lowest level of the tile range where it appears (GDD 8.4, "b"). */
+    /** Lowest level of the tile range where it appears (GDD 8.4, "b"). Stats below are for this level. */
     baseLevel: z.number().int().min(1),
+    /** Highest level it can roll to on this tile (GDD 8.4). */
+    levelMax: z.number().int().min(1),
     maxHp: designValueSchema.refine((v) => v > 0, 'must be greater than 0'),
     damageMin: designValueSchema,
     damageMax: designValueSchema,
@@ -63,10 +65,11 @@ export const enemySchema = z
     hitPct: percentSchema,
     armor: designValueSchema,
     dodgePct: percentSchema,
-    /** XP granted when defeated (GDD 6.2, 8.3). */
+    /** XP granted when defeated at `baseLevel` (GDD 6.2, 8.3); scales with the rolled level. */
     xp: designValueSchema,
   })
-  .refine(damageRangeValid, { message: 'damageMin must not be greater than damageMax' });
+  .refine(damageRangeValid, { message: 'damageMin must not be greater than damageMax' })
+  .refine((e) => e.levelMax >= e.baseLevel, { message: 'levelMax must not be less than baseLevel' });
 export type Enemy = z.infer<typeof enemySchema>;
 
 export const enemiesSchema = z
@@ -262,6 +265,14 @@ export const balanceSchema = z.object({
     hideoutRegenS: designSecondsSchema.refine((v) => v > 0, 'must be greater than 0'),
     /** % of the current level's XP progress lost on an online death (GDD 6.3). Level never drops. */
     xpLossPct: percentSchema,
+  }),
+  /** Enemy stat scaling per level above its tile's base level (GDD 8.4, M6.1). Crit is locked (GDD 6.1). */
+  enemyLeveling: z.object({
+    hpPctPerLevel: percentSchema,
+    damagePctPerLevel: percentSchema,
+    xpPctPerLevel: percentSchema,
+    dodgePctPerLevel: designValueSchema,
+    maxDodgePct: percentSchema,
   }),
 });
 export type Balance = z.infer<typeof balanceSchema>;

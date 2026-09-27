@@ -36,9 +36,12 @@ export function toEncounterConfigInput(balance: Balance, enemy: Enemy, lootData:
       armor: enemy.armor,
       dodgePct: enemy.dodgePct,
     },
-    // GDD 8.4: fixed at the enemy's base level until the map (M6) rolls it per tile.
-    enemyLevel: enemy.baseLevel,
+    // GDD 8.4: rolled per encounter within [enemyLevelMin, enemyLevelMax]. Tile-based ranges
+    // come with the map (M6.2) - for now this is the single enemy's own range.
+    enemyLevelMin: enemy.baseLevel,
+    enemyLevelMax: enemy.levelMax,
     enemyXp: enemy.xp,
+    enemyLeveling: balance.enemyLeveling,
     rules: balance.combat,
     regenAmount: balance.player.regenAmount,
     regenIntervalS: balance.player.regenIntervalS,

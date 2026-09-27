@@ -56,12 +56,21 @@ import {
   type LootConfigInput,
   type LootState,
 } from '../loot/loot';
-import { branch, type RngState } from '../rng/rng';
+import { branch, nextInt, type RngState } from '../rng/rng';
 import { composeStats, type ComposedStats } from '../stats/stats';
 import { secondsToMs, TICK_MS } from '../time/fixedStep';
 
 export type EncounterPhase = 'idle' | 'searching' | 'fighting' | 'hideout';
 export type Combatant = 'player' | 'enemy';
+
+/** Enemy stat scaling per level above its tile's base level (GDD 8.4, M6.1). Crit is locked (GDD 6.1). */
+export interface EnemyLeveling {
+  readonly hpPctPerLevel: number;
+  readonly damagePctPerLevel: number;
+  readonly xpPctPerLevel: number;
+  readonly dodgePctPerLevel: number;
+  readonly maxDodgePct: number;
+}
 
 export interface EncounterConfig {
   /** How long the search for an enemy takes (ms). */
@@ -76,10 +85,13 @@ export interface EncounterConfig {
   readonly enemyAttackIntervalMs: number;
   /** Player's base stats at level 1, before level bonuses (GDD 6.2). */
   readonly playerBase: FighterStatsInput;
-  readonly enemy: FighterStats;
-  /** Enemy level (GDD 8.4). Fixed to its base level until the map (M6) rolls it per tile. */
-  readonly enemyLevel: number;
-  /** XP granted when the enemy is defeated (hundredths). */
+  /** Enemy stats at `enemyLevelMin` (GDD 8.4, "b"); scaled per level by `enemyLeveling`, see enemyStats(). */
+  readonly enemyBase: FighterStats;
+  /** Lowest/highest level the enemy can roll to per encounter (GDD 8.4). Tile-based ranges come with M6.2. */
+  readonly enemyLevelMin: number;
+  readonly enemyLevelMax: number;
+  readonly enemyLeveling: EnemyLeveling;
+  /** XP granted when the enemy is defeated at `enemyLevelMin` (hundredths); scaled per level, see enemyXp(). */
   readonly enemyXp: number;
   readonly rules: CombatRules;
   /** HP regenerated every `regenIntervalMs` at level 1, before per-level growth (hundredths). */
@@ -105,7 +117,9 @@ export interface EncounterConfigInput {
   readonly offHandDamagePct: number;
   readonly player: FighterStatsInput;
   readonly enemy: FighterStatsInput;
-  readonly enemyLevel: number;
+  readonly enemyLevelMin: number;
+  readonly enemyLevelMax: number;
+  readonly enemyLeveling: EnemyLeveling;
   /** XP granted when the enemy is defeated (design value, GDD 6.2/8.3). */
   readonly enemyXp: number;
   readonly rules: CombatRulesInput;
@@ -130,6 +144,10 @@ export interface EncounterState {
   readonly playerHp: number;
   /** Current HP of the enemy (hundredths). Only meaningful while fighting. */
   readonly enemyHp: number;
+  /** Level of the current (or next, while searching) enemy (GDD 8.4). */
+  readonly enemyLevel: number;
+  /** Separate stream for rolling it, so it never changes how a fight plays out (like loot). */
+  readonly enemyLevelRng: RngState;
   /** Time since the last regen tick (ms). Ticks in idle/searching/fighting, not in hideout. */
   readonly regenElapsedMs: number;
   /** Time spent in the hideout so far (ms). Only meaningful while `hideout`. */
@@ -184,8 +202,11 @@ export function createEncounterConfig(input: EncounterConfigInput): EncounterCon
   if (playerAttackIntervalMs < TICK_MS || enemyAttackIntervalMs < TICK_MS) {
     throw new Error(`Attack intervals must be at least ${TICK_MS / 1000} s`);
   }
-  if (!Number.isInteger(input.enemyLevel) || input.enemyLevel < 1) {
-    throw new Error('enemyLevel must be a whole number >= 1');
+  if (!Number.isInteger(input.enemyLevelMin) || input.enemyLevelMin < 1) {
+    throw new Error('enemyLevelMin must be a whole number >= 1');
+  }
+  if (!Number.isInteger(input.enemyLevelMax) || input.enemyLevelMax < input.enemyLevelMin) {
+    throw new Error('enemyLevelMax must be a whole number >= enemyLevelMin');
   }
   const regenIntervalMs = secondsToMs(input.regenIntervalS);
   if (regenIntervalMs < TICK_MS) {
@@ -205,8 +226,10 @@ export function createEncounterConfig(input: EncounterConfigInput): EncounterCon
     offHandDamagePct: input.offHandDamagePct,
     enemyAttackIntervalMs,
     playerBase: input.player,
-    enemy: createFighterStats(input.enemy),
-    enemyLevel: input.enemyLevel,
+    enemyBase: createFighterStats(input.enemy),
+    enemyLevelMin: input.enemyLevelMin,
+    enemyLevelMax: input.enemyLevelMax,
+    enemyLeveling: input.enemyLeveling,
     enemyXp: toHundredths(input.enemyXp),
     rules: createCombatRules(input.rules),
     regenAmount: toHundredths(input.regenAmount),
@@ -222,6 +245,7 @@ export function createEncounterConfig(input: EncounterConfigInput): EncounterCon
 /** New encounter in phase `idle`, squirrel at full HP, level 1, no XP. */
 export function createEncounter(config: EncounterConfig, rng: RngState): EncounterState {
   const progression = createProgression();
+  const firstLevel = rollEnemyLevel(config, branch(rng, 'enemyLevel'));
   return {
     phase: 'idle',
     searchElapsedMs: 0,
@@ -229,6 +253,8 @@ export function createEncounter(config: EncounterConfig, rng: RngState): Encount
     enemyAttackElapsedMs: 0,
     playerHp: playerStats(config, progression.level).maxHp,
     enemyHp: 0,
+    enemyLevel: firstLevel.level,
+    enemyLevelRng: firstLevel.rng,
     regenElapsedMs: 0,
     hideoutElapsedMs: 0,
     progression,
@@ -237,6 +263,36 @@ export function createEncounter(config: EncounterConfig, rng: RngState): Encount
     lootRng: branch(rng, 'loot'),
     inventory: createInventory(),
   };
+}
+
+/**
+ * Rolls the level of the next enemy within [enemyLevelMin, enemyLevelMax] (GDD 8.4).
+ * Its own Rng stream, so it never changes how a fight plays out (like loot).
+ */
+function rollEnemyLevel(config: EncounterConfig, rng: RngState): { readonly level: number; readonly rng: RngState } {
+  if (config.enemyLevelMin === config.enemyLevelMax) return { level: config.enemyLevelMin, rng };
+  const draw = nextInt(rng, config.enemyLevelMin, config.enemyLevelMax + 1);
+  return { level: draw.value, rng: draw.state };
+}
+
+/** Enemy's effective combat stats at `level` (GDD 8.4): +hpPctPerLevel/damagePctPerLevel/dodgePctPerLevel per level above enemyLevelMin. */
+export function enemyStats(config: EncounterConfig, level: number): FighterStats {
+  const levelsAbove = level - config.enemyLevelMin;
+  const lv = config.enemyLeveling;
+  const base = config.enemyBase;
+  return {
+    ...base,
+    maxHp: Math.round(base.maxHp * (1 + (lv.hpPctPerLevel / 100) * levelsAbove)),
+    damageMin: Math.round(base.damageMin * (1 + (lv.damagePctPerLevel / 100) * levelsAbove)),
+    damageMax: Math.round(base.damageMax * (1 + (lv.damagePctPerLevel / 100) * levelsAbove)),
+    dodgePct: Math.min(lv.maxDodgePct, base.dodgePct + lv.dodgePctPerLevel * levelsAbove),
+  };
+}
+
+/** XP granted for defeating the enemy at `level` (GDD 8.4): +xpPctPerLevel per level above enemyLevelMin. */
+export function enemyXpAt(config: EncounterConfig, level: number): number {
+  const levelsAbove = level - config.enemyLevelMin;
+  return Math.round(config.enemyXp * (1 + (config.enemyLeveling.xpPctPerLevel / 100) * levelsAbove));
 }
 
 /**
@@ -451,7 +507,7 @@ export function tick(state: EncounterState, config: EncounterConfig): EncounterS
           searchElapsedMs: config.searchMs,
           playerAttackElapsedMs: 0,
           enemyAttackElapsedMs: 0,
-          enemyHp: config.enemy.maxHp,
+          enemyHp: enemyStats(config, regenerated.enemyLevel).maxHp,
         },
         events: [{ type: 'enemyFound' }],
       };
@@ -497,12 +553,13 @@ function tickFight(state: EncounterState, config: EncounterConfig): EncounterSte
   const composed = composedPlayer(config, progression.level, state.inventory.equipment);
   const player = composed.fighter;
   const playerIntervalMs = composed.attackIntervalMs;
+  const enemy = enemyStats(config, state.enemyLevel);
   // GDD 7.2 v1.7: hit chance shifts 0.5 % per level of difference, mirrored for the enemy.
-  const levelDiff = progression.level - config.enemyLevel;
+  const levelDiff = progression.level - state.enemyLevel;
 
   if (playerAttackElapsedMs >= playerIntervalMs) {
     playerAttackElapsedMs -= playerIntervalMs;
-    const attack = resolveAttack(player, config.enemy, config.rules, rng, levelDiff);
+    const attack = resolveAttack(player, enemy, config.rules, rng, levelDiff);
     rng = attack.rng;
     enemyHp = Math.max(0, enemyHp - attack.result.damage);
     events.push({ type: 'attack', attacker: 'player', ...attack.result });
@@ -519,13 +576,15 @@ function tickFight(state: EncounterState, config: EncounterConfig): EncounterSte
       const bagFull = drop.item !== null && state.inventory.bag.length >= BAG_CAPACITY;
       const inventory = drop.item ? addToBag(state.inventory, drop.item) : state.inventory;
       if (drop.item) events.push({ type: 'itemFound', item: drop.item, bagFull });
-      const gain = gainXp(progression, config.enemyXp);
+      const gain = gainXp(progression, enemyXpAt(config, state.enemyLevel));
       progression = gain.state;
       // Every level gained heals by exactly its HP bonus (GDD 6.2) - never a full heal.
       for (const level of gain.levelsGained) {
         playerHp += 100; // levelUpDelta().hpBonus is always +1.0 (100 hundredths).
         events.push({ type: 'leveledUp', level });
       }
+      // GDD 8.4: roll the next enemy's level (own Rng stream, like loot).
+      const nextLevel = rollEnemyLevel(config, state.enemyLevelRng);
       // GDD 7.1: after each defeated enemy the next search starts automatically.
       events.push({ type: 'searchStarted' });
       return {
@@ -537,6 +596,8 @@ function tickFight(state: EncounterState, config: EncounterConfig): EncounterSte
           enemyAttackElapsedMs: 0,
           playerHp,
           enemyHp: 0,
+          enemyLevel: nextLevel.level,
+          enemyLevelRng: nextLevel.rng,
           progression,
           rng,
           loot,
@@ -550,7 +611,7 @@ function tickFight(state: EncounterState, config: EncounterConfig): EncounterSte
 
   if (enemyAttackElapsedMs >= config.enemyAttackIntervalMs) {
     enemyAttackElapsedMs -= config.enemyAttackIntervalMs;
-    const attack = resolveAttack(config.enemy, player, config.rules, rng, -levelDiff);
+    const attack = resolveAttack(enemy, player, config.rules, rng, -levelDiff);
     rng = attack.rng;
     playerHp = Math.max(0, playerHp - attack.result.damage);
     events.push({ type: 'attack', attacker: 'enemy', ...attack.result });
@@ -647,7 +708,7 @@ export function attackProgress(
 export function hpFraction(state: EncounterState, config: EncounterConfig, who: Combatant): number {
   return who === 'player'
     ? clamp01(state.playerHp / playerStats(config, state.progression.level, state.inventory.equipment).maxHp)
-    : clamp01(state.enemyHp / config.enemy.maxHp);
+    : clamp01(state.enemyHp / enemyStats(config, state.enemyLevel).maxHp);
 }
 
 function clamp01(value: number): number {

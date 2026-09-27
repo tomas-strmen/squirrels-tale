@@ -10,6 +10,8 @@ import {
   compareEquip,
   createEncounter,
   createEncounterConfig,
+  enemyStats,
+  enemyXpAt,
   hpFraction,
   makePeace,
   playerAttackIntervalMs,
@@ -37,6 +39,9 @@ const rules = {
 };
 const squirrelInput = { maxHp: 5.0, damageMin: 0.3, damageMax: 0.4, hitPct: 85, armor: 0, dodgePct: 0 };
 const antInput = { maxHp: 1.2, damageMin: 0.2, damageMax: 0.3, hitPct: 65, armor: 0, dodgePct: 0 };
+// GDD 8.4. Zeroed out in tests that need a fixed enemy level with no stat scaling confound.
+const enemyLeveling = { hpPctPerLevel: 10, damagePctPerLevel: 5, xpPctPerLevel: 10, dodgePctPerLevel: 0.5, maxDodgePct: 40 };
+const noEnemyLeveling = { hpPctPerLevel: 0, damagePctPerLevel: 0, xpPctPerLevel: 0, dodgePctPerLevel: 0, maxDodgePct: 40 };
 
 const lootInput = {
   items: parseItems(itemsData),
@@ -54,7 +59,9 @@ function makeConfig(patch: Partial<EncounterConfigInput> = {}): EncounterConfig 
     offHandDamagePct: 50,
     player: squirrelInput,
     enemy: antInput,
-    enemyLevel: 1,
+    enemyLevelMin: 1,
+    enemyLevelMax: 1,
+    enemyLeveling,
     enemyXp: 2,
     rules,
     regenAmount: 0.1,
@@ -139,7 +146,7 @@ describe('createEncounterConfig', () => {
     expect(config.searchMs).toBe(1000);
     expect(config.playerAttackIntervalMs).toBe(2000);
     expect(config.enemyAttackIntervalMs).toBe(3000);
-    expect(config.enemy.maxHp).toBe(120);
+    expect(config.enemyBase.maxHp).toBe(120);
     expect(config.enemyXp).toBe(200);
     expect(config.rules.minDamage).toBe(10);
   });
@@ -150,13 +157,68 @@ describe('createEncounterConfig', () => {
     expect(() => makeConfig({ enemyAttackIntervalS: 0.25 })).toThrow();
   });
 
-  it('rejects an invalid enemy level', () => {
-    expect(() => makeConfig({ enemyLevel: 0 })).toThrow();
-    expect(() => makeConfig({ enemyLevel: 1.5 })).toThrow();
+  it('rejects an invalid enemy level range', () => {
+    expect(() => makeConfig({ enemyLevelMin: 0 })).toThrow();
+    expect(() => makeConfig({ enemyLevelMin: 1.5 })).toThrow();
+    expect(() => makeConfig({ enemyLevelMax: 0 })).toThrow(); // below enemyLevelMin (1)
   });
 
   it('rejects an invalid player base (e.g. 0 HP)', () => {
     expect(() => makeConfig({ player: { ...squirrelInput, maxHp: 0 } })).toThrow();
+  });
+});
+
+describe('enemyStats / enemyXpAt (GDD 8.4, M6.1)', () => {
+  const cfg = makeConfig({ enemyLevelMin: 3, enemyLevelMax: 5 });
+
+  it('equals the base stats at enemyLevelMin (no levels above base)', () => {
+    expect(enemyStats(cfg, 3)).toEqual(cfg.enemyBase);
+    expect(enemyXpAt(cfg, 3)).toBe(cfg.enemyXp);
+  });
+
+  it('scales HP/damage/dodge/XP per level above enemyLevelMin', () => {
+    // 2 levels above: +20 % HP, +10 % damage, +1.0 dodge, +20 % XP.
+    const s = enemyStats(cfg, 5);
+    expect(s.maxHp).toBe(Math.round(cfg.enemyBase.maxHp * 1.2));
+    expect(s.damageMin).toBe(Math.round(cfg.enemyBase.damageMin * 1.1));
+    expect(s.damageMax).toBe(Math.round(cfg.enemyBase.damageMax * 1.1));
+    expect(s.dodgePct).toBeCloseTo(cfg.enemyBase.dodgePct + 1.0);
+    expect(enemyXpAt(cfg, 5)).toBe(Math.round(cfg.enemyXp * 1.2));
+  });
+
+  it('caps dodge at maxDodgePct', () => {
+    const highDodge = makeConfig({
+      enemy: { ...antInput, dodgePct: 39 },
+      enemyLevelMin: 1,
+      enemyLevelMax: 20,
+    });
+    expect(enemyStats(highDodge, 20).dodgePct).toBe(enemyLeveling.maxDodgePct);
+  });
+
+  it('with no leveling configured, stats never change across the range', () => {
+    const flat = makeConfig({ enemyLevelMin: 1, enemyLevelMax: 10, enemyLeveling: noEnemyLeveling });
+    expect(enemyStats(flat, 10)).toEqual(flat.enemyBase);
+    expect(enemyXpAt(flat, 10)).toBe(flat.enemyXp);
+  });
+});
+
+describe('enemy level rolling (GDD 8.4, M6.1)', () => {
+  it('rolls within [enemyLevelMin, enemyLevelMax] and never changes the fight (own Rng stream)', () => {
+    const cfg = makeConfig({ enemyLevelMin: 2, enemyLevelMax: 6 });
+    let state = fresh(cfg);
+    const seenLevels = new Set<number>();
+    for (let i = 0; i < 30; i++) {
+      seenLevels.add(state.enemyLevel);
+      expect(state.enemyLevel).toBeGreaterThanOrEqual(2);
+      expect(state.enemyLevel).toBeLessThanOrEqual(6);
+      state = run(startSearch(state).state, 10000, cfg).state;
+    }
+    expect(seenLevels.size).toBeGreaterThan(1); // it does vary, not stuck on one value
+  });
+
+  it('a fixed range (enemyLevelMin === enemyLevelMax) never rolls (nextInt would throw on equal bounds)', () => {
+    const cfg = makeConfig({ enemyLevelMin: 4, enemyLevelMax: 4 });
+    expect(fresh(cfg).enemyLevel).toBe(4);
   });
 });
 
@@ -261,7 +323,8 @@ describe('encounter', () => {
     const strongEnemy = makeConfig({
       player: { ...squirrelInput, maxHp: 999.0 },
       enemy: { ...antInput, maxHp: 999.0 },
-      enemyLevel: 21, // 20 levels above the squirrel: -10 % for her, +10 % for the enemy
+      enemyLevelMin: 21, // 20 levels above the squirrel: -10 % for her, +10 % for the enemy
+      enemyLevelMax: 21,
     });
     expect(hitRate(tanky, 'player') - hitRate(strongEnemy, 'player')).toBeGreaterThan(0.06);
     expect(hitRate(strongEnemy, 'enemy') - hitRate(tanky, 'enemy')).toBeGreaterThan(0.06);

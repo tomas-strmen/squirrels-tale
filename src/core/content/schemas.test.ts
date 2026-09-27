@@ -28,6 +28,7 @@ describe('enemiesSchema / parseEnemies', () => {
   const ant = {
     id: 'worker_ant',
     baseLevel: 1,
+    levelMax: 2,
     maxHp: 1.2,
     damageMin: 0.2,
     damageMax: 0.3,
@@ -77,6 +78,11 @@ describe('enemiesSchema / parseEnemies', () => {
     expect(enemiesSchema.safeParse([{ ...ant, baseLevel: 1.5 }]).success).toBe(false);
   });
 
+  it('rejects levelMax below baseLevel (GDD 8.4)', () => {
+    expect(enemiesSchema.safeParse([{ ...ant, baseLevel: 3, levelMax: 2 }]).success).toBe(false);
+    expect(enemiesSchema.safeParse([{ ...ant, baseLevel: 2, levelMax: 2 }]).success).toBe(true);
+  });
+
   it('rejects HP with more than 1 decimal place', () => {
     expect(enemiesSchema.safeParse([{ ...ant, maxHp: 1.25 }]).success).toBe(false);
   });
@@ -113,6 +119,7 @@ describe('balanceSchema / parseBalance', () => {
     },
     loot: { dropChancePct: 4, pity: [{ rarity: 'rare', kills: 1000 }, { rarity: 'unique', kills: 5000 }, { rarity: 'legendary', kills: 20000 }], affixTierGrowthPct: 35, upgradeGrowthPct: 8 },
     death: { hideoutRegenS: 10.0, xpLossPct: 10 },
+    enemyLeveling: { hpPctPerLevel: 10, damagePctPerLevel: 5, xpPctPerLevel: 10, dodgePctPerLevel: 0.5, maxDodgePct: 40 },
   };
 
   it('accepts valid data', () => {

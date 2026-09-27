@@ -24,6 +24,7 @@ import {
   startSearch,
   tick,
   discardBagRarity,
+  enemyStats,
   toggleItemLock,
   unequipItem,
   type Combatant,
@@ -77,6 +78,8 @@ export class FightScene extends Phaser.Scene {
 
   private player!: Phaser.GameObjects.Rectangle;
   private enemy!: Phaser.GameObjects.Rectangle;
+  private enemyNameText!: Phaser.GameObjects.Text;
+  private enemyId!: string;
   private enemyGroup!: Phaser.GameObjects.Container;
   private playerBar!: ProgressBar;
   private playerAttackGroup!: Phaser.GameObjects.Container;
@@ -119,6 +122,7 @@ export class FightScene extends Phaser.Scene {
     const balance = parseBalance(balanceData);
     const enemyData = enemies[0];
     if (!enemyData) throw new Error('data/enemies.json has no enemies');
+    this.enemyId = enemyData.id;
 
     const rarities = parseRarities(raritiesData);
     this.rarityColors = new Map(rarities.map((r) => [r.id, r.color]));
@@ -173,9 +177,9 @@ export class FightScene extends Phaser.Scene {
     this.enemy = this.add
       .rectangle(ENEMY_X, FIGHTER_Y, FIGHTER_SIZE, FIGHTER_SIZE, 0x7a7a7a)
       .setStrokeStyle(3, 0x4a4a4a);
-    const enemyName = this.add
-      // GDD 8.4: level shown next to the name ("Worker Ant Lv1").
-      .text(ENEMY_X, FIGHTER_Y + 90, `${tDynamic(`enemy.${enemyData.id}.name`)} ${t('fight.levelShort')}${this.config.enemyLevel}`, {
+    // GDD 8.4: level shown next to the name ("Worker Ant Lv1"), rerolled per enemy - see onEvent('enemyFound').
+    this.enemyNameText = this.add
+      .text(ENEMY_X, FIGHTER_Y + 90, `${tDynamic(`enemy.${this.enemyId}.name`)} ${t('fight.levelShort')}${this.state.enemyLevel}`, {
         ...textStyle,
         fontSize: '26px',
       })
@@ -198,7 +202,7 @@ export class FightScene extends Phaser.Scene {
     });
     this.enemyGroup = this.add.container(0, 0, [
       this.enemy,
-      enemyName,
+      this.enemyNameText,
       enemyAttackLabel,
       this.enemyBar,
       this.enemyHpText,
@@ -382,7 +386,7 @@ export class FightScene extends Phaser.Scene {
         regenAmountHundredths(fromHundredths(this.config.regenAmount), level, this.config.regenGrowthPctPerLevel),
       )} / ${(this.config.regenIntervalMs / 1000).toFixed(1)} s`,
       // Against the current enemy (level difference, GDD 7.2 v1.7); floor to 0.1 for display.
-      `${t('stats.hitChance')}: ${(Math.floor(hitChancePct(stats, this.config.enemy, this.config.rules, level - this.config.enemyLevel) * 10) / 10).toFixed(1)} %`,
+      `${t('stats.hitChance')}: ${(Math.floor(hitChancePct(stats, enemyStats(this.config, this.state.enemyLevel), this.config.rules, level - this.state.enemyLevel) * 10) / 10).toFixed(1)} %`,
       `${t('stats.armor')}: ${formatHundredths(stats.armor)}`,
     ]);
   }
@@ -435,7 +439,7 @@ export class FightScene extends Phaser.Scene {
     if (this.state.phase === 'fighting') {
       this.enemyHpBar.setProgress(hpFraction(this.state, this.config, 'enemy'));
       this.enemyHpText.setText(
-        `${formatHpHundredths(this.state.enemyHp)} / ${formatHundredths(this.config.enemy.maxHp)}`,
+        `${formatHpHundredths(this.state.enemyHp)} / ${formatHundredths(enemyStats(this.config, this.state.enemyLevel).maxHp)}`,
       );
     }
   }
@@ -460,6 +464,8 @@ export class FightScene extends Phaser.Scene {
         this.peaceButton.setVisible(true);
         break;
       case 'enemyFound':
+        // GDD 8.4: level rolled per encounter within the enemy's range.
+        this.enemyNameText.setText(`${tDynamic(`enemy.${this.enemyId}.name`)} ${t('fight.levelShort')}${this.state.enemyLevel}`);
         this.searchGroup.setVisible(false);
         this.tweens.killTweensOf(this.enemyGroup);
         this.enemy.setAlpha(1);
@@ -474,7 +480,7 @@ export class FightScene extends Phaser.Scene {
       case 'enemyDefeated':
         // Enemy bar shows 0 before it fades; next search starts in the same tick.
         this.enemyHpBar.setProgress(0);
-        this.enemyHpText.setText(`0.0 / ${formatHundredths(this.config.enemy.maxHp)}`);
+        this.enemyHpText.setText(`0.0 / ${formatHundredths(enemyStats(this.config, this.state.enemyLevel).maxHp)}`);
         this.playerAttackGroup.setVisible(false);
         this.tweens.add({
           targets: this.enemyGroup,

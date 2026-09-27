@@ -2,6 +2,7 @@
   {
     "id": "worker_ant",
     "baseLevel": 1,
+    "levelMax": 2,
     "maxHp": 1.2,
     "damageMin": 0.2,
     "damageMax": 0.3,

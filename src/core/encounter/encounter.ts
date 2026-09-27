@@ -26,9 +26,18 @@ import {
 } from '../combat/combat';
 import { fromHundredths, toHundredths } from '../numbers/numbers';
 import {
+  addToBag,
+  createInventory,
+  EMPTY_EQUIPMENT,
+  equip,
+  unequip,
+  type Equipment,
+  type EquipSlot,
+  type InventoryState,
+} from '../inventory/inventory';
+import {
   addLevelBonus,
   applyDeathXpLoss,
-  attackIntervalMsAtLevel,
   createProgression,
   cumulativeLevelBonuses,
   gainXp,
@@ -45,6 +54,7 @@ import {
   type LootState,
 } from '../loot/loot';
 import { branch, type RngState } from '../rng/rng';
+import { composeStats, type ComposedStats } from '../stats/stats';
 import { secondsToMs, TICK_MS } from '../time/fixedStep';
 
 export type EncounterPhase = 'idle' | 'searching' | 'fighting' | 'hideout';
@@ -57,6 +67,8 @@ export interface EncounterConfig {
   readonly playerAttackIntervalMs: number;
   /** Attack speed gained per player level, compounding (%, GDD 6.1 v1.7). */
   readonly playerAttackSpeedPctPerLevel: number;
+  /** Left-paw weapon damage, % of its own (GDD 9.1 v2.3). */
+  readonly offHandDamagePct: number;
   /** Time between two enemy attacks (ms). */
   readonly enemyAttackIntervalMs: number;
   /** Player's base stats at level 1, before level bonuses (GDD 6.2). */
@@ -87,6 +99,7 @@ export interface EncounterConfigInput {
   readonly playerAttackIntervalS: number;
   readonly enemyAttackIntervalS: number;
   readonly playerAttackSpeedPctPerLevel: number;
+  readonly offHandDamagePct: number;
   readonly player: FighterStatsInput;
   readonly enemy: FighterStatsInput;
   readonly enemyLevel: number;
@@ -123,8 +136,8 @@ export interface EncounterState {
   readonly loot: LootState;
   /** Separate stream for drops, so loot never changes how fights play out. */
   readonly lootRng: RngState;
-  /** Every item found this session, oldest first. Placeholder until the inventory (M5). */
-  readonly foundItems: readonly Item[];
+  /** Found items (bag) and equipped gear (GDD 9.1, 10). */
+  readonly inventory: InventoryState;
 }
 
 export type EncounterEvent =
@@ -186,6 +199,7 @@ export function createEncounterConfig(input: EncounterConfigInput): EncounterCon
     searchMs,
     playerAttackIntervalMs,
     playerAttackSpeedPctPerLevel: input.playerAttackSpeedPctPerLevel,
+    offHandDamagePct: input.offHandDamagePct,
     enemyAttackIntervalMs,
     playerBase: input.player,
     enemy: createFighterStats(input.enemy),
@@ -218,16 +232,16 @@ export function createEncounter(config: EncounterConfig, rng: RngState): Encount
     rng,
     loot: createLootState(),
     lootRng: branch(rng, 'loot'),
-    foundItems: [],
+    inventory: createInventory(),
   };
 }
 
 /**
- * The player's current effective stats: base stats plus the cumulative bonus
- * for `level` (GDD 6.1/6.2: +1.0 max HP/level, +0.1 max damage every level,
- * +0.1 min damage every 2nd level).
+ * Character only (no gear): base stats plus the cumulative bonus for `level`
+ * (GDD 6.1/6.2: +1.0 max HP/level, +0.1 max damage every level, +0.1 min
+ * damage every 2nd level).
  */
-export function playerStats(config: EncounterConfig, level: number): FighterStats {
+export function characterStats(config: EncounterConfig, level: number): FighterStats {
   const bonus = cumulativeLevelBonuses(level);
   return createFighterStats({
     ...config.playerBase,
@@ -237,14 +251,64 @@ export function playerStats(config: EncounterConfig, level: number): FighterStat
   });
 }
 
-/** The player's attack interval at `level` (GDD 6.1 v1.7: x1.01 per level, min 0.5 s). */
-export function playerAttackIntervalMs(config: EncounterConfig, level: number): number {
-  return attackIntervalMsAtLevel(
-    config.playerAttackIntervalMs,
-    level,
-    config.playerAttackSpeedPctPerLevel,
-    config.rules.minAttackIntervalMs,
-  );
+/** Character + gear (core/stats, GDD 6.1 v1.8): what the squirrel fights with. */
+export function composedPlayer(
+  config: EncounterConfig,
+  level: number,
+  equipment: Equipment = EMPTY_EQUIPMENT,
+): ComposedStats {
+  return composeStats({
+    character: characterStats(config, level),
+    baseAttackIntervalMs: config.playerAttackIntervalMs,
+    levelSpeedFactor: (1 + config.playerAttackSpeedPctPerLevel / 100) ** (level - 1),
+    minAttackIntervalMs: config.rules.minAttackIntervalMs,
+    equipment,
+    offHandDamagePct: config.offHandDamagePct,
+  });
+}
+
+/** The squirrel's effective combat stats at `level` with `equipment` (default: none). */
+export function playerStats(
+  config: EncounterConfig,
+  level: number,
+  equipment: Equipment = EMPTY_EQUIPMENT,
+): FighterStats {
+  return composedPlayer(config, level, equipment).fighter;
+}
+
+/**
+ * The player's attack interval (GDD 6.1/7.2): fists 4.0 s + right-paw weapon
+ * shift, x1.01 faster per level, gear speed %, min 0.5 s.
+ */
+export function playerAttackIntervalMs(
+  config: EncounterConfig,
+  level: number,
+  equipment: Equipment = EMPTY_EQUIPMENT,
+): number {
+  return composedPlayer(config, level, equipment).attackIntervalMs;
+}
+
+/**
+ * Equips a bag item (GDD 9.1 v2.3). Works in any phase. Current HP never
+ * exceeds the new max HP (e.g. after taking off a +HP amulet).
+ */
+export function equipItem(
+  state: EncounterState,
+  config: EncounterConfig,
+  uid: number,
+  slot: EquipSlot,
+): EncounterState {
+  return withInventory(state, config, equip(state.inventory, uid, slot));
+}
+
+export function unequipItem(state: EncounterState, config: EncounterConfig, slot: EquipSlot): EncounterState {
+  return withInventory(state, config, unequip(state.inventory, slot));
+}
+
+function withInventory(state: EncounterState, config: EncounterConfig, inventory: InventoryState): EncounterState {
+  if (inventory === state.inventory) return state;
+  const maxHp = playerStats(config, state.progression.level, inventory.equipment).maxHp;
+  return { ...state, inventory, playerHp: Math.min(state.playerHp, maxHp) };
 }
 
 /** Player pressed "Find enemy". Only works while idle. */
@@ -289,7 +353,10 @@ export function tick(state: EncounterState, config: EncounterConfig): EncounterS
         return { state: { ...state, hideoutElapsedMs }, events: [] };
       }
       return {
-        state: toIdle({ ...state, hideoutElapsedMs }, playerStats(config, state.progression.level).maxHp),
+        state: toIdle(
+          { ...state, hideoutElapsedMs },
+          playerStats(config, state.progression.level, state.inventory.equipment).maxHp,
+        ),
         events: [{ type: 'returnedFromHideout' }],
       };
     }
@@ -324,7 +391,8 @@ export function tick(state: EncounterState, config: EncounterConfig): EncounterS
  * Never applied in the `hideout` phase (that has its own fixed recovery time).
  */
 function applyRegen(state: EncounterState, config: EncounterConfig): EncounterState {
-  const maxHp = playerStats(config, state.progression.level).maxHp;
+  const composed = composedPlayer(config, state.progression.level, state.inventory.equipment);
+  const maxHp = composed.fighter.maxHp;
   if (state.playerHp >= maxHp) {
     return { ...state, regenElapsedMs: 0 };
   }
@@ -332,10 +400,10 @@ function applyRegen(state: EncounterState, config: EncounterConfig): EncounterSt
   if (regenElapsedMs < config.regenIntervalMs) {
     return { ...state, regenElapsedMs };
   }
-  const amount = regenAmountHundredths(
-    fromHundredths(config.regenAmount),
-    state.progression.level,
-    config.regenGrowthPctPerLevel,
+  // GDD 6.1 + gear regen % (each item multiplies, core/stats).
+  const amount = Math.round(
+    regenAmountHundredths(fromHundredths(config.regenAmount), state.progression.level, config.regenGrowthPctPerLevel) *
+      composed.regenMultiplier,
   );
   return {
     ...state,
@@ -349,8 +417,9 @@ function tickFight(state: EncounterState, config: EncounterConfig): EncounterSte
   let { rng, playerHp, enemyHp, progression } = state;
   let playerAttackElapsedMs = state.playerAttackElapsedMs + TICK_MS;
   let enemyAttackElapsedMs = state.enemyAttackElapsedMs + TICK_MS;
-  const player = playerStats(config, progression.level);
-  const playerIntervalMs = playerAttackIntervalMs(config, progression.level);
+  const composed = composedPlayer(config, progression.level, state.inventory.equipment);
+  const player = composed.fighter;
+  const playerIntervalMs = composed.attackIntervalMs;
   // GDD 7.2 v1.7: hit chance shifts 0.5 % per level of difference, mirrored for the enemy.
   const levelDiff = progression.level - config.enemyLevel;
 
@@ -370,7 +439,7 @@ function tickFight(state: EncounterState, config: EncounterConfig): EncounterSte
       });
       const loot = drop.state;
       const lootRng = drop.rng;
-      const foundItems = drop.item ? [...state.foundItems, drop.item] : state.foundItems;
+      const inventory = drop.item ? addToBag(state.inventory, drop.item) : state.inventory;
       if (drop.item) events.push({ type: 'itemFound', item: drop.item });
       const gain = gainXp(progression, config.enemyXp);
       progression = gain.state;
@@ -394,7 +463,7 @@ function tickFight(state: EncounterState, config: EncounterConfig): EncounterSte
           rng,
           loot,
           lootRng,
-          foundItems,
+          inventory,
         },
         events,
       };
@@ -490,7 +559,8 @@ export function attackProgress(
   if (state.phase !== 'fighting') return 0;
   return who === 'player'
     ? clamp01(
-        (state.playerAttackElapsedMs + extraMs) / playerAttackIntervalMs(config, state.progression.level),
+        (state.playerAttackElapsedMs + extraMs) /
+          playerAttackIntervalMs(config, state.progression.level, state.inventory.equipment),
       )
     : clamp01((state.enemyAttackElapsedMs + extraMs) / config.enemyAttackIntervalMs);
 }
@@ -498,7 +568,7 @@ export function attackProgress(
 /** HP bar value 0..1 for one fighter. */
 export function hpFraction(state: EncounterState, config: EncounterConfig, who: Combatant): number {
   return who === 'player'
-    ? clamp01(state.playerHp / playerStats(config, state.progression.level).maxHp)
+    ? clamp01(state.playerHp / playerStats(config, state.progression.level, state.inventory.equipment).maxHp)
     : clamp01(state.enemyHp / config.enemy.maxHp);
 }
 

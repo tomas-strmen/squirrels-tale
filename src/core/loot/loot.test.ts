@@ -142,7 +142,7 @@ describe('generateItem (GDD 9.3)', () => {
       const gen = generateItem(config, rng, t1, rarity('legendary'), i);
       rng = gen.rng;
       if (gen.item.baseId === 'sharp_twig') {
-        expect(gen.item.weapon).toEqual({ damageMin: 60, damageMax: 100, attackIntervalMs: 2000 });
+        expect(gen.item.weapon).toEqual({ damageMin: 60, damageMax: 100, attackIntervalModMs: -400 });
         return;
       }
     }

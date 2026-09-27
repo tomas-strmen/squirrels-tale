@@ -8,6 +8,8 @@ import Phaser from 'phaser';
 export class StatsPanel extends Phaser.GameObjects.Container {
   private readonly text: Phaser.GameObjects.Text;
   private readonly bg: Phaser.GameObjects.Rectangle;
+  /** If set, the panel grows upwards so its bottom edge stays at this y. */
+  private bottomY: number | null = null;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y);
@@ -23,5 +25,12 @@ export class StatsPanel extends Phaser.GameObjects.Container {
     this.text.setText(lines.join('\n'));
     const padding = 10;
     this.bg.setSize(this.text.width + padding * 2, this.text.height + padding * 2);
+    if (this.bottomY !== null) this.y = this.bottomY - this.bg.height;
+  }
+
+  /** Anchors the panel's bottom edge at `y` (it grows upwards). */
+  anchorBottom(y: number): this {
+    this.bottomY = y;
+    return this;
   }
 }

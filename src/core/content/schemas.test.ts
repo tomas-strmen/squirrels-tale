@@ -97,6 +97,7 @@ describe('balanceSchema / parseBalance', () => {
       hitPct: 85,
       armor: 0,
       attackSpeedPctPerLevel: 1,
+      offHandDamagePct: 50,
       regenAmount: 0.1,
       regenIntervalS: 2.0,
       regenGrowthPctPerLevel: 3,
@@ -139,7 +140,7 @@ describe('items / rarities / affixes schemas (M4.1)', () => {
     slot: 'melee',
     tier: 1,
     kind: 'base',
-    weapon: { damageMin: 0.3, damageMax: 0.5, attackIntervalS: 2.0 },
+    weapon: { damageMin: 0.3, damageMax: 0.5, attackIntervalModS: -0.4 },
     stats: [],
   };
 
@@ -149,7 +150,7 @@ describe('items / rarities / affixes schemas (M4.1)', () => {
     expect(itemsSchema.safeParse([{ ...twig, tier: 0 }]).success).toBe(false);
     expect(itemsSchema.safeParse([twig, twig]).success).toBe(false);
     expect(
-      itemsSchema.safeParse([{ ...twig, weapon: { damageMin: 0.6, damageMax: 0.5, attackIntervalS: 2.0 } }]).success,
+      itemsSchema.safeParse([{ ...twig, weapon: { damageMin: 0.6, damageMax: 0.5, attackIntervalModS: -0.4 } }]).success,
     ).toBe(false);
     expect(itemsSchema.safeParse([{ ...twig, stats: [{ stat: 'luck', min: 1, max: 2 }] }]).success).toBe(false);
   });

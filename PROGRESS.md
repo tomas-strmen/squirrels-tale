@@ -1,13 +1,24 @@
 # PROGRESS – stav vývoja
 
 ## Aktuálne
-- **Etapa:** M4 Predmety (GDD kap. 22) – M3 Progres hotová ✅
-- **Posledný krok:** M4.2 – kocka k20 pri drope – hotové, čaká na test (PR)
+- **Etapa:** M5 Inventár a výbava (GDD kap. 22) – M4 Predmety hotová ✅
+- **Posledný krok:** M5.1 – výbava ovplyvňuje boj – hotové, čaká na test (PR)
+- **Ďalší krok:** M5.2 – plný inventár (limit 20, porovnanie, zamykanie, triedenie, „Keep only upgrades“)
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model: podľa náročnosti kroku (poviem vopred). Od teraz: AI pripraví vetvu/commit/push a dá Tomasovi presné príkazy/odkaz na PR, test a merge robí Tomas sám (šetrí tokeny oproti ovládaniu prehliadača).
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.
 
 ## Hotové
+### M5.1 – výbava (2026-09-27)
+- 9 slotov: pravá/ľavá labka, ranged, head, body, legs, ring, amulet, tail (tail zatiaľ bez predmetov).
+- Ľavá labka: druhá zbraň pridá 50 % poškodenia (`balance.json` `offHandDamagePct`), interval nemení.
+- Zbraň posúva interval o pevné sekundy (`items.json` `attackIntervalModS`): Sharp Twig −0.4 s (4.0 → 3.6 s),
+  Pebble Club +0.2 s. GDD v2.3.
+- Nové moduly `core/inventory` (sloty, bag, equip/unequip) a `core/stats` (skladanie štatistík z výbavy).
+- UI: panel Found items = EQUIPPED + nájdené predmety s tlačidlami R paw / L paw / Equip / Off;
+  Stats vľavo dole nad Time – oba panely naraz. 212 testov zelených.
+- Overené v prehliadači: rozloženie panelov; nasadenie predmetu v prehliadači neoverené (overené testami).
+
 ### M4.2 – kocka k20 (2026-09-26)
 - `data/rarities.json`: pridané `diceRange`/`goldDiceRange` (1–14 Common, 15–18 Uncommon, 19 Rare,
   20 → zlatá kocka s vlastným rozsahom pre Unique/Set/Legendary). Zod schéma (`diceRangeSchema`).

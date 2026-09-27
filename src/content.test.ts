@@ -12,6 +12,7 @@ import en from '../strings/en.json';
 import { toEncounterConfigInput } from './core/content/encounterInput';
 import { parseAffixes, parseBalance, parseEnemies, parseItems, parseRarities, statIdSchema } from './core/content/schemas';
 import { createEncounterConfig } from './core/encounter/encounter';
+import { EQUIP_SLOTS } from './core/inventory/inventory';
 
 const strings: Record<string, string> = en;
 
@@ -56,6 +57,9 @@ describe('data + strings', () => {
     }
     for (const rarity of parseRarities(raritiesData)) {
       expect(strings[`rarity.${rarity.id}.name`], `missing text rarity.${rarity.id}.name`).toBeTruthy();
+    }
+    for (const slot of EQUIP_SLOTS) {
+      expect(strings[`slot.${slot}.name`], `missing text slot.${slot}.name`).toBeTruthy();
     }
     for (const stat of statIdSchema.options) {
       expect(strings[`stat.${stat}.name`], `missing text stat.${stat}.name`).toBeTruthy();

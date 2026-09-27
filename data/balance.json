@@ -10,6 +10,7 @@
     "hitPct": 85,
     "armor": 0,
     "attackSpeedPctPerLevel": 1,
+    "offHandDamagePct": 50,
     "regenAmount": 0.1,
     "regenIntervalS": 3.0,
     "regenGrowthPctPerLevel": 3

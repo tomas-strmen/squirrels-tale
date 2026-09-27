@@ -19,7 +19,13 @@ export interface ItemsPanelActions {
   readonly compareToSlot: (item: Item, slot: EquipSlot) => readonly EquipComparisonLine[];
   /** M5.2b1: true if `item` beats what's worn in at least one visible stat, for any fitting slot. */
   readonly hasUpgrade: (item: Item) => boolean;
+  /** M5.2b2: flips `item.locked` (bag items only, for now just a flag). */
+  readonly onToggleLock: (uid: number) => void;
+  /** M5.2b2: higher = more valuable, for the Rarity sort mode. */
+  readonly rarityRank: (item: Item) => number;
 }
+
+type SortMode = 'newest' | 'rarity';
 
 const LINE_COLOR: Record<EquipComparisonLine['verdict'], string> = { better: '#5fd97a', worse: '#e0605f' };
 const UPGRADE_TINT = 0x2f6fb0; // faint blue: this item has at least one better stat than what's worn
@@ -39,6 +45,8 @@ export class ItemsPanel extends Phaser.GameObjects.Container {
   private scrollOffset = 0;
   /** Bag item currently expanded for comparison (M5.2b1), or null. */
   private expandedUid: number | null = null;
+  /** M5.2b2: 'newest' (drop order) or 'rarity' (most valuable first, newest-first within a tier). */
+  private sortMode: SortMode = 'newest';
   /**
    * Set by scroll/expand clicks so `show()` re-renders on the *next* frame -
    * never call render() directly from inside a row's own click handler, since
@@ -90,10 +98,11 @@ export class ItemsPanel extends Phaser.GameObjects.Container {
       width = Math.max(width, x + label.width + PAD);
       return label;
     };
-    const addButton = (x: number, label: string, onClick: () => void) => {
-      const b = new Button(this.scene, x + 22, y + 8, label, onClick, { width: 44, height: 18, fontSize: 12 });
+    const addButton = (x: number, label: string, onClick: () => void, width = 44) => {
+      const b = new Button(this.scene, x + width / 2, y + 8, label, onClick, { width, height: 18, fontSize: 12 });
       this.add(b);
       this.rows.push(b);
+      return b;
     };
 
     addText(PAD, t('items.equipped'));
@@ -121,9 +130,23 @@ export class ItemsPanel extends Phaser.GameObjects.Container {
       addButton(220, '▲', () => this.scroll(-1));
       addButton(272, '▼', () => this.scroll(1));
     }
+    addButton(
+      324,
+      this.sortMode === 'newest' ? t('items.sortNewest') : t('items.sortRarity'),
+      () => {
+        this.sortMode = this.sortMode === 'newest' ? 'rarity' : 'newest';
+        this.scrollOffset = 0;
+        this.dirty = true;
+      },
+      80,
+    );
     y += ROW_H;
     const newestFirst = [...inventory.bag].reverse();
-    const visible = newestFirst.slice(this.scrollOffset, this.scrollOffset + BAG_ROWS);
+    const sorted =
+      this.sortMode === 'rarity'
+        ? [...newestFirst].sort((a, b) => this.actions.rarityRank(b) - this.actions.rarityRank(a))
+        : newestFirst;
+    const visible = sorted.slice(this.scrollOffset, this.scrollOffset + BAG_ROWS);
     if (visible.length === 0) {
       addText(PAD, t('loot.none'), '#909090');
       y += ROW_H;
@@ -139,8 +162,10 @@ export class ItemsPanel extends Phaser.GameObjects.Container {
         this.rows.push(tint);
         rowTints.push(tint);
       }
+      // Lock toggle (M5.2b2): protects the item from future bulk-discard/disassembly.
+      addButton(PAD, item.locked ? '🔒' : '🔓', () => this.actions.onToggleLock(item.uid), 22);
       // Tap the summary to compare (M5.2b1); tap again (or another item) to switch/close.
-      const label = addText(PAD, `${expanded ? '▾' : '▸'} ${itemSummary(item)}`, this.actions.colorOf(item));
+      const label = addText(PAD + 26, `${expanded ? '▾' : '▸'} ${itemSummary(item)}`, this.actions.colorOf(item));
       label.setInteractive({ useHandCursor: true }).on('pointerup', () => {
         this.expandedUid = expanded ? null : item.uid;
         this.dirty = true;

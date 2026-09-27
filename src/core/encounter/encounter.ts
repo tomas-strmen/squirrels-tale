@@ -31,6 +31,7 @@ import {
   createInventory,
   EMPTY_EQUIPMENT,
   equip,
+  toggleLock,
   unequip,
   type Equipment,
   type EquipSlot,
@@ -367,6 +368,12 @@ export function equipItem(
 
 export function unequipItem(state: EncounterState, config: EncounterConfig, slot: EquipSlot): EncounterState {
   return withInventory(state, config, unequip(state.inventory, slot));
+}
+
+/** Flips `locked` on a bag item (M5.2b2). Locked items are for now just a flag - protected from
+ * future bulk actions (M5.2b3 discard, M16 disassembly), not from equip/unequip. */
+export function toggleItemLock(state: EncounterState, config: EncounterConfig, uid: number): EncounterState {
+  return withInventory(state, config, toggleLock(state.inventory, uid));
 }
 
 function withInventory(state: EncounterState, config: EncounterConfig, inventory: InventoryState): EncounterState {

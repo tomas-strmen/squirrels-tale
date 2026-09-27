@@ -23,6 +23,7 @@ import {
   searchProgress,
   startSearch,
   tick,
+  toggleItemLock,
   unequipItem,
   type Combatant,
   type EncounterConfig,
@@ -99,6 +100,8 @@ export class FightScene extends Phaser.Scene {
   private lootButton!: Button;
   private lootPanel!: ItemsPanel;
   private rarityColors = new Map<string, string>();
+  /** M5.2b2: rarities.json order = value, for the bag's "Sort: Rarity". */
+  private rarityRanks = new Map<string, number>();
   /** Simulated game time (counts faster at x4/x20/x50 - it follows the simulation). */
   private simElapsedMs = 0;
   private timeText!: Phaser.GameObjects.Text;
@@ -118,6 +121,7 @@ export class FightScene extends Phaser.Scene {
 
     const rarities = parseRarities(raritiesData);
     this.rarityColors = new Map(rarities.map((r) => [r.id, r.color]));
+    this.rarityRanks = new Map(rarities.map((r, i) => [r.id, i]));
     this.config = createEncounterConfig(
       toEncounterConfigInput(balance, enemyData, {
         items: parseItems(itemsData),
@@ -293,6 +297,10 @@ export class FightScene extends Phaser.Scene {
           );
           return verdict === 'better' || verdict === 'mixed';
         }),
+      onToggleLock: (uid) => {
+        this.state = toggleItemLock(this.state, this.config, uid);
+      },
+      rarityRank: (item) => this.rarityRanks.get(item.rarityId) ?? 0,
     });
     this.lootPanel.setVisible(false);
 

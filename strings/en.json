@@ -36,6 +36,8 @@
   "items.equipRight": "R paw",
   "items.equipLeft": "L paw",
   "items.unequip": "Off",
+  "items.sortNewest": "Sort: Newest",
+  "items.sortRarity": "Sort: Rarity",
   "compare.none": "No change",
   "slot.rightPaw.name": "Right paw",
   "slot.leftPaw.name": "Left paw",

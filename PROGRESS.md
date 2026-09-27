@@ -2,13 +2,22 @@
 
 ## Aktuálne
 - **Etapa:** M5 Inventár a výbava (GDD kap. 22) – M4 Predmety hotová ✅
-- **Posledný krok:** M5.2b1 (dizajn podfarbenia podľa Tomasa) – hotové, čaká na test (PR)
-- **Ďalší krok:** M5.2b2 – zamknutie predmetov + triedenie batohu (newest / rarity)
+- **Posledný krok:** M5.2b2 – zamknutie predmetov + triedenie batohu (newest / rarity) – hotové, čaká na test (PR)
+- **Ďalší krok:** M5.2b3 – hromadné zahodenie predmetov podľa vzácnosti (napr. „Discard Common“)
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model: podľa náročnosti kroku (poviem vopred). Od teraz: AI pripraví vetvu/commit/push a dá Tomasovi presné príkazy/odkaz na PR, test a merge robí Tomas sám (šetrí tokeny oproti ovládaniu prehliadača).
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.
 
 ## Hotové
+### M5.2b2 – zamknutie + triedenie batohu (2026-09-27)
+- Každý predmet v batohu má zámok 🔓/🔒 (tlačidlo pri riadku) - zatiaľ len príznak, nič nerobí
+  navyše (blokovanie predaja/rozoberania príde s M16 kováčom / budúcim hromadným zahadzovaním).
+- Triedenie: tlačidlo „Sort: Newest“/„Sort: Rarity“ pri hlavičke batohu - podľa dátumu nálezu
+  (default) alebo podľa vzácnosti (najcennejšie prvé, v rámci rovnakej vzácnosti najnovšie prvé).
+- `core/inventory.toggleLock` (nový, testovaný), `Item.locked` (voliteľný príznak).
+- 217 testov zelených. V prehliadači overené len rozloženie (tlačidlo triedenia sa zobrazuje
+  správne); samotné zamykanie/triedenie po drope over ty.
+
 ### M5.2b1 – porovnanie pred nasadením (2026-09-27)
 - Funguje rovnako na telefóne aj PC (žiadny hover): klik na predmet v batohu rozbalí porovnanie
   oproti nasadenému kusu (dmg, armor, max HP, hit%, interval útoku), pri zbrani zvlášť pre R aj L paw.

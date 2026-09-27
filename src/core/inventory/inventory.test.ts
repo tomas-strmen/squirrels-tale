@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Item } from '../loot/loot';
-import { addToBag, BAG_CAPACITY, createInventory, equip, equippedItems, slotsFor, unequip } from './inventory';
+import { addToBag, BAG_CAPACITY, createInventory, equip, equippedItems, slotsFor, toggleLock, unequip } from './inventory';
 
 function item(uid: number, slot: Item['slot'], baseId = 'sharp_twig'): Item {
   return { uid, baseId, slot, tier: 1, rarityId: 'common', weapon: null, stats: [], affixes: [] };
@@ -55,6 +55,23 @@ describe('equip / unequip', () => {
     const copy = structuredClone(bagged);
     equip(bagged, 1, 'rightPaw');
     expect(bagged).toEqual(copy);
+  });
+});
+
+describe('toggleLock (M5.2b2)', () => {
+  it('flips locked on the matching bag item, leaves others alone', () => {
+    const twig = item(1, 'melee');
+    const club = item(2, 'melee', 'pebble_club');
+    const bagged = [twig, club].reduce(addToBag, createInventory());
+    const locked = toggleLock(bagged, 1);
+    expect(locked.bag.find((i) => i.uid === 1)?.locked).toBe(true);
+    expect(locked.bag.find((i) => i.uid === 2)?.locked).toBeFalsy();
+    expect(toggleLock(locked, 1).bag.find((i) => i.uid === 1)?.locked).toBe(false);
+  });
+
+  it('does nothing for a uid not in the bag', () => {
+    const bagged = addToBag(createInventory(), item(1, 'melee'));
+    expect(toggleLock(bagged, 99)).toBe(bagged);
   });
 });
 

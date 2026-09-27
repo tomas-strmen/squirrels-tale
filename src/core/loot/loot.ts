@@ -59,6 +59,8 @@ export interface Item {
   readonly weapon: { readonly damageMin: number; readonly damageMax: number; readonly attackIntervalModMs: number } | null;
   readonly stats: readonly ItemStat[];
   readonly affixes: readonly ItemAffix[];
+  /** M5.2b2: protects from future bulk-discard/disassembly. Not set (undefined) = unlocked. */
+  readonly locked?: boolean;
 }
 
 export interface PityRule {

@@ -3,7 +3,8 @@
  * state and never modifies the one passed in.
  *
  * M5.1 scope: 9 equipment slots, equip/unequip.
- * M5.2a: 20-slot bag limit. Not yet (M5.2b+): comparison, locking, sorting,
+ * M5.2a: 20-slot bag limit. M5.2b1: comparison (core/encounter.compareEquip).
+ * M5.2b2: locking. Not yet: sorting UI state (lives in the panel, not here),
  * "Keep only upgrades", stacks.
  */
 import type { ItemSlot } from '../content/schemas';
@@ -88,6 +89,16 @@ export function equip(state: InventoryState, uid: number, slot: EquipSlot): Inve
     bag: previous ? [...bag, previous] : bag,
     equipment: { ...state.equipment, [slot]: item },
   };
+}
+
+/** Flips `locked` on the bag item `uid` (M5.2b2). Does nothing if it's not in the bag. */
+export function toggleLock(state: InventoryState, uid: number): InventoryState {
+  const index = state.bag.findIndex((i) => i.uid === uid);
+  if (index === -1) return state;
+  const bag = [...state.bag];
+  const item = bag[index]!;
+  bag[index] = { ...item, locked: !item.locked };
+  return { ...state, bag };
 }
 
 /** Moves the item in `slot` back to the bag. Does nothing for an empty slot. */

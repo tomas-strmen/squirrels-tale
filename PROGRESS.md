@@ -2,13 +2,27 @@
 
 ## Aktuálne
 - **Etapa:** M6 Mapa (GDD kap. 8, 22) – M5 Inventár a výbava hotová ✅
-- **Posledný krok:** M6.1 – levely nepriateľov podľa GDD 8.4 – hotové a otestované, mergnuté
-- **Ďalší krok:** M6.2 – viac políčok (`data/tiles.json`, výber políčka, odomykanie podľa počtu zabití)
+- **Posledný krok:** M6.2a – políčka T1→T2, výber políčka, odomykanie podľa zabití – otestované (Tomas), čaká na merge PR `m6.2a-tiles`
+- **Ďalší krok:** M6.2b – ďalšie políčka (T3+), vrátane odomykania podľa levelu (T3: 30 zabití + Lv 5) a bossa (T4)
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model: podľa náročnosti kroku (poviem vopred). Od teraz: AI pripraví vetvu/commit/push a dá Tomasovi presné príkazy/odkaz na PR, test a merge robí Tomas sám (šetrí tokeny oproti ovládaniu prehliadača).
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.
 
 ## Hotové
+### M6.2a – políčka T1→T2 (2026-09-28)
+- `data/tiles.json` (nové): T1 Fallen Nest (odomknuté), T2 Mossy Roots (odomkne sa po 8 zabitiach
+  na T1). Rozsah levelu nepriateľov je teraz vlastnosť políčka (GDD 8.4 „z rozsahu políčka"), nie
+  jedného nepriateľa - `enemies.json` stratil `levelMax`, `baseLevel` ostáva ako vlastná kotva
+  nepriateľa (nemení sa podľa políčka).
+- Nový Pill Bug (`data/enemies.json`, GDD 8.3) - druhý nepriateľ na T2, armor 1.0.
+- `core/encounter`: config drží zoznam nepriateľov políčka (vyberie sa náhodne pri každom novom
+  súboji, podobne ako level); `killsByTile` počíta zabitia zvlášť pre každé políčko; nové
+  `switchTile()` prepne políčko (len ak odomknuté) bez straty HP/levelu/výbavy.
+- Nový modul `core/tiles`: čistá logika odomykania (`isTileUnlocked`/`unlockedTileIds`/`killsToUnlock`).
+- `FightScene`: tlačidlá políčok vedľa boja, zamknuté ukáže „🔒 N kills to unlock".
+- 270 testov zelených (bolo 249). Overené v prehliadači (AI): odomykanie sa dekrementuje po
+  zabitiach, klik na zamknuté políčko nič nerobí, boj beží ďalej. Tomas otestoval a schválil.
+
 ### M6.1 – levely nepriateľov (2026-09-28)
 - Worker Ant má na T1 rozsah levelu 1–2 (`data/enemies.json` `levelMax`); level sa hodí náhodne
   pri každom stretnutí (vlastný Rng stream, ako loot - nemení priebeh boja).

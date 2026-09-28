@@ -2,7 +2,6 @@
   {
     "id": "worker_ant",
     "baseLevel": 1,
-    "levelMax": 2,
     "maxHp": 1.2,
     "damageMin": 0.2,
     "damageMax": 0.3,
@@ -11,5 +10,29 @@
     "armor": 0,
     "dodgePct": 0,
     "xp": 2
+  },
+  {
+    "id": "pill_bug",
+    "baseLevel": 2,
+    "maxHp": 2.0,
+    "damageMin": 0.2,
+    "damageMax": 0.3,
+    "attackIntervalS": 3.0,
+    "hitPct": 65,
+    "armor": 1.0,
+    "dodgePct": 0,
+    "xp": 3
+  },
+  {
+    "id": "armed_ant",
+    "baseLevel": 4,
+    "maxHp": 2.5,
+    "damageMin": 0.3,
+    "damageMax": 0.5,
+    "attackIntervalS": 2.8,
+    "hitPct": 70,
+    "armor": 0,
+    "dodgePct": 0,
+    "xp": 4
   }
 ]

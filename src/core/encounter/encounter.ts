@@ -72,6 +72,28 @@ export interface EnemyLeveling {
   readonly maxDodgePct: number;
 }
 
+/** One enemy species that can spawn on a tile (GDD 8.2/8.3), resolved to internal units. */
+export interface EncounterEnemyDef {
+  readonly id: string;
+  /** Combat stats at `baseLevel` (GDD 8.4, "b"); scaled per level by `enemyLeveling`, see enemyStats(). */
+  readonly base: FighterStats;
+  /** The species' own anchor level (GDD 8.4, "b") - fixed regardless of which tile it spawns on. */
+  readonly baseLevel: number;
+  /** Time between two of its attacks (ms). */
+  readonly attackIntervalMs: number;
+  /** XP granted when defeated at `baseLevel` (hundredths); scaled per level, see enemyXpAt(). */
+  readonly xp: number;
+}
+
+/** Design values for one enemy species, as written in data/enemies.json. */
+export interface EncounterEnemyInput extends FighterStatsInput {
+  readonly id: string;
+  readonly baseLevel: number;
+  readonly attackIntervalS: number;
+  /** XP granted when defeated at `baseLevel` (design value, GDD 6.2/8.3). */
+  readonly xp: number;
+}
+
 export interface EncounterConfig {
   /** How long the search for an enemy takes (ms). */
   readonly searchMs: number;
@@ -81,18 +103,14 @@ export interface EncounterConfig {
   readonly playerAttackSpeedPctPerLevel: number;
   /** Left-paw weapon damage, % of its own (GDD 9.1 v2.3). */
   readonly offHandDamagePct: number;
-  /** Time between two enemy attacks (ms). */
-  readonly enemyAttackIntervalMs: number;
   /** Player's base stats at level 1, before level bonuses (GDD 6.2). */
   readonly playerBase: FighterStatsInput;
-  /** Enemy stats at `enemyLevelMin` (GDD 8.4, "b"); scaled per level by `enemyLeveling`, see enemyStats(). */
-  readonly enemyBase: FighterStats;
-  /** Lowest/highest level the enemy can roll to per encounter (GDD 8.4). Tile-based ranges come with M6.2. */
+  /** Enemy species that can spawn on this tile (GDD 8.2); one is picked per encounter, see rollEnemy(). */
+  readonly enemies: readonly EncounterEnemyDef[];
+  /** Lowest/highest level enemies roll to on this tile, regardless of species (GDD 8.4). */
   readonly enemyLevelMin: number;
   readonly enemyLevelMax: number;
   readonly enemyLeveling: EnemyLeveling;
-  /** XP granted when the enemy is defeated at `enemyLevelMin` (hundredths); scaled per level, see enemyXp(). */
-  readonly enemyXp: number;
   readonly rules: CombatRules;
   /** HP regenerated every `regenIntervalMs` at level 1, before per-level growth (hundredths). */
   readonly regenAmount: number;
@@ -104,7 +122,7 @@ export interface EncounterConfig {
   /** % of the current level's XP progress lost on an online death (GDD 6.3). */
   readonly deathXpLossPct: number;
   readonly loot: LootConfig;
-  /** Tier of the current tile (GDD 8.2/9.3). Fixed to 1 until the map (M6). */
+  /** Tier of the tile this config is for (GDD 8.2/9.3), e.g. 2 for T2. */
   readonly tileTier: number;
 }
 
@@ -112,16 +130,14 @@ export interface EncounterConfig {
 export interface EncounterConfigInput {
   readonly searchDurationS: number;
   readonly playerAttackIntervalS: number;
-  readonly enemyAttackIntervalS: number;
   readonly playerAttackSpeedPctPerLevel: number;
   readonly offHandDamagePct: number;
   readonly player: FighterStatsInput;
-  readonly enemy: FighterStatsInput;
+  /** Enemy species available on this tile (GDD 8.2); at least one. */
+  readonly enemies: readonly EncounterEnemyInput[];
   readonly enemyLevelMin: number;
   readonly enemyLevelMax: number;
   readonly enemyLeveling: EnemyLeveling;
-  /** XP granted when the enemy is defeated (design value, GDD 6.2/8.3). */
-  readonly enemyXp: number;
   readonly rules: CombatRulesInput;
   readonly regenAmount: number;
   readonly regenIntervalS: number;
@@ -144,9 +160,11 @@ export interface EncounterState {
   readonly playerHp: number;
   /** Current HP of the enemy (hundredths). Only meaningful while fighting. */
   readonly enemyHp: number;
+  /** Id of the current (or next, while searching) enemy species (GDD 8.2, M6.2). */
+  readonly enemyId: string;
   /** Level of the current (or next, while searching) enemy (GDD 8.4). */
   readonly enemyLevel: number;
-  /** Separate stream for rolling it, so it never changes how a fight plays out (like loot). */
+  /** Separate stream for rolling species+level, so it never changes how a fight plays out (like loot). */
   readonly enemyLevelRng: RngState;
   /** Time since the last regen tick (ms). Ticks in idle/searching/fighting, not in hideout. */
   readonly regenElapsedMs: number;
@@ -159,6 +177,10 @@ export interface EncounterState {
   readonly lootRng: RngState;
   /** Found items (bag) and equipped gear (GDD 9.1, 10). */
   readonly inventory: InventoryState;
+  /** Id of the tile currently being fought on (GDD 8.1/8.2, M6.2). */
+  readonly tileId: string;
+  /** Kills so far on each tile ever visited, keyed by tile id (M6.2: unlocks the next tile). */
+  readonly killsByTile: Readonly<Record<string, number>>;
 }
 
 export type EncounterEvent =
@@ -181,7 +203,9 @@ export type EncounterEvent =
   /** Hideout time is over: back to idle at full HP (GDD 6.3). */
   | { readonly type: 'returnedFromHideout' }
   /** Player pressed "Peace!": search or fight ended at once (no XP, no loot). */
-  | { readonly type: 'peaceMade'; readonly from: 'searching' | 'fighting' };
+  | { readonly type: 'peaceMade'; readonly from: 'searching' | 'fighting' }
+  /** Player switched to a different (unlocked) map tile (GDD 8.1, M6.2). */
+  | { readonly type: 'tileSwitched'; readonly tileId: string };
 
 export interface EncounterStep {
   readonly state: EncounterState;
@@ -195,11 +219,10 @@ export interface EncounterStep {
 export function createEncounterConfig(input: EncounterConfigInput): EncounterConfig {
   const searchMs = secondsToMs(input.searchDurationS);
   const playerAttackIntervalMs = secondsToMs(input.playerAttackIntervalS);
-  const enemyAttackIntervalMs = secondsToMs(input.enemyAttackIntervalS);
   if (searchMs < TICK_MS) {
     throw new Error(`searchDurationS must be at least ${TICK_MS / 1000} s`);
   }
-  if (playerAttackIntervalMs < TICK_MS || enemyAttackIntervalMs < TICK_MS) {
+  if (playerAttackIntervalMs < TICK_MS) {
     throw new Error(`Attack intervals must be at least ${TICK_MS / 1000} s`);
   }
   if (!Number.isInteger(input.enemyLevelMin) || input.enemyLevelMin < 1) {
@@ -207,6 +230,9 @@ export function createEncounterConfig(input: EncounterConfigInput): EncounterCon
   }
   if (!Number.isInteger(input.enemyLevelMax) || input.enemyLevelMax < input.enemyLevelMin) {
     throw new Error('enemyLevelMax must be a whole number >= enemyLevelMin');
+  }
+  if (input.enemies.length === 0) {
+    throw new Error('A tile needs at least one enemy species');
   }
   const regenIntervalMs = secondsToMs(input.regenIntervalS);
   if (regenIntervalMs < TICK_MS) {
@@ -219,18 +245,29 @@ export function createEncounterConfig(input: EncounterConfigInput): EncounterCon
   // Validates the base stats early (e.g. maxHp > 0); the checked value itself
   // is discarded because effective stats are recomputed per level, see playerStats().
   createFighterStats(input.player);
+  const enemies = input.enemies.map((enemy): EncounterEnemyDef => {
+    const attackIntervalMs = secondsToMs(enemy.attackIntervalS);
+    if (attackIntervalMs < TICK_MS) {
+      throw new Error(`Attack intervals must be at least ${TICK_MS / 1000} s`);
+    }
+    return {
+      id: enemy.id,
+      base: createFighterStats(enemy),
+      baseLevel: enemy.baseLevel,
+      attackIntervalMs,
+      xp: toHundredths(enemy.xp),
+    };
+  });
   return {
     searchMs,
     playerAttackIntervalMs,
     playerAttackSpeedPctPerLevel: input.playerAttackSpeedPctPerLevel,
     offHandDamagePct: input.offHandDamagePct,
-    enemyAttackIntervalMs,
     playerBase: input.player,
-    enemyBase: createFighterStats(input.enemy),
+    enemies,
     enemyLevelMin: input.enemyLevelMin,
     enemyLevelMax: input.enemyLevelMax,
     enemyLeveling: input.enemyLeveling,
-    enemyXp: toHundredths(input.enemyXp),
     rules: createCombatRules(input.rules),
     regenAmount: toHundredths(input.regenAmount),
     regenIntervalMs,
@@ -242,10 +279,10 @@ export function createEncounterConfig(input: EncounterConfigInput): EncounterCon
   };
 }
 
-/** New encounter in phase `idle`, squirrel at full HP, level 1, no XP. */
-export function createEncounter(config: EncounterConfig, rng: RngState): EncounterState {
+/** New encounter in phase `idle`, squirrel at full HP, level 1, no XP, on `tileId`. */
+export function createEncounter(config: EncounterConfig, rng: RngState, tileId: string): EncounterState {
   const progression = createProgression();
-  const firstLevel = rollEnemyLevel(config, branch(rng, 'enemyLevel'));
+  const first = rollEnemy(config, branch(rng, 'enemyLevel'));
   return {
     phase: 'idle',
     searchElapsedMs: 0,
@@ -253,8 +290,9 @@ export function createEncounter(config: EncounterConfig, rng: RngState): Encount
     enemyAttackElapsedMs: 0,
     playerHp: playerStats(config, progression.level).maxHp,
     enemyHp: 0,
-    enemyLevel: firstLevel.level,
-    enemyLevelRng: firstLevel.rng,
+    enemyId: first.enemyId,
+    enemyLevel: first.level,
+    enemyLevelRng: first.rng,
     regenElapsedMs: 0,
     hideoutElapsedMs: 0,
     progression,
@@ -262,24 +300,49 @@ export function createEncounter(config: EncounterConfig, rng: RngState): Encount
     loot: createLootState(),
     lootRng: branch(rng, 'loot'),
     inventory: createInventory(),
+    tileId,
+    killsByTile: {},
   };
 }
 
-/**
- * Rolls the level of the next enemy within [enemyLevelMin, enemyLevelMax] (GDD 8.4).
- * Its own Rng stream, so it never changes how a fight plays out (like loot).
- */
-function rollEnemyLevel(config: EncounterConfig, rng: RngState): { readonly level: number; readonly rng: RngState } {
-  if (config.enemyLevelMin === config.enemyLevelMax) return { level: config.enemyLevelMin, rng };
-  const draw = nextInt(rng, config.enemyLevelMin, config.enemyLevelMax + 1);
-  return { level: draw.value, rng: draw.state };
+/** Looks up a species' def by id. Throws if `config` (the current tile) doesn't have it. */
+function enemyDefOf(config: EncounterConfig, enemyId: string): EncounterEnemyDef {
+  const def = config.enemies.find((e) => e.id === enemyId);
+  if (!def) throw new Error(`Unknown enemy id "${enemyId}" for this tile`);
+  return def;
 }
 
-/** Enemy's effective combat stats at `level` (GDD 8.4): +hpPctPerLevel/damagePctPerLevel/dodgePctPerLevel per level above enemyLevelMin. */
-export function enemyStats(config: EncounterConfig, level: number): FighterStats {
-  const levelsAbove = level - config.enemyLevelMin;
+/**
+ * Rolls the next enemy: a species from `config.enemies` (GDD 8.2) and a level within
+ * [enemyLevelMin, enemyLevelMax] (GDD 8.4). Its own Rng stream, so it never changes
+ * how a fight plays out (like loot). A single-species tile never rolls the species
+ * (keeps the same deterministic sequence as before multi-species tiles existed).
+ */
+function rollEnemy(
+  config: EncounterConfig,
+  rng: RngState,
+): { readonly enemyId: string; readonly level: number; readonly rng: RngState } {
+  let nextRng = rng;
+  let enemyId = config.enemies[0]?.id;
+  if (config.enemies.length > 1) {
+    const pick = nextInt(nextRng, 0, config.enemies.length);
+    enemyId = config.enemies[pick.value]?.id;
+    nextRng = pick.state;
+  }
+  if (enemyId === undefined) throw new Error('A tile needs at least one enemy species');
+  if (config.enemyLevelMin === config.enemyLevelMax) {
+    return { enemyId, level: config.enemyLevelMin, rng: nextRng };
+  }
+  const draw = nextInt(nextRng, config.enemyLevelMin, config.enemyLevelMax + 1);
+  return { enemyId, level: draw.value, rng: draw.state };
+}
+
+/** Enemy's effective combat stats at `level` (GDD 8.4): +hpPctPerLevel/damagePctPerLevel/dodgePctPerLevel per level above its own baseLevel. */
+export function enemyStats(config: EncounterConfig, enemyId: string, level: number): FighterStats {
+  const def = enemyDefOf(config, enemyId);
+  const levelsAbove = level - def.baseLevel;
   const lv = config.enemyLeveling;
-  const base = config.enemyBase;
+  const base = def.base;
   return {
     ...base,
     maxHp: Math.round(base.maxHp * (1 + (lv.hpPctPerLevel / 100) * levelsAbove)),
@@ -289,10 +352,11 @@ export function enemyStats(config: EncounterConfig, level: number): FighterStats
   };
 }
 
-/** XP granted for defeating the enemy at `level` (GDD 8.4): +xpPctPerLevel per level above enemyLevelMin. */
-export function enemyXpAt(config: EncounterConfig, level: number): number {
-  const levelsAbove = level - config.enemyLevelMin;
-  return Math.round(config.enemyXp * (1 + (config.enemyLeveling.xpPctPerLevel / 100) * levelsAbove));
+/** XP granted for defeating the enemy at `level` (GDD 8.4): +xpPctPerLevel per level above its own baseLevel. */
+export function enemyXpAt(config: EncounterConfig, enemyId: string, level: number): number {
+  const def = enemyDefOf(config, enemyId);
+  const levelsAbove = level - def.baseLevel;
+  return Math.round(def.xp * (1 + (config.enemyLeveling.xpPctPerLevel / 100) * levelsAbove));
 }
 
 /**
@@ -471,6 +535,36 @@ export function makePeace(state: EncounterState): EncounterStep {
 }
 
 /**
+ * Player picks a different tile on the map (GDD 8.1, M6.2). No-op if it's the tile she's
+ * already on, or if `tileId` isn't in `unlockedTileIds` (e.g. a stale click on a tile that
+ * just got locked again - shouldn't happen from the UI, but keeps state consistent).
+ * Interrupts any search/fight in progress (like Peace!, no XP/loot) and rolls a fresh
+ * enemy for the new tile; keeps HP, progression, inventory and every tile's kill counts.
+ */
+export function switchTile(
+  state: EncounterState,
+  newConfig: EncounterConfig,
+  tileId: string,
+  unlockedTileIds: ReadonlySet<string>,
+): EncounterStep {
+  if (tileId === state.tileId || !unlockedTileIds.has(tileId)) {
+    return { state, events: [] };
+  }
+  const idle = state.phase === 'idle' ? state : toIdle(state, state.playerHp);
+  const next = rollEnemy(newConfig, idle.enemyLevelRng);
+  return {
+    state: {
+      ...idle,
+      tileId,
+      enemyId: next.enemyId,
+      enemyLevel: next.level,
+      enemyLevelRng: next.rng,
+    },
+    events: [{ type: 'tileSwitched', tileId }],
+  };
+}
+
+/**
  * Advances the encounter by one simulation step (TICK_MS).
  * If both fighters are due to attack in the same step, the player attacks first;
  * if that attack kills the enemy, the enemy does not attack.
@@ -507,7 +601,7 @@ export function tick(state: EncounterState, config: EncounterConfig): EncounterS
           searchElapsedMs: config.searchMs,
           playerAttackElapsedMs: 0,
           enemyAttackElapsedMs: 0,
-          enemyHp: enemyStats(config, regenerated.enemyLevel).maxHp,
+          enemyHp: enemyStats(config, regenerated.enemyId, regenerated.enemyLevel).maxHp,
         },
         events: [{ type: 'enemyFound' }],
       };
@@ -553,7 +647,8 @@ function tickFight(state: EncounterState, config: EncounterConfig): EncounterSte
   const composed = composedPlayer(config, progression.level, state.inventory.equipment);
   const player = composed.fighter;
   const playerIntervalMs = composed.attackIntervalMs;
-  const enemy = enemyStats(config, state.enemyLevel);
+  const enemy = enemyStats(config, state.enemyId, state.enemyLevel);
+  const enemyAttackIntervalMs = enemyDefOf(config, state.enemyId).attackIntervalMs;
   // GDD 7.2 v1.7: hit chance shifts 0.5 % per level of difference, mirrored for the enemy.
   const levelDiff = progression.level - state.enemyLevel;
 
@@ -576,15 +671,16 @@ function tickFight(state: EncounterState, config: EncounterConfig): EncounterSte
       const bagFull = drop.item !== null && state.inventory.bag.length >= BAG_CAPACITY;
       const inventory = drop.item ? addToBag(state.inventory, drop.item) : state.inventory;
       if (drop.item) events.push({ type: 'itemFound', item: drop.item, bagFull });
-      const gain = gainXp(progression, enemyXpAt(config, state.enemyLevel));
+      const gain = gainXp(progression, enemyXpAt(config, state.enemyId, state.enemyLevel));
       progression = gain.state;
       // Every level gained heals by exactly its HP bonus (GDD 6.2) - never a full heal.
       for (const level of gain.levelsGained) {
         playerHp += 100; // levelUpDelta().hpBonus is always +1.0 (100 hundredths).
         events.push({ type: 'leveledUp', level });
       }
-      // GDD 8.4: roll the next enemy's level (own Rng stream, like loot).
-      const nextLevel = rollEnemyLevel(config, state.enemyLevelRng);
+      // GDD 8.2/8.4: roll the next enemy's species and level (own Rng stream, like loot).
+      const next = rollEnemy(config, state.enemyLevelRng);
+      const killsByTile = { ...state.killsByTile, [state.tileId]: (state.killsByTile[state.tileId] ?? 0) + 1 };
       // GDD 7.1: after each defeated enemy the next search starts automatically.
       events.push({ type: 'searchStarted' });
       return {
@@ -596,21 +692,23 @@ function tickFight(state: EncounterState, config: EncounterConfig): EncounterSte
           enemyAttackElapsedMs: 0,
           playerHp,
           enemyHp: 0,
-          enemyLevel: nextLevel.level,
-          enemyLevelRng: nextLevel.rng,
+          enemyId: next.enemyId,
+          enemyLevel: next.level,
+          enemyLevelRng: next.rng,
           progression,
           rng,
           loot,
           lootRng,
           inventory,
+          killsByTile,
         },
         events,
       };
     }
   }
 
-  if (enemyAttackElapsedMs >= config.enemyAttackIntervalMs) {
-    enemyAttackElapsedMs -= config.enemyAttackIntervalMs;
+  if (enemyAttackElapsedMs >= enemyAttackIntervalMs) {
+    enemyAttackElapsedMs -= enemyAttackIntervalMs;
     const attack = resolveAttack(enemy, player, config.rules, rng, -levelDiff);
     rng = attack.rng;
     playerHp = Math.max(0, playerHp - attack.result.damage);
@@ -701,14 +799,14 @@ export function attackProgress(
         (state.playerAttackElapsedMs + extraMs) /
           playerAttackIntervalMs(config, state.progression.level, state.inventory.equipment),
       )
-    : clamp01((state.enemyAttackElapsedMs + extraMs) / config.enemyAttackIntervalMs);
+    : clamp01((state.enemyAttackElapsedMs + extraMs) / enemyDefOf(config, state.enemyId).attackIntervalMs);
 }
 
 /** HP bar value 0..1 for one fighter. */
 export function hpFraction(state: EncounterState, config: EncounterConfig, who: Combatant): number {
   return who === 'player'
     ? clamp01(state.playerHp / playerStats(config, state.progression.level, state.inventory.equipment).maxHp)
-    : clamp01(state.enemyHp / enemyStats(config, state.enemyLevel).maxHp);
+    : clamp01(state.enemyHp / enemyStats(config, state.enemyId, state.enemyLevel).maxHp);
 }
 
 function clamp01(value: number): number {

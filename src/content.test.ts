@@ -5,12 +5,21 @@
 import { describe, expect, it } from 'vitest';
 import balance from '../data/balance.json';
 import enemies from '../data/enemies.json';
+import tilesData from '../data/tiles.json';
 import affixesData from '../data/affixes.json';
 import itemsData from '../data/items.json';
 import raritiesData from '../data/rarities.json';
 import en from '../strings/en.json';
 import { toEncounterConfigInput } from './core/content/encounterInput';
-import { parseAffixes, parseBalance, parseEnemies, parseItems, parseRarities, statIdSchema } from './core/content/schemas';
+import {
+  parseAffixes,
+  parseBalance,
+  parseEnemies,
+  parseItems,
+  parseRarities,
+  parseTiles,
+  statIdSchema,
+} from './core/content/schemas';
 import { createEncounterConfig } from './core/encounter/encounter';
 import { EQUIP_SLOTS } from './core/inventory/inventory';
 
@@ -31,16 +40,31 @@ describe('data + strings', () => {
     }
   });
 
-  it('every enemy builds a valid encounter config with the balance values', () => {
+  it('data/tiles.json matches its schema', () => {
+    expect(() => parseTiles(tilesData)).not.toThrow();
+  });
+
+  it("every tile's enemyIds reference a known enemy (M6.2)", () => {
+    const enemyIds = new Set(parseEnemies(enemies).map((e) => e.id));
+    for (const tile of parseTiles(tilesData)) {
+      for (const enemyId of tile.enemyIds) {
+        expect(enemyIds.has(enemyId), `tile ${tile.id} references unknown enemy ${enemyId}`).toBe(true);
+      }
+    }
+  });
+
+  it('every tile builds a valid encounter config with the balance values (M6.2)', () => {
     const validBalance = parseBalance(balance);
+    const allEnemies = parseEnemies(enemies);
     const lootData = {
       items: parseItems(itemsData),
       rarities: parseRarities(raritiesData),
       affixes: parseAffixes(affixesData),
     };
-    for (const enemy of parseEnemies(enemies)) {
+    for (const tile of parseTiles(tilesData)) {
+      const tileEnemies = allEnemies.filter((e) => tile.enemyIds.includes(e.id));
       expect(() =>
-        createEncounterConfig(toEncounterConfigInput(validBalance, enemy, lootData)),
+        createEncounterConfig(toEncounterConfigInput(validBalance, tile, tileEnemies, lootData)),
       ).not.toThrow();
     }
   });

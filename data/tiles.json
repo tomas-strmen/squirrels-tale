@@ -1,0 +1,26 @@
+[
+  {
+    "id": "t1",
+    "tier": 1,
+    "enemyIds": ["worker_ant"],
+    "enemyLevelMin": 1,
+    "enemyLevelMax": 2,
+    "unlockKills": 0
+  },
+  {
+    "id": "t2",
+    "tier": 2,
+    "enemyIds": ["worker_ant", "pill_bug"],
+    "enemyLevelMin": 2,
+    "enemyLevelMax": 4,
+    "unlockKills": 8
+  },
+  {
+    "id": "t3",
+    "tier": 3,
+    "enemyIds": ["armed_ant", "worker_ant"],
+    "enemyLevelMin": 4,
+    "enemyLevelMax": 6,
+    "unlockKills": 15
+  }
+]

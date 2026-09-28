@@ -7,7 +7,9 @@ import {
   itemsSchema,
   parseBalance,
   parseEnemies,
+  parseTiles,
   raritiesSchema,
+  tilesSchema,
 } from './schemas';
 
 describe('idSchema', () => {
@@ -28,7 +30,6 @@ describe('enemiesSchema / parseEnemies', () => {
   const ant = {
     id: 'worker_ant',
     baseLevel: 1,
-    levelMax: 2,
     maxHp: 1.2,
     damageMin: 0.2,
     damageMax: 0.3,
@@ -78,17 +79,45 @@ describe('enemiesSchema / parseEnemies', () => {
     expect(enemiesSchema.safeParse([{ ...ant, baseLevel: 1.5 }]).success).toBe(false);
   });
 
-  it('rejects levelMax below baseLevel (GDD 8.4)', () => {
-    expect(enemiesSchema.safeParse([{ ...ant, baseLevel: 3, levelMax: 2 }]).success).toBe(false);
-    expect(enemiesSchema.safeParse([{ ...ant, baseLevel: 2, levelMax: 2 }]).success).toBe(true);
-  });
-
   it('rejects HP with more than 1 decimal place', () => {
     expect(enemiesSchema.safeParse([{ ...ant, maxHp: 1.25 }]).success).toBe(false);
   });
 
   it('throws a readable error for bad data', () => {
     expect(() => parseEnemies([{ ...ant, id: 'Bad Id' }])).toThrow(/snake_case/);
+  });
+});
+
+describe('tilesSchema / parseTiles (M6.2)', () => {
+  const t1 = { id: 't1', tier: 1, enemyIds: ['worker_ant'], enemyLevelMin: 1, enemyLevelMax: 2, unlockKills: 0 };
+  const t2 = { id: 't2', tier: 2, enemyIds: ['worker_ant', 'pill_bug'], enemyLevelMin: 2, enemyLevelMax: 4, unlockKills: 8 };
+
+  it('accepts valid data', () => {
+    expect(() => parseTiles([t1, t2])).not.toThrow();
+  });
+
+  it('rejects an empty list', () => {
+    expect(tilesSchema.safeParse([]).success).toBe(false);
+  });
+
+  it('rejects duplicate ids', () => {
+    expect(tilesSchema.safeParse([t1, { ...t2, id: 't1' }]).success).toBe(false);
+  });
+
+  it('rejects an empty enemyIds list', () => {
+    expect(tilesSchema.safeParse([{ ...t1, enemyIds: [] }]).success).toBe(false);
+  });
+
+  it('rejects enemyLevelMax below enemyLevelMin', () => {
+    expect(tilesSchema.safeParse([{ ...t1, enemyLevelMin: 5, enemyLevelMax: 4 }]).success).toBe(false);
+  });
+
+  it('rejects a first tile that is not unlocked from the start', () => {
+    expect(tilesSchema.safeParse([{ ...t1, unlockKills: 1 }]).success).toBe(false);
+  });
+
+  it('a later tile may require kills to unlock', () => {
+    expect(tilesSchema.safeParse([t1, t2]).success).toBe(true);
   });
 });
 

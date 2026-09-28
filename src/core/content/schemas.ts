@@ -54,10 +54,12 @@ const damageRangeValid = (v: { damageMin: number; damageMax: number }) =>
 export const enemySchema = z
   .object({
     id: idSchema,
-    /** Lowest level of the tile range where it appears (GDD 8.4, "b"). Stats below are for this level. */
+    /**
+     * Anchor level (GDD 8.4, "b"): the enemy's own lowest level of first appearance, across
+     * every tile it can spawn on. Stats below apply at this level; the tile it fights on
+     * supplies the actual rolled level range (see `tileSchema`).
+     */
     baseLevel: z.number().int().min(1),
-    /** Highest level it can roll to on this tile (GDD 8.4). */
-    levelMax: z.number().int().min(1),
     maxHp: designValueSchema.refine((v) => v > 0, 'must be greater than 0'),
     damageMin: designValueSchema,
     damageMax: designValueSchema,
@@ -68,8 +70,7 @@ export const enemySchema = z
     /** XP granted when defeated at `baseLevel` (GDD 6.2, 8.3); scales with the rolled level. */
     xp: designValueSchema,
   })
-  .refine(damageRangeValid, { message: 'damageMin must not be greater than damageMax' })
-  .refine((e) => e.levelMax >= e.baseLevel, { message: 'levelMax must not be less than baseLevel' });
+  .refine(damageRangeValid, { message: 'damageMin must not be greater than damageMax' });
 export type Enemy = z.infer<typeof enemySchema>;
 
 export const enemiesSchema = z
@@ -77,6 +78,35 @@ export const enemiesSchema = z
   .min(1, 'data/enemies.json must contain at least one enemy')
   .refine((enemies) => new Set(enemies.map((e) => e.id)).size === enemies.length, {
     message: 'enemy ids must be unique',
+  });
+
+/** A map tile (GDD 8.1/8.2): which enemies can spawn there, their rolled level range, and
+ * how many kills on the previous tile unlock this one. Order in the array = map order. */
+export const tileSchema = z
+  .object({
+    id: idSchema,
+    /** Tier used by loot (GDD 9.3/9.6 `minTileTier`) - the tile's own "T" number. */
+    tier: z.number().int().min(1),
+    enemyIds: z.array(idSchema).min(1),
+    /** Level range enemies roll into on this tile (GDD 8.4). */
+    enemyLevelMin: z.number().int().min(1),
+    enemyLevelMax: z.number().int().min(1),
+    /** Kills needed on the *previous* tile in the array to unlock this one (0 = unlocked from the start). */
+    unlockKills: z.number().int().min(0),
+  })
+  .refine((t) => t.enemyLevelMax >= t.enemyLevelMin, {
+    message: 'enemyLevelMax must not be less than enemyLevelMin',
+  });
+export type TileData = z.infer<typeof tileSchema>;
+
+export const tilesSchema = z
+  .array(tileSchema)
+  .min(1, 'data/tiles.json must contain at least one tile')
+  .refine((tiles) => new Set(tiles.map((t) => t.id)).size === tiles.length, {
+    message: 'tile ids must be unique',
+  })
+  .refine((tiles) => tiles[0]?.unlockKills === 0, {
+    message: 'the first tile must be unlocked from the start (unlockKills: 0)',
   });
 
 /** Stats that gear can carry (GDD 9.3 affixes, 9.4 item stats). Values are flat or % (see name). */
@@ -280,6 +310,11 @@ export type Balance = z.infer<typeof balanceSchema>;
 /** Parses data/enemies.json. Throws a ZodError with a readable message if invalid. */
 export function parseEnemies(data: unknown): Enemy[] {
   return enemiesSchema.parse(data);
+}
+
+/** Parses data/tiles.json. Throws a ZodError with a readable message if invalid. */
+export function parseTiles(data: unknown): TileData[] {
+  return tilesSchema.parse(data);
 }
 
 /** Parses data/balance.json. Throws a ZodError with a readable message if invalid. */

@@ -4,10 +4,19 @@ import balanceData from '../../../data/balance.json';
 import enemiesData from '../../../data/enemies.json';
 import itemsData from '../../../data/items.json';
 import raritiesData from '../../../data/rarities.json';
+import tilesData from '../../../data/tiles.json';
 import en from '../../../strings/en.json';
 import { now } from '../../core/clock/clock';
 import { toEncounterConfigInput } from '../../core/content/encounterInput';
-import { parseAffixes, parseBalance, parseEnemies, parseItems, parseRarities } from '../../core/content/schemas';
+import {
+  parseAffixes,
+  parseBalance,
+  parseEnemies,
+  parseItems,
+  parseRarities,
+  parseTiles,
+  type TileData,
+} from '../../core/content/schemas';
 import {
   attackProgress,
   classifyEquip,
@@ -22,6 +31,7 @@ import {
   playerStats,
   searchProgress,
   startSearch,
+  switchTile,
   tick,
   discardBagRarity,
   enemyStats,
@@ -33,6 +43,7 @@ import {
   type EncounterState,
 } from '../../core/encounter/encounter';
 import { hitChancePct } from '../../core/combat/combat';
+import { killsToUnlock, unlockedTileIds } from '../../core/tiles/tiles';
 import { formatHpHundredths, formatHundredths, fromHundredths } from '../../core/numbers/numbers';
 import { regenAmountHundredths, xpToNextLevelHundredths } from '../../core/progression/progression';
 import { createRng } from '../../core/rng/rng';
@@ -76,10 +87,14 @@ export class FightScene extends Phaser.Scene {
   private dropRateIndex = 0;
   private baseDropChanceBp = 0;
 
+  private tiles: TileData[] = [];
+  /** Unmodified per-tile configs (M6.2); `this.config` may additionally have the debug drop rate applied. */
+  private baseConfigByTileId = new Map<string, EncounterConfig>();
+  private tileButtons: Button[] = [];
+
   private player!: Phaser.GameObjects.Rectangle;
   private enemy!: Phaser.GameObjects.Rectangle;
   private enemyNameText!: Phaser.GameObjects.Text;
-  private enemyId!: string;
   private enemyGroup!: Phaser.GameObjects.Container;
   private playerBar!: ProgressBar;
   private playerAttackGroup!: Phaser.GameObjects.Container;
@@ -120,23 +135,31 @@ export class FightScene extends Phaser.Scene {
     // loudly here too, not only in tests.
     const enemies = parseEnemies(enemiesData);
     const balance = parseBalance(balanceData);
-    const enemyData = enemies[0];
-    if (!enemyData) throw new Error('data/enemies.json has no enemies');
-    this.enemyId = enemyData.id;
+    this.tiles = parseTiles(tilesData);
+    const firstTile = this.tiles[0];
+    if (!firstTile) throw new Error('data/tiles.json has no tiles');
 
     const rarities = parseRarities(raritiesData);
     this.rarityColors = new Map(rarities.map((r) => [r.id, r.color]));
     this.rarityRanks = new Map(rarities.map((r, i) => [r.id, i]));
-    this.config = createEncounterConfig(
-      toEncounterConfigInput(balance, enemyData, {
-        items: parseItems(itemsData),
-        rarities,
-        affixes: parseAffixes(affixesData),
-      }),
+    const lootData = { items: parseItems(itemsData), rarities, affixes: parseAffixes(affixesData) };
+    this.baseConfigByTileId = new Map(
+      this.tiles.map((tile) => [
+        tile.id,
+        createEncounterConfig(
+          toEncounterConfigInput(
+            balance,
+            tile,
+            enemies.filter((e) => tile.enemyIds.includes(e.id)),
+            lootData,
+          ),
+        ),
+      ]),
     );
-    this.baseDropChanceBp = this.config.loot.dropChanceBp;
+    this.baseDropChanceBp = this.baseConfigByTileId.get(firstTile.id)!.loot.dropChanceBp;
+    this.config = this.configFor(firstTile.id);
     // Seeded Rng (GDD 5); a new seed per session until saves arrive in M8.
-    this.state = createEncounter(this.config, createRng(now()));
+    this.state = createEncounter(this.config, createRng(now()), firstTile.id);
     this.accumulatorMs = 0;
 
     const textStyle = this.textStyle;
@@ -179,7 +202,7 @@ export class FightScene extends Phaser.Scene {
       .setStrokeStyle(3, 0x4a4a4a);
     // GDD 8.4: level shown next to the name ("Worker Ant Lv1"), rerolled per enemy - see onEvent('enemyFound').
     this.enemyNameText = this.add
-      .text(ENEMY_X, FIGHTER_Y + 90, `${tDynamic(`enemy.${this.enemyId}.name`)} ${t('fight.levelShort')}${this.state.enemyLevel}`, {
+      .text(ENEMY_X, FIGHTER_Y + 90, `${tDynamic(`enemy.${this.state.enemyId}.name`)} ${t('fight.levelShort')}${this.state.enemyLevel}`, {
         ...textStyle,
         fontSize: '26px',
       })
@@ -271,6 +294,16 @@ export class FightScene extends Phaser.Scene {
     );
     this.refreshDropRateButtons();
 
+    // Tile picker (GDD 8.1, M6.2): one button per tile, locked ones show kills still needed.
+    this.tileButtons = this.tiles.map((tile, index) =>
+      new Button(this, 640 + index * 190, 140, '', () => this.onSelectTile(tile.id), {
+        width: 180,
+        height: 60,
+        fontSize: 16,
+      }),
+    );
+    this.refreshTileButtons();
+
     // Player-facing stats panel (Tomas, M3.1): level, XP, HP, damage, hit%, armor.
     this.statsButton = new Button(this, 150, 40, t('stats.button'), () => this.onToggleStats());
     this.statsButton.setScale(0.55);
@@ -351,14 +384,49 @@ export class FightScene extends Phaser.Scene {
 
   private onSelectDropRate(index: number): void {
     this.dropRateIndex = index;
-    const multiplier = DROP_RATE_OPTIONS[index] ?? 1;
-    const dropChanceBp = multiplier === 100 ? 10000 : Math.min(10000, this.baseDropChanceBp * multiplier);
-    this.config = { ...this.config, loot: { ...this.config.loot, dropChanceBp } };
+    this.config = this.configFor(this.state.tileId);
     this.refreshDropRateButtons();
   }
 
   private refreshDropRateButtons(): void {
     this.dropRateButtons.forEach((button, index) => button.setSelected(index === this.dropRateIndex));
+  }
+
+  /** `tileId`'s base config (M6.2) with the debug drop rate override (Tomas) applied. */
+  private configFor(tileId: string): EncounterConfig {
+    const base = this.baseConfigByTileId.get(tileId);
+    if (!base) throw new Error(`No config for tile "${tileId}"`);
+    const multiplier = DROP_RATE_OPTIONS[this.dropRateIndex] ?? 1;
+    const dropChanceBp = multiplier === 100 ? 10000 : Math.min(10000, this.baseDropChanceBp * multiplier);
+    return { ...base, loot: { ...base.loot, dropChanceBp } };
+  }
+
+  /** Player clicked a tile button (GDD 8.1, M6.2). No-op in core if it's already current or still locked. */
+  private onSelectTile(tileId: string): void {
+    const unlocked = unlockedTileIds(this.tiles, this.state.killsByTile);
+    const step = switchTile(this.state, this.configFor(tileId), tileId, unlocked);
+    this.state = step.state;
+    if (step.events.some((e) => e.type === 'tileSwitched')) {
+      this.config = this.configFor(tileId);
+      this.hideFightGroups();
+      this.findButton.setVisible(true);
+    }
+    this.refreshTileButtons();
+  }
+
+  private refreshTileButtons(): void {
+    const unlocked = unlockedTileIds(this.tiles, this.state.killsByTile);
+    this.tileButtons.forEach((button, index) => {
+      const tile = this.tiles[index];
+      if (!tile) return;
+      const name = tDynamic(`tile.${tile.id}.name`);
+      button.setLabel(
+        unlocked.has(tile.id)
+          ? name
+          : `🔒 ${name}\n${t('tile.locked').replace('{kills}', String(killsToUnlock(this.tiles, this.state.killsByTile, tile.id)))}`,
+      );
+      button.setSelected(tile.id === this.state.tileId);
+    });
   }
 
   private onToggleStats(): void {
@@ -386,7 +454,7 @@ export class FightScene extends Phaser.Scene {
         regenAmountHundredths(fromHundredths(this.config.regenAmount), level, this.config.regenGrowthPctPerLevel),
       )} / ${(this.config.regenIntervalMs / 1000).toFixed(1)} s`,
       // Against the current enemy (level difference, GDD 7.2 v1.7); floor to 0.1 for display.
-      `${t('stats.hitChance')}: ${(Math.floor(hitChancePct(stats, enemyStats(this.config, this.state.enemyLevel), this.config.rules, level - this.state.enemyLevel) * 10) / 10).toFixed(1)} %`,
+      `${t('stats.hitChance')}: ${(Math.floor(hitChancePct(stats, enemyStats(this.config, this.state.enemyId, this.state.enemyLevel), this.config.rules, level - this.state.enemyLevel) * 10) / 10).toFixed(1)} %`,
       `${t('stats.armor')}: ${formatHundredths(stats.armor)}`,
     ]);
   }
@@ -422,6 +490,7 @@ export class FightScene extends Phaser.Scene {
     this.levelText.setText(`${t('stats.level')} ${this.state.progression.level}`);
     if (this.statsPanel.visible) this.refreshStatsPanel();
     if (this.lootPanel.visible) this.refreshLootPanel();
+    this.refreshTileButtons();
     this.timeText.setText(`${t('hud.time')}: ${formatDuration(this.simElapsedMs)}`);
     // One line per pity rarity that can drop here (GDD 9.6 v2.2); locked ones stay hidden.
     const countdowns = pityCountdowns(this.state.loot, this.config.loot, {
@@ -439,7 +508,7 @@ export class FightScene extends Phaser.Scene {
     if (this.state.phase === 'fighting') {
       this.enemyHpBar.setProgress(hpFraction(this.state, this.config, 'enemy'));
       this.enemyHpText.setText(
-        `${formatHpHundredths(this.state.enemyHp)} / ${formatHundredths(enemyStats(this.config, this.state.enemyLevel).maxHp)}`,
+        `${formatHpHundredths(this.state.enemyHp)} / ${formatHundredths(enemyStats(this.config, this.state.enemyId, this.state.enemyLevel).maxHp)}`,
       );
     }
   }
@@ -465,7 +534,7 @@ export class FightScene extends Phaser.Scene {
         break;
       case 'enemyFound':
         // GDD 8.4: level rolled per encounter within the enemy's range.
-        this.enemyNameText.setText(`${tDynamic(`enemy.${this.enemyId}.name`)} ${t('fight.levelShort')}${this.state.enemyLevel}`);
+        this.enemyNameText.setText(`${tDynamic(`enemy.${this.state.enemyId}.name`)} ${t('fight.levelShort')}${this.state.enemyLevel}`);
         this.searchGroup.setVisible(false);
         this.tweens.killTweensOf(this.enemyGroup);
         this.enemy.setAlpha(1);
@@ -480,7 +549,7 @@ export class FightScene extends Phaser.Scene {
       case 'enemyDefeated':
         // Enemy bar shows 0 before it fades; next search starts in the same tick.
         this.enemyHpBar.setProgress(0);
-        this.enemyHpText.setText(`0.0 / ${formatHundredths(enemyStats(this.config, this.state.enemyLevel).maxHp)}`);
+        this.enemyHpText.setText(`0.0 / ${formatHundredths(enemyStats(this.config, this.state.enemyId, this.state.enemyLevel).maxHp)}`);
         this.playerAttackGroup.setVisible(false);
         this.tweens.add({
           targets: this.enemyGroup,

@@ -20,10 +20,12 @@ import {
   hideoutProgress,
   searchProgress,
   startSearch,
+  switchTile,
   tick,
   unequipItem,
   type EncounterConfig,
   type EncounterConfigInput,
+  type EncounterEnemyInput,
   type EncounterEvent,
   type EncounterState,
 } from './encounter';
@@ -38,7 +40,19 @@ const rules = {
   minAttackIntervalS: 0.5,
 };
 const squirrelInput = { maxHp: 5.0, damageMin: 0.3, damageMax: 0.4, hitPct: 85, armor: 0, dodgePct: 0 };
-const antInput = { maxHp: 1.2, damageMin: 0.2, damageMax: 0.3, hitPct: 65, armor: 0, dodgePct: 0 };
+/** A tile's only enemy, base level 1 (so `enemyLevelMin: 1` means "no levels above base"). */
+const antInput: EncounterEnemyInput = {
+  id: 'worker_ant',
+  baseLevel: 1,
+  maxHp: 1.2,
+  damageMin: 0.2,
+  damageMax: 0.3,
+  attackIntervalS: 3.0,
+  hitPct: 65,
+  armor: 0,
+  dodgePct: 0,
+  xp: 2,
+};
 // GDD 8.4. Zeroed out in tests that need a fixed enemy level with no stat scaling confound.
 const enemyLeveling = { hpPctPerLevel: 10, damagePctPerLevel: 5, xpPctPerLevel: 10, dodgePctPerLevel: 0.5, maxDodgePct: 40 };
 const noEnemyLeveling = { hpPctPerLevel: 0, damagePctPerLevel: 0, xpPctPerLevel: 0, dodgePctPerLevel: 0, maxDodgePct: 40 };
@@ -54,15 +68,13 @@ function makeConfig(patch: Partial<EncounterConfigInput> = {}): EncounterConfig 
   return createEncounterConfig({
     searchDurationS: 1.0,
     playerAttackIntervalS: 2.0,
-    enemyAttackIntervalS: 3.0,
     playerAttackSpeedPctPerLevel: 1,
     offHandDamagePct: 50,
     player: squirrelInput,
-    enemy: antInput,
+    enemies: [antInput],
     enemyLevelMin: 1,
     enemyLevelMax: 1,
     enemyLeveling,
-    enemyXp: 2,
     rules,
     regenAmount: 0.1,
     regenIntervalS: 2.0,
@@ -80,7 +92,7 @@ const config = makeConfig();
 /** Nobody can die: for timing tests. */
 const tanky = makeConfig({
   player: { ...squirrelInput, maxHp: 999.0 },
-  enemy: { ...antInput, maxHp: 999.0 },
+  enemies: [{ ...antInput, maxHp: 999.0 }],
   regenAmount: 0, // isolates attack-timing/damage tests from passive regen
 });
 
@@ -103,7 +115,7 @@ function run(
 }
 
 function fresh(cfg: EncounterConfig = config, seed = 1): EncounterState {
-  return createEncounter(cfg, createRng(seed));
+  return createEncounter(cfg, createRng(seed), 't1');
 }
 
 function fighting(cfg: EncounterConfig = config, seed = 1): EncounterState {
@@ -145,16 +157,16 @@ describe('createEncounterConfig', () => {
   it('converts seconds to milliseconds and stats to hundredths', () => {
     expect(config.searchMs).toBe(1000);
     expect(config.playerAttackIntervalMs).toBe(2000);
-    expect(config.enemyAttackIntervalMs).toBe(3000);
-    expect(config.enemyBase.maxHp).toBe(120);
-    expect(config.enemyXp).toBe(200);
+    expect(config.enemies[0]?.attackIntervalMs).toBe(3000);
+    expect(config.enemies[0]?.base.maxHp).toBe(120);
+    expect(config.enemies[0]?.xp).toBe(200);
     expect(config.rules.minDamage).toBe(10);
   });
 
   it('rejects zero or invalid durations', () => {
     expect(() => makeConfig({ searchDurationS: 0 })).toThrow();
     expect(() => makeConfig({ playerAttackIntervalS: 0 })).toThrow();
-    expect(() => makeConfig({ enemyAttackIntervalS: 0.25 })).toThrow();
+    expect(() => makeConfig({ enemies: [{ ...antInput, attackIntervalS: 0.25 }] })).toThrow();
   });
 
   it('rejects an invalid enemy level range', () => {
@@ -163,42 +175,53 @@ describe('createEncounterConfig', () => {
     expect(() => makeConfig({ enemyLevelMax: 0 })).toThrow(); // below enemyLevelMin (1)
   });
 
+  it('rejects an empty enemy list', () => {
+    expect(() => makeConfig({ enemies: [] })).toThrow();
+  });
+
   it('rejects an invalid player base (e.g. 0 HP)', () => {
     expect(() => makeConfig({ player: { ...squirrelInput, maxHp: 0 } })).toThrow();
   });
 });
 
 describe('enemyStats / enemyXpAt (GDD 8.4, M6.1)', () => {
-  const cfg = makeConfig({ enemyLevelMin: 3, enemyLevelMax: 5 });
+  const enemyId = 'worker_ant';
+  const cfg = makeConfig({ enemies: [{ ...antInput, baseLevel: 3 }], enemyLevelMin: 3, enemyLevelMax: 5 });
+  const base = () => cfg.enemies[0]!;
 
   it('equals the base stats at enemyLevelMin (no levels above base)', () => {
-    expect(enemyStats(cfg, 3)).toEqual(cfg.enemyBase);
-    expect(enemyXpAt(cfg, 3)).toBe(cfg.enemyXp);
+    expect(enemyStats(cfg, enemyId, 3)).toEqual(base().base);
+    expect(enemyXpAt(cfg, enemyId, 3)).toBe(base().xp);
   });
 
-  it('scales HP/damage/dodge/XP per level above enemyLevelMin', () => {
+  it('scales HP/damage/dodge/XP per level above its own baseLevel', () => {
     // 2 levels above: +20 % HP, +10 % damage, +1.0 dodge, +20 % XP.
-    const s = enemyStats(cfg, 5);
-    expect(s.maxHp).toBe(Math.round(cfg.enemyBase.maxHp * 1.2));
-    expect(s.damageMin).toBe(Math.round(cfg.enemyBase.damageMin * 1.1));
-    expect(s.damageMax).toBe(Math.round(cfg.enemyBase.damageMax * 1.1));
-    expect(s.dodgePct).toBeCloseTo(cfg.enemyBase.dodgePct + 1.0);
-    expect(enemyXpAt(cfg, 5)).toBe(Math.round(cfg.enemyXp * 1.2));
+    const s = enemyStats(cfg, enemyId, 5);
+    expect(s.maxHp).toBe(Math.round(base().base.maxHp * 1.2));
+    expect(s.damageMin).toBe(Math.round(base().base.damageMin * 1.1));
+    expect(s.damageMax).toBe(Math.round(base().base.damageMax * 1.1));
+    expect(s.dodgePct).toBeCloseTo(base().base.dodgePct + 1.0);
+    expect(enemyXpAt(cfg, enemyId, 5)).toBe(Math.round(base().xp * 1.2));
   });
 
   it('caps dodge at maxDodgePct', () => {
     const highDodge = makeConfig({
-      enemy: { ...antInput, dodgePct: 39 },
+      enemies: [{ ...antInput, baseLevel: 1, dodgePct: 39 }],
       enemyLevelMin: 1,
       enemyLevelMax: 20,
     });
-    expect(enemyStats(highDodge, 20).dodgePct).toBe(enemyLeveling.maxDodgePct);
+    expect(enemyStats(highDodge, enemyId, 20).dodgePct).toBe(enemyLeveling.maxDodgePct);
   });
 
   it('with no leveling configured, stats never change across the range', () => {
-    const flat = makeConfig({ enemyLevelMin: 1, enemyLevelMax: 10, enemyLeveling: noEnemyLeveling });
-    expect(enemyStats(flat, 10)).toEqual(flat.enemyBase);
-    expect(enemyXpAt(flat, 10)).toBe(flat.enemyXp);
+    const flat = makeConfig({
+      enemies: [{ ...antInput, baseLevel: 1 }],
+      enemyLevelMin: 1,
+      enemyLevelMax: 10,
+      enemyLeveling: noEnemyLeveling,
+    });
+    expect(enemyStats(flat, enemyId, 10)).toEqual(flat.enemies[0]!.base);
+    expect(enemyXpAt(flat, enemyId, 10)).toBe(flat.enemies[0]!.xp);
   });
 });
 
@@ -219,6 +242,22 @@ describe('enemy level rolling (GDD 8.4, M6.1)', () => {
   it('a fixed range (enemyLevelMin === enemyLevelMax) never rolls (nextInt would throw on equal bounds)', () => {
     const cfg = makeConfig({ enemyLevelMin: 4, enemyLevelMax: 4 });
     expect(fresh(cfg).enemyLevel).toBe(4);
+  });
+
+  it('picks a random species from a multi-enemy tile (GDD 8.2, M6.2)', () => {
+    const pillBug: EncounterEnemyInput = { ...antInput, id: 'pill_bug', baseLevel: 2, armor: 1.0 };
+    const cfg = makeConfig({ enemies: [antInput, pillBug], enemyLevelMin: 1, enemyLevelMax: 4 });
+    let state = fresh(cfg);
+    const seenIds = new Set<string>();
+    for (let i = 0; i < 30; i++) {
+      seenIds.add(state.enemyId);
+      state = run(startSearch(state).state, 10000, cfg).state;
+    }
+    expect(seenIds).toEqual(new Set(['worker_ant', 'pill_bug']));
+  });
+
+  it('a single-species tile never rolls the species (deterministic, unaffected by other tiles)', () => {
+    expect(fresh().enemyId).toBe('worker_ant');
   });
 });
 
@@ -322,7 +361,7 @@ describe('encounter', () => {
     };
     const strongEnemy = makeConfig({
       player: { ...squirrelInput, maxHp: 999.0 },
-      enemy: { ...antInput, maxHp: 999.0 },
+      enemies: [{ ...antInput, maxHp: 999.0 }],
       enemyLevelMin: 21, // 20 levels above the squirrel: -10 % for her, +10 % for the enemy
       enemyLevelMax: 21,
     });
@@ -352,7 +391,7 @@ describe('encounter', () => {
 
   it('when the enemy dies, the next search starts at once and grants XP', () => {
     // A 0.1 HP enemy dies from the first hit; xp 5.0 (< 10.0 needed for Lv2, no level-up here).
-    const fragile = makeConfig({ enemy: { ...antInput, maxHp: 0.1, hitPct: 0 }, enemyXp: 5.0 });
+    const fragile = makeConfig({ enemies: [{ ...antInput, maxHp: 0.1, hitPct: 0, xp: 5.0 }] });
     const { state, log } = runUntil(fighting(fragile), fragile, (e) => e.type === 'enemyDefeated');
     const defeatTick = log.find((l) => l.event.type === 'enemyDefeated')?.tick;
     const sameTick = log.filter((l) => l.tick === defeatTick).map((l) => l.event.type);
@@ -362,7 +401,7 @@ describe('encounter', () => {
   });
 
   it('leveling up from a kill heals by exactly the HP bonus and raises max HP', () => {
-    const fragile = makeConfig({ enemy: { ...antInput, maxHp: 0.1, hitPct: 0 }, enemyXp: 10.0 });
+    const fragile = makeConfig({ enemies: [{ ...antInput, maxHp: 0.1, hitPct: 0, xp: 10.0 }] });
     const before = fighting(fragile);
     const { state, log } = runUntil(before, fragile, (e) => e.type === 'leveledUp');
     const defeatTick = log.find((l) => l.event.type === 'enemyDefeated')?.tick;
@@ -381,7 +420,7 @@ describe('encounter', () => {
 
   it('can level up more than once from a single big XP gain', () => {
     // Lv1 needs 10.0, Lv2 needs 14.0 -> a 25.0 XP kill takes the squirrel to level 3.
-    const fragile = makeConfig({ enemy: { ...antInput, maxHp: 0.1, hitPct: 0 }, enemyXp: 25.0 });
+    const fragile = makeConfig({ enemies: [{ ...antInput, maxHp: 0.1, hitPct: 0, xp: 25.0 }] });
     const { state, log } = runUntil(fighting(fragile), fragile, (e) => e.type === 'enemyDefeated');
     const levelUps = log.filter((l) => l.event.type === 'leveledUp').map((l) => l.event);
     expect(levelUps).toEqual([
@@ -391,9 +430,15 @@ describe('encounter', () => {
     expect(state.progression.level).toBe(3);
   });
 
+  it('tracks kills per tile (M6.2): increments killsByTile[tileId] on each kill', () => {
+    const fragile = makeConfig({ enemies: [{ ...antInput, maxHp: 0.1, hitPct: 0 }] });
+    const { state } = runUntil(fighting(fragile), fragile, (e) => e.type === 'enemyDefeated');
+    expect(state.killsByTile).toEqual({ t1: 1 });
+  });
+
   it('kills can drop items (GDD 9.6): itemFound right after enemyDefeated, kept in foundItems', () => {
     const lucky = makeConfig({
-      enemy: { ...antInput, maxHp: 0.1, hitPct: 0 },
+      enemies: [{ ...antInput, maxHp: 0.1, hitPct: 0 }],
       loot: { ...lootInput, balance: { ...lootInput.balance, dropChancePct: 100 } },
     });
     const { state, log } = runUntil(fighting(lucky), lucky, (e) => e.type === 'enemyDefeated');
@@ -500,7 +545,7 @@ describe('encounter', () => {
     // enemy is due too. The enemy has 0.1 HP, so the first hit kills it.
     const cfg = makeConfig({
       playerAttackIntervalS: 3.0,
-      enemy: { ...antInput, maxHp: 0.1 },
+      enemies: [{ ...antInput, maxHp: 0.1 }],
     });
     for (let seed = 1; seed <= 20; seed++) {
       const { log } = run(fighting(cfg, seed), 200, cfg);
@@ -511,7 +556,7 @@ describe('encounter', () => {
   });
 
   const deadly = makeConfig({
-    enemy: { ...antInput, maxHp: 999.0, damageMin: 5.0, damageMax: 5.0, hitPct: 100 },
+    enemies: [{ ...antInput, maxHp: 999.0, damageMin: 5.0, damageMax: 5.0, hitPct: 100 }],
   });
   /** A squirrel already mid-level, with XP progress to lose, about to get one-shot. */
   function aboutToDie(): EncounterState {
@@ -630,6 +675,43 @@ describe('makePeace (GDD 7.1)', () => {
   });
 });
 
+describe('switchTile (GDD 8.1, M6.2)', () => {
+  const t2Config = makeConfig({
+    enemies: [{ ...antInput, id: 'pill_bug', baseLevel: 2, armor: 1.0 }],
+    enemyLevelMin: 2,
+    enemyLevelMax: 2,
+  });
+
+  it('is a no-op for the tile she is already on', () => {
+    const state = fresh();
+    const r = switchTile(state, config, 't1', new Set(['t1', 't2']));
+    expect(r).toEqual({ state, events: [] });
+  });
+
+  it('refuses a tile that is not unlocked', () => {
+    const state = fresh();
+    const r = switchTile(state, t2Config, 't2', new Set(['t1']));
+    expect(r).toEqual({ state, events: [] });
+  });
+
+  it('interrupts the current fight, rolls a fresh enemy, keeps HP/progression/inventory/kills', () => {
+    const midFight: EncounterState = {
+      ...fighting(),
+      progression: { level: 3, xp: 50 },
+      killsByTile: { t1: 8 },
+    };
+    const r = switchTile(midFight, t2Config, 't2', new Set(['t1', 't2']));
+    expect(r.events).toEqual([{ type: 'tileSwitched', tileId: 't2' }]);
+    expect(r.state.tileId).toBe('t2');
+    expect(r.state.phase).toBe('idle');
+    expect(r.state.enemyId).toBe('pill_bug');
+    expect(r.state.enemyLevel).toBe(2);
+    expect(r.state.playerHp).toBe(midFight.playerHp);
+    expect(r.state.progression).toEqual({ level: 3, xp: 50 });
+    expect(r.state.killsByTile).toEqual({ t1: 8 });
+  });
+});
+
 describe('passive HP regeneration (GDD 6.1/7.1)', () => {
   it('heals 0.1 HP every 2.0 s while idle', () => {
     const hurt = { ...fresh(), playerHp: 100 };
@@ -656,7 +738,7 @@ describe('passive HP regeneration (GDD 6.1/7.1)', () => {
 
   it('does not regenerate while in the hideout (that has its own fixed recovery)', () => {
     const deadly = makeConfig({
-      enemy: { ...antInput, maxHp: 999.0, damageMin: 5.0, damageMax: 5.0, hitPct: 100 },
+      enemies: [{ ...antInput, maxHp: 999.0, damageMin: 5.0, damageMax: 5.0, hitPct: 100 }],
     });
     const inHideout = runUntil(fighting(deadly), deadly, (e) => e.type === 'playerDefeated').state;
     expect(run(inHideout, 20, deadly).state.playerHp).toBe(0);

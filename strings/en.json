@@ -78,5 +78,9 @@
   "stat.dodgePct.name": "Dodge",
   "stat.stunChancePct.name": "Stun chance",
   "player.name": "Squirrel",
-  "enemy.worker_ant.name": "Worker Ant"
+  "enemy.worker_ant.name": "Worker Ant",
+  "enemy.pill_bug.name": "Pill Bug",
+  "tile.t1.name": "Fallen Nest",
+  "tile.t2.name": "Mossy Roots",
+  "tile.locked": "{kills} kills to unlock"
 }

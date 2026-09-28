@@ -11,8 +11,9 @@ record in the JSON, never new code here.
   schemas for `data/enemies.json` and `data/balance.json` (enemy includes `xp` and its own
   anchor `baseLevel`, GDD 6.2/8.3/8.4).
 - `tileSchema` / `tilesSchema` (+ `TileData` type, M6.2) – schema for `data/tiles.json`: which
-  enemies can spawn on a tile, their rolled level range, and kills needed on the *previous*
-  tile in the array to unlock it (array order = map order, first tile always unlocked).
+  enemies can spawn on a tile, their rolled level range, kills needed on the *previous* tile in
+  the array to unlock it (array order = map order, first tile always unlocked), and an optional
+  `unlockLevel` (GDD 8.2, e.g. a future T4: 30 kills + Lv 5).
 - `designValueSchema`, `percentSchema` – HP/damage/armor (max. 1 decimal) and whole percentages.
 - `parseEnemies(data)`, `parseBalance(data)`, `parseTiles(data)` – parse + throw a readable
   `ZodError` if the data is invalid.

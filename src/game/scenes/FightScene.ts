@@ -403,7 +403,7 @@ export class FightScene extends Phaser.Scene {
 
   /** Player clicked a tile button (GDD 8.1, M6.2). No-op in core if it's already current or still locked. */
   private onSelectTile(tileId: string): void {
-    const unlocked = unlockedTileIds(this.tiles, this.state.killsByTile);
+    const unlocked = unlockedTileIds(this.tiles, this.state.killsByTile, this.state.progression.level);
     const step = switchTile(this.state, this.configFor(tileId), tileId, unlocked);
     this.state = step.state;
     if (step.events.some((e) => e.type === 'tileSwitched')) {
@@ -415,7 +415,7 @@ export class FightScene extends Phaser.Scene {
   }
 
   private refreshTileButtons(): void {
-    const unlocked = unlockedTileIds(this.tiles, this.state.killsByTile);
+    const unlocked = unlockedTileIds(this.tiles, this.state.killsByTile, this.state.progression.level);
     this.tileButtons.forEach((button, index) => {
       const tile = this.tiles[index];
       if (!tile) return;

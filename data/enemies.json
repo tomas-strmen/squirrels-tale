@@ -22,5 +22,17 @@
     "armor": 1.0,
     "dodgePct": 0,
     "xp": 3
+  },
+  {
+    "id": "armed_ant",
+    "baseLevel": 4,
+    "maxHp": 2.5,
+    "damageMin": 0.3,
+    "damageMax": 0.5,
+    "attackIntervalS": 2.8,
+    "hitPct": 70,
+    "armor": 0,
+    "dodgePct": 0,
+    "xp": 4
   }
 ]

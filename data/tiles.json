@@ -14,5 +14,13 @@
     "enemyLevelMin": 2,
     "enemyLevelMax": 4,
     "unlockKills": 8
+  },
+  {
+    "id": "t3",
+    "tier": 3,
+    "enemyIds": ["armed_ant", "worker_ant"],
+    "enemyLevelMin": 4,
+    "enemyLevelMax": 6,
+    "unlockKills": 15
   }
 ]

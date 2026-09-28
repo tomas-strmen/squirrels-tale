@@ -9,10 +9,11 @@
  */
 import type { TileData } from '../content/schemas';
 
-/** Whether `tileId` is unlocked given kills so far on each tile visited. */
+/** Whether `tileId` is unlocked given kills so far on each tile visited and the player's level. */
 export function isTileUnlocked(
   tiles: readonly TileData[],
   killsByTile: Readonly<Record<string, number>>,
+  playerLevel: number,
   tileId: string,
 ): boolean {
   const index = tiles.findIndex((t) => t.id === tileId);
@@ -20,6 +21,7 @@ export function isTileUnlocked(
   const previous = tiles[index - 1];
   const tile = tiles[index];
   if (!previous || !tile) return false;
+  if (tile.unlockLevel !== undefined && playerLevel < tile.unlockLevel) return false;
   return (killsByTile[previous.id] ?? 0) >= tile.unlockKills;
 }
 
@@ -27,11 +29,12 @@ export function isTileUnlocked(
 export function unlockedTileIds(
   tiles: readonly TileData[],
   killsByTile: Readonly<Record<string, number>>,
+  playerLevel: number,
 ): ReadonlySet<string> {
-  return new Set(tiles.filter((t) => isTileUnlocked(tiles, killsByTile, t.id)).map((t) => t.id));
+  return new Set(tiles.filter((t) => isTileUnlocked(tiles, killsByTile, playerLevel, t.id)).map((t) => t.id));
 }
 
-/** Kills still needed on the previous tile to unlock `tileId` (0 once it's unlocked). */
+/** Kills still needed on the previous tile to unlock `tileId` (0 once it's unlocked). Ignores `unlockLevel`. */
 export function killsToUnlock(
   tiles: readonly TileData[],
   killsByTile: Readonly<Record<string, number>>,

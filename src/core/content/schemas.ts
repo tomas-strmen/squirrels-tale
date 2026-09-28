@@ -93,6 +93,8 @@ export const tileSchema = z
     enemyLevelMax: z.number().int().min(1),
     /** Kills needed on the *previous* tile in the array to unlock this one (0 = unlocked from the start). */
     unlockKills: z.number().int().min(0),
+    /** Player level also needed to unlock this tile (GDD 8.2, e.g. T3: 30 kills + Lv 5); omitted = none. */
+    unlockLevel: z.number().int().min(1).optional(),
   })
   .refine((t) => t.enemyLevelMax >= t.enemyLevelMin, {
     message: 'enemyLevelMax must not be less than enemyLevelMin',

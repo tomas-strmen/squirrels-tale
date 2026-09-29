@@ -2,13 +2,31 @@
 
 ## Aktuálne
 - **Etapa:** M6 Mapa (GDD kap. 8, 22) – M5 Inventár a výbava hotová ✅
-- **Posledný krok:** M6.2b – políčko T3 (Ant Trail), voliteľné odomknutie podľa levelu v schéme – otestované a zmergnuté
-- **Ďalší krok:** M6.2c – ďalšie políčka T4-T9 vrátane bossov (Ant Captain, Grass Snake) a odomykania questom; T4 ako prvé využije `unlockLevel` (30 zabití + Lv 5)
+- **Posledný krok:** Loot v2.4 – drop tabuľky a vzácnosť per nepriateľ (GDD 9.3/9.5/9.6, mimo poradia M6) – otestované a zmergnuté
+- **Rozpracované:** M6.2c – políčko T4 (Anthill, Ant Soldier, `unlockLevel` 30 zabití + Lv 5) + oprava pádu lootu na T4 – hotové na vetve `m6.2c-tile4`, čaká na Tomasov test/merge (vetva je ešte založená na starom `main`, treba merge/rebase cez lootom pridané zmeny)
+- **Ďalší krok:** po zmergovaní M6.2c: loot krok 3 (doladenie čísel v drop tabuľkách) a krok 4 (editor drop tabuliek); v M6 zvyšné políčka T5-T9 vrátane bossov a odomykania questom
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model: podľa náročnosti kroku (poviem vopred). Od teraz: AI pripraví vetvu/commit/push a dá Tomasovi presné príkazy/odkaz na PR, test a merge robí Tomas sám (šetrí tokeny oproti ovládaniu prehliadača).
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.
 
 ## Hotové
+### Loot v2.4 – drop tabuľky per nepriateľ (2026-09-29)
+- GDD 9.3/9.5/9.6: nahradené spoločné pravidlá (výber predmetu z tabuľky políčka, globálne váhy
+  vzácnosti) za vlastnú drop tabuľku a tabuľku váh vzácnosti pre **každého nepriateľa**, obe
+  škálované jeho vlastným `minLevel`/`maxLevel` (nezávisle od políčka). Z jedného zabitia môže
+  padnúť 0, 1 aj viac predmetov naraz (každá položka sa hodí samostatne).
+- Unikátne/set predmety sú vlastný riadok v tabuľke s pevnou vzácnosťou - starý fallback „unique
+  bez kusu → Rare" už nemôže nastať. Pity nezmenené (garantuje aspoň danú vzácnosť aj mimo tabuliek).
+- `data/rarities.json` stratil `weight`/`minTileTier` (len metadáta: farba, násobok, afixy, MF,
+  quest zámok). `data/enemies.json`: Worker Ant/Pill Bug/Armed Ant majú vyplnené tabuľky
+  (štartovacie čísla podľa starých globálnych váh - treba doladiť, krok 3 nižšie).
+- `FightScene`: kocky/popupy pri viacerých dropoch naraz idú vedľa seba (nie postupne); debug
+  „Drop rate" tlačidlo teraz škáluje % každej položky v tabuľke aktuálneho nepriateľa.
+- 262 testov zelených (bolo 250). Tomas otestoval (aj po reštarte dev servera kvôli Vite cache
+  po prepnutí vetvy) a zmergoval (PR #25).
+- **Ďalšie kroky (mimo tohto):** 3 – doladiť konkrétne % a váhy v tabuľkách; 4 – editor na
+  pohodlnú úpravu tabuliek (návrh príde samostatne, záleží od finálnej schémy).
+
 ### M6.2b – políčko T3 (2026-09-29)
 - `data/tiles.json`: T3 Ant Trail (Armed Ant + Worker Ant, Lv 4-6), odomkne sa po 15 zabitiach
   na T2 (GDD 8.2). Nový nepriateľ Armed Ant (`data/enemies.json`, GDD 8.3).

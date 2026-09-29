@@ -120,7 +120,7 @@ export class FightScene extends Phaser.Scene {
   private lootPanel!: ItemsPanel;
   private rarityColors = new Map<string, string>();
   /** Multiple items can drop from one kill now (GDD 9.3 v2.4) - their dice rolls queue up. */
-  private diceQueue: { item: Item; bagFull: boolean }[] = [];
+  private diceQueue: { item: Item; bagFull: boolean }[][] = [];
   private diceAnimating = false;
   /** M5.2b2: rarities.json order = value, for the bag's "Sort: Rarity". */
   private rarityRanks = new Map<string, number>();
@@ -489,7 +489,14 @@ export class FightScene extends Phaser.Scene {
     for (let i = 0; i < frame.steps; i++) {
       const step = tick(this.state, this.config);
       this.state = step.state;
-      step.events.forEach((e) => this.onEvent(e));
+      // Every item a single kill drops (GDD 9.3 v2.4) arrives as its own event in this same
+      // step - group them so their dice roll side by side instead of one after another.
+      const found: { item: Item; bagFull: boolean }[] = [];
+      for (const e of step.events) {
+        if (e.type === 'itemFound') found.push({ item: e.item, bagFull: e.bagFull });
+        else this.onEvent(e);
+      }
+      if (found.length > 0) this.queueDiceGroup(found);
     }
     // accumulatorMs (< 1 tick, always > 0) smooths the bars between ticks for
     // rendering only - it never changes the simulation state itself.
@@ -576,9 +583,6 @@ export class FightScene extends Phaser.Scene {
           onComplete: () => this.enemyGroup.setVisible(false),
         });
         break;
-      case 'itemFound':
-        this.queueDice(event.item, event.bagFull);
-        break;
       case 'leveledUp':
         this.floatingText(PLAYER_X, FIGHTER_Y - 100, t('fight.leveledUp'), '#ffe08a', 1200);
         break;
@@ -620,43 +624,62 @@ export class FightScene extends Phaser.Scene {
 
   /**
    * A kill can now drop several items at once (GDD 9.3 v2.4: each drop-table entry rolls
-   * independently) - their dice rolls/popups queue and play one after another.
+   * independently) - one kill's items roll side by side; a later kill's items queue behind them.
    */
-  private queueDice(item: Item, bagFull: boolean): void {
-    this.diceQueue.push({ item, bagFull });
+  private queueDiceGroup(entries: { item: Item; bagFull: boolean }[]): void {
+    this.diceQueue.push(entries);
     if (!this.diceAnimating) this.processDiceQueue();
   }
 
   private processDiceQueue(): void {
-    const next = this.diceQueue.shift();
-    if (!next) {
+    const group = this.diceQueue.shift();
+    if (!group) {
       this.diceAnimating = false;
       return;
     }
     this.diceAnimating = true;
-    this.rollDice(next.item, next.bagFull, () => this.processDiceQueue());
+    this.rollDiceGroup(group, () => this.processDiceQueue());
   }
 
-  /** GDD 9.6: one d20 (two for Unique/Set/Legendary), then the "Found: ..." popup. */
-  private rollDice(item: Item, bagFull: boolean, onDone: () => void): void {
-    const faces = diceFaces(item, this.config.loot);
-    const dice: Dice[] = [faces.second === null ? new Dice(this, W / 2, 220) : new Dice(this, W / 2 - 40, 220)];
-    let remaining = 1;
-    const onAllDone = () => {
-      remaining -= 1;
-      if (remaining > 0) return;
-      dice.forEach((d) => d.destroyDelayed(400));
-      // M5.2a: bag was at BAG_CAPACITY, the item was rolled but not kept.
-      const label = bagFull ? `${t('loot.found')}: ${itemName(item)} (${t('loot.bagFull')})` : `${t('loot.found')}: ${itemName(item)}`;
-      this.floatingText(PLAYER_X, FIGHTER_Y - 130, label, bagFull ? '#ff9f9f' : this.rarityColors.get(item.rarityId) ?? '#ffffff', 1800);
+  /** GDD 9.6: one d20 per item (two for Unique/Set/Legendary), side by side, then the "Found: ..." popups. */
+  private rollDiceGroup(entries: { item: Item; bagFull: boolean }[], onDone: () => void): void {
+    const SLOT_WIDTH = 140;
+    const startX = W / 2 - ((entries.length - 1) * SLOT_WIDTH) / 2;
+    const allDice: Dice[] = [];
+    let remainingDice = 0;
+
+    const onAllDiceDone = () => {
+      remainingDice -= 1;
+      if (remainingDice > 0) return;
+      allDice.forEach((d) => d.destroyDelayed(400));
+      entries.forEach(({ item, bagFull }, i) => {
+        // M5.2a: bag was at BAG_CAPACITY, the item was rolled but not kept.
+        const label = bagFull ? `${t('loot.found')}: ${itemName(item)} (${t('loot.bagFull')})` : `${t('loot.found')}: ${itemName(item)}`;
+        this.floatingText(
+          PLAYER_X,
+          FIGHTER_Y - 130 - i * 26,
+          label,
+          bagFull ? '#ff9f9f' : this.rarityColors.get(item.rarityId) ?? '#ffffff',
+          1800,
+        );
+      });
       onDone();
     };
-    if (faces.second !== null) {
-      remaining = 2;
-      dice.push(new Dice(this, W / 2 + 40, 220, true));
-      dice[1]?.roll(faces.second, onAllDone);
-    }
-    dice[0]?.roll(faces.first, onAllDone);
+
+    entries.forEach(({ item }, i) => {
+      const slotX = startX + i * SLOT_WIDTH;
+      const faces = diceFaces(item, this.config.loot);
+      const dice = [faces.second === null ? new Dice(this, slotX, 220) : new Dice(this, slotX - 30, 220)];
+      remainingDice += 1;
+      dice[0]?.roll(faces.first, onAllDiceDone);
+      if (faces.second !== null) {
+        const gold = new Dice(this, slotX + 30, 220, true);
+        remainingDice += 1;
+        gold.roll(faces.second, onAllDiceDone);
+        dice.push(gold);
+      }
+      allDice.push(...dice);
+    });
   }
 
   /** Damage number or "Miss" rising above the target. */

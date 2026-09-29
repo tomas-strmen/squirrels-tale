@@ -5,16 +5,20 @@
  * All values are internal hundredths (core/numbers), percentages too
  * (3 % -> 300), rolled in 0.01 steps (GDD 9.3 v2.0).
  *
- * Not yet (later stages): unique/set items and their fixed properties and
- * set bonuses (need data from later tiles), legendary traits, upgrades (M16).
+ * v2.4 (M6.2 follow-up): each enemy owns its drop table (which items, at what
+ * %) and its own rarity weights, both interpolated between the enemy's own
+ * minLevel/maxLevel. Every drop-table entry rolls independently, so a single
+ * kill can drop zero, one or several items - there is no single "does
+ * anything drop" gate or tile-wide item pool anymore.
+ *
+ * Not yet (later stages): legendary traits, upgrades (M16).
  */
-import type { AffixData, ItemData, ItemSlot, RarityData, StatId } from '../content/schemas';
+import type { AffixData, EnemyLoot, ItemData, ItemSlot, RarityData, StatId } from '../content/schemas';
 import { toHundredths } from '../numbers/numbers';
 import { branch, createRng, next, nextInt, type RngState } from '../rng/rng';
 import { secondsToMs } from '../time/fixedStep';
 
 export interface LootBalanceInput {
-  readonly dropChancePct: number;
   readonly pity: readonly { readonly rarity: string; readonly kills: number }[];
   readonly affixTierGrowthPct: number;
   readonly upgradeGrowthPct: number;
@@ -31,11 +35,58 @@ export interface LootConfig {
   readonly items: readonly ItemData[];
   readonly rarities: readonly RarityData[];
   readonly affixes: readonly AffixData[];
-  /** Drop chance per normal kill, in 0.01 % (4 % -> 400). */
-  readonly dropChanceBp: number;
   /** Pity guarantees, lowest rarity first; `rank` = index in `rarities`. */
   readonly pity: readonly PityRule[];
   readonly affixTierGrowthPct: number;
+}
+
+/** One entry in an enemy's own drop table, resolved to internal units (GDD 9.3 v2.4). */
+export interface EnemyDropItemConfig {
+  readonly itemId: string;
+  /** Drop chance in 0.01 % units (0.5 % -> 50), like the old flat dropChanceBp. */
+  readonly pctBpAtMin: number;
+  readonly pctBpAtMax: number;
+}
+
+/** An enemy's own weight for one rarity (GDD 9.3/9.6 v2.4). Not hundredths - a plain ratio, like the old global weights. */
+export interface EnemyRarityWeightConfig {
+  readonly rarityId: string;
+  readonly weightAtMin: number;
+  readonly weightAtMax: number;
+}
+
+export interface EnemyLootTable {
+  readonly minLevel: number;
+  readonly maxLevel: number;
+  readonly items: readonly EnemyDropItemConfig[];
+  readonly rarities: readonly EnemyRarityWeightConfig[];
+}
+
+export function createEnemyLootTable(input: EnemyLoot): EnemyLootTable {
+  return {
+    minLevel: input.minLevel,
+    maxLevel: input.maxLevel,
+    items: input.items.map((i) => ({
+      itemId: i.itemId,
+      pctBpAtMin: toHundredths(i.pctAtMin),
+      pctBpAtMax: toHundredths(i.pctAtMax),
+    })),
+    rarities: input.rarities.map((r) => ({
+      rarityId: r.rarityId,
+      weightAtMin: r.weightAtMin,
+      weightAtMax: r.weightAtMax,
+    })),
+  };
+}
+
+/** Linear interpolation between `atMin`/`atMax` over [minLevel, maxLevel], clamped; a fixed
+ * (boss) level range (minLevel === maxLevel) just returns `atMin`. Callers round if needed
+ * (rarity weights stay plain floats like the old global ones; item drop chances are rounded
+ * to a whole basis-point unit, see rollKillDrop). */
+function interpolate(atMin: number, atMax: number, level: number, minLevel: number, maxLevel: number): number {
+  if (maxLevel <= minLevel) return atMin;
+  const t = Math.min(1, Math.max(0, (level - minLevel) / (maxLevel - minLevel)));
+  return atMin + (atMax - atMin) * t;
 }
 
 export interface ItemStat {
@@ -79,8 +130,6 @@ export interface LootState {
 }
 
 export interface LootContext {
-  /** Tier of the current tile (1 until the map in M6). */
-  readonly tileTier: number;
   readonly magicFindPct: number;
   /** Quest ids that unlocked stats (GDD 6.1); locked affixes never roll. */
   readonly unlocked: ReadonlySet<string>;
@@ -99,7 +148,6 @@ export function createLootConfig(input: LootConfigInput): LootConfig {
     items: input.items,
     rarities: input.rarities,
     affixes: input.affixes,
-    dropChanceBp: input.balance.dropChancePct * 100,
     pity,
     affixTierGrowthPct: input.balance.affixTierGrowthPct,
   };
@@ -115,33 +163,32 @@ export function effectiveMagicFind(magicFindPct: number): number {
 }
 
 /**
- * Rarity weights for this roll (GDD 9.6): base weights scaled by Magic Find,
- * rarities not available on this tile tier get 0, the remainder rarity
- * (Common) gets 100 - the rest (min 0). With `pityOnly`, only pity-tier
- * rarities keep their weight (the "at least Unique" guarantee).
+ * Weights for this enemy's own base-kind rarities at `level` (GDD 9.3/9.6 v2.4): each
+ * interpolated between the enemy's minLevel/maxLevel, then scaled by Magic Find. Common
+ * (the remainder rarity) gets 100 - the rest (min 0). With `minRank`, only rarities of
+ * that rank or better keep their weight (the pity "at least X" guarantee).
  */
 export function rarityWeights(
   config: LootConfig,
+  enemyLoot: EnemyLootTable,
+  level: number,
   ctx: LootContext,
-  /** Pity roll: only rarities of this rank or better keep their weight ("at least X"). */
   minRank?: number,
 ): { readonly rarity: RarityData; readonly weight: number }[] {
   const pityOnly = minRank !== undefined;
   const mfLinear = 1 + ctx.magicFindPct / 100;
   const mfDiminishing = 1 + effectiveMagicFind(ctx.magicFindPct) / 100;
   const weighted = config.rarities.map((rarity, rank) => {
-    if (rarity.isRemainder || ctx.tileTier < rarity.minTileTier) return { rarity, weight: 0 };
+    if (rarity.isRemainder) return { rarity, weight: 0 };
+    const entry = enemyLoot.rarities.find((r) => r.rarityId === rarity.id);
+    if (!entry) return { rarity, weight: 0 };
     // Locked rarities (e.g. Legendary before its quest, GDD 9.6 v2.1) never drop; their share goes to Common.
     if (rarity.unlockedBy !== null && !ctx.unlocked.has(rarity.unlockedBy)) return { rarity, weight: 0 };
     if (pityOnly && rank < minRank) return { rarity, weight: 0 };
-    // The pity guarantee is "at least X" (GDD 9.6), so it never picks a
-    // Unique/Set that would fall back to Rare on this tile.
-    if (pityOnly && rarity.itemKind !== 'base' && eligibleItems(config, ctx.tileTier, rarity.itemKind).length === 0) {
-      return { rarity, weight: 0 };
-    }
+    const base = interpolate(entry.weightAtMin, entry.weightAtMax, level, enemyLoot.minLevel, enemyLoot.maxLevel);
     const mult =
       rarity.mfScaling === 'linear' ? mfLinear : rarity.mfScaling === 'diminishing' ? mfDiminishing : 1;
-    return { rarity, weight: rarity.weight * mult };
+    return { rarity, weight: base * mult };
   });
   if (pityOnly) return weighted;
   const others = weighted.reduce((sum, w) => sum + w.weight, 0);
@@ -150,11 +197,13 @@ export function rarityWeights(
 
 export function rollRarity(
   config: LootConfig,
+  enemyLoot: EnemyLootTable,
+  level: number,
   rng: RngState,
   ctx: LootContext,
   minRank?: number,
 ): { readonly rarity: RarityData; readonly rng: RngState } {
-  const weights = rarityWeights(config, ctx, minRank);
+  const weights = rarityWeights(config, enemyLoot, level, ctx, minRank);
   const total = weights.reduce((sum, w) => sum + w.weight, 0);
   const draw = next(rng);
   let target = draw.value * total;
@@ -168,40 +217,32 @@ export function rollRarity(
   return { rarity: last.rarity, rng: draw.state };
 }
 
-/** Base items that can drop on this tile: tier <= t and >= t - 2 (GDD 9.3). */
-export function eligibleItems(config: LootConfig, tileTier: number, kind: ItemData['kind']): ItemData[] {
-  return config.items.filter((i) => i.kind === kind && i.tier <= tileTier && i.tier >= tileTier - 2);
+function itemDataOf(config: LootConfig, itemId: string): ItemData {
+  const item = config.items.find((i) => i.id === itemId);
+  if (!item) throw new Error(`Unknown item id "${itemId}" in an enemy's drop table`);
+  return item;
+}
+
+/** The one rarity for a non-base itemKind (Unique/Set always drop as themselves, GDD 9.5 v2.4). */
+function fixedRarityFor(config: LootConfig, kind: 'unique' | 'set'): RarityData {
+  const rarity = config.rarities.find((r) => r.itemKind === kind);
+  if (!rarity) throw new Error(`No rarity configured for itemKind "${kind}"`);
+  return rarity;
 }
 
 /**
- * Generates one item of `rarity` (GDD 9.3). A Unique/Set roll with no such
- * item available on this tile becomes a Rare with one extra affix (GDD 9.5).
+ * Generates one instance of `base` at `rarity` (GDD 9.3 steps 3-4): stat values scaled by the
+ * rarity multiplier, then affixes. `base` and `rarity` are already decided by the caller.
  */
-export function generateItem(
+export function generateItemFromBase(
   config: LootConfig,
   rng: RngState,
   ctx: LootContext,
-  rolled: RarityData,
+  base: ItemData,
+  rarity: RarityData,
   uid: number,
 ): { readonly item: Item; readonly rng: RngState } {
-  let rarity = rolled;
-  let affixCount = rolled.affixCount;
-  let pool = eligibleItems(config, ctx.tileTier, rolled.itemKind);
-  if (pool.length === 0 && rolled.itemKind !== 'base') {
-    const rare = config.rarities.find((r) => r.id === 'rare');
-    if (!rare) throw new Error('Fallback rarity "rare" is missing');
-    rarity = rare;
-    affixCount = rare.affixCount + 1;
-    pool = eligibleItems(config, ctx.tileTier, 'base');
-  }
-  if (pool.length === 0) throw new Error(`No items can drop on tile tier ${ctx.tileTier}`);
-
   let r = rng;
-  const pick = nextInt(r, 0, pool.length);
-  r = pick.state;
-  const base = pool[pick.value];
-  if (!base) throw new Error('Item pick out of range');
-
   const mult = rarity.statMultPct / 100;
   const weapon = base.weapon
     ? {
@@ -218,7 +259,7 @@ export function generateItem(
     stats.push({ stat: s.stat, value: roll.value });
   }
 
-  const affixRoll = rollAffixes(config, r, ctx, base.tier, affixCount);
+  const affixRoll = rollAffixes(config, r, ctx, base.tier, rarity.affixCount);
   return {
     item: {
       uid,
@@ -289,67 +330,122 @@ export function rollAffixes(
   return { affixes, rng: r };
 }
 
-/** Can this rarity drop right now (unlocked, tile tier, and for Unique/Set: such items exist here)? */
-export function canDrop(config: LootConfig, ctx: LootContext, rarity: RarityData): boolean {
-  if (ctx.tileTier < rarity.minTileTier) return false;
+/** Can this rarity drop right now for this enemy (unlocked, and it's actually in its table)? */
+export function canDrop(config: LootConfig, enemyLoot: EnemyLootTable, ctx: LootContext, rarity: RarityData): boolean {
   if (rarity.unlockedBy !== null && !ctx.unlocked.has(rarity.unlockedBy)) return false;
-  return rarity.itemKind === 'base' || eligibleItems(config, ctx.tileTier, rarity.itemKind).length > 0;
+  if (rarity.itemKind !== 'base') {
+    return enemyLoot.items.some((e) => itemDataOfSafe(config, e.itemId)?.kind === rarity.itemKind);
+  }
+  if (rarity.isRemainder) return true;
+  return enemyLoot.rarities.some((r) => r.rarityId === rarity.id);
 }
 
-/** Pity countdowns for the UI: rarities that can drop now and kills left for each (GDD 9.6). */
+function itemDataOfSafe(config: LootConfig, itemId: string): ItemData | undefined {
+  return config.items.find((i) => i.id === itemId);
+}
+
+/** Pity countdowns for the UI: rarities that can drop from this enemy now, and kills left for each (GDD 9.6). */
 export function pityCountdowns(
   state: LootState,
   config: LootConfig,
+  enemyLoot: EnemyLootTable,
   ctx: LootContext,
 ): { readonly rarityId: string; readonly killsLeft: number }[] {
   return config.pity
     .filter((p) => {
       const rarity = config.rarities[p.rank];
-      return rarity !== undefined && canDrop(config, ctx, rarity);
+      return rarity !== undefined && canDrop(config, enemyLoot, ctx, rarity);
     })
     .map((p) => ({ rarityId: p.rarityId, killsLeft: Math.max(0, p.kills - (state.pityCounters[p.rarityId] ?? 0)) }));
 }
 
+/** Rank (index in config.rarities) of a rarity id. */
+function rankOf(config: LootConfig, rarityId: string): number {
+  return config.rarities.findIndex((r) => r.id === rarityId);
+}
+
 /**
- * Called once per killed enemy (GDD 9.6 v2.2): each pity counter whose rarity
- * can drop here counts the kill; if one is full, the drop is forced and is at
- * least that rarity (the highest full one wins). Otherwise the normal 4 % roll.
- * A dropped item resets every counter of its rarity or lower (a Legendary also
- * satisfies the Rare and Unique guarantees).
+ * Called once per killed enemy (GDD 9.3/9.6 v2.4): every entry in the enemy's own drop table
+ * is rolled independently, so zero, one or several items can drop. Each dropped base item
+ * separately rolls its rarity from the enemy's own rarity weights (scaled by level and Magic
+ * Find); unique/set items are their own table entry and always drop as themselves - no roll,
+ * no fallback needed. Pity (GDD 9.6 v2.2) still guarantees at least one item of the pity
+ * rarity once its counter is full, even if the tables above wouldn't have dropped one.
  */
 export function rollKillDrop(
   state: LootState,
   config: LootConfig,
   rng: RngState,
   ctx: LootContext,
-): { readonly state: LootState; readonly item: Item | null; readonly rng: RngState } {
+  enemyLoot: EnemyLootTable,
+  enemyLevel: number,
+): { readonly state: LootState; readonly items: readonly Item[]; readonly rng: RngState } {
   const counters: Record<string, number> = { ...state.pityCounters };
-  let forcedRank: number | undefined;
+  let forcedRarityId: string | undefined;
+  let forcedRank = -1;
   for (const p of config.pity) {
     const rarity = config.rarities[p.rank];
-    if (!rarity || !canDrop(config, ctx, rarity)) continue;
+    if (!rarity || !canDrop(config, enemyLoot, ctx, rarity)) continue;
     counters[p.rarityId] = (counters[p.rarityId] ?? 0) + 1;
-    if ((counters[p.rarityId] ?? 0) >= p.kills) forcedRank = p.rank; // sorted by rank: highest full wins
-  }
-  let r = rng;
-  if (forcedRank === undefined) {
-    const chance = nextInt(r, 0, 10000);
-    r = chance.state;
-    if (chance.value >= config.dropChanceBp) {
-      return { state: { ...state, pityCounters: counters }, item: null, rng: r };
+    if ((counters[p.rarityId] ?? 0) >= p.kills && p.rank > forcedRank) {
+      forcedRarityId = p.rarityId;
+      forcedRank = p.rank;
     }
   }
-  const rarityRoll = rollRarity(config, r, ctx, forcedRank);
-  const gen = generateItem(config, rarityRoll.rng, ctx, rarityRoll.rarity, state.nextUid);
-  const finalRank = config.rarities.findIndex((x) => x.id === gen.item.rarityId);
-  for (const p of config.pity) {
-    if (p.rank <= finalRank && p.rarityId in counters) counters[p.rarityId] = 0;
+
+  let r = rng;
+  let uid = state.nextUid;
+  const items: Item[] = [];
+  let satisfiedRank = -1;
+
+  for (const entry of enemyLoot.items) {
+    const pctBp = Math.round(
+      interpolate(entry.pctBpAtMin, entry.pctBpAtMax, enemyLevel, enemyLoot.minLevel, enemyLoot.maxLevel),
+    );
+    const draw = nextInt(r, 0, 10000);
+    r = draw.state;
+    if (draw.value >= pctBp) continue;
+    const base = itemDataOf(config, entry.itemId);
+    let rarity: RarityData;
+    if (base.kind === 'base') {
+      const rarityRoll = rollRarity(config, enemyLoot, enemyLevel, r, ctx);
+      rarity = rarityRoll.rarity;
+      r = rarityRoll.rng;
+    } else {
+      rarity = fixedRarityFor(config, base.kind);
+    }
+    const gen = generateItemFromBase(config, r, ctx, base, rarity, uid);
+    r = gen.rng;
+    uid += 1;
+    items.push(gen.item);
+    satisfiedRank = Math.max(satisfiedRank, rankOf(config, rarity.id));
   }
-  return {
-    state: { pityCounters: counters, nextUid: state.nextUid + 1 },
-    item: gen.item,
-    rng: gen.rng,
-  };
+
+  if (forcedRarityId !== undefined && forcedRank > satisfiedRank) {
+    const forcedRarity = config.rarities[forcedRank];
+    if (!forcedRarity) throw new Error(`Unknown forced rarity rank ${forcedRank}`);
+    const candidates = enemyLoot.items
+      .map((e) => itemDataOf(config, e.itemId))
+      .filter((i) => i.kind === forcedRarity.itemKind);
+    if (candidates.length === 0) {
+      throw new Error(`Pity wants rarity "${forcedRarity.id}" but enemy has no matching item in its drop table`);
+    }
+    const pick = nextInt(r, 0, candidates.length);
+    r = pick.state;
+    const base = candidates[pick.value];
+    if (!base) throw new Error('Pity item pick out of range');
+    const gen = generateItemFromBase(config, r, ctx, base, forcedRarity, uid);
+    r = gen.rng;
+    uid += 1;
+    items.push(gen.item);
+    satisfiedRank = Math.max(satisfiedRank, forcedRank);
+  }
+
+  for (const p of config.pity) {
+    if (p.rank <= satisfiedRank && p.rarityId in counters) counters[p.rarityId] = 0;
+  }
+
+  return { state: { pityCounters: counters, nextUid: uid }, items, rng: r };
 }
 
 /** Uniform whole hundredths in [min, max] (both inclusive), inputs rounded first. */

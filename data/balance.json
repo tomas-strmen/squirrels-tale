@@ -25,7 +25,6 @@
     "minAttackIntervalS": 0.5
   },
   "loot": {
-    "dropChancePct": 4,
     "pity": [
       { "rarity": "rare", "kills": 1000 },
       { "rarity": "unique", "kills": 5000 },

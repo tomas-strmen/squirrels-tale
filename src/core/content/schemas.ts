@@ -51,6 +51,49 @@ export const percentSchema = z.number().int().min(0).max(100);
 const damageRangeValid = (v: { damageMin: number; damageMax: number }) =>
   v.damageMin <= v.damageMax;
 
+/**
+ * One entry in an enemy's own drop table (GDD 9.3/9.6 v2.4): rolled independently on each
+ * kill. `pctAtMin`/`pctAtMax` are the drop chance (in %, e.g. 0.5 = 0.5 %) at the enemy's own
+ * `minLevel`/`maxLevel` (see `enemyLootSchema`), linearly interpolated for levels in between.
+ */
+export const enemyDropItemSchema = z.object({
+  itemId: idSchema,
+  pctAtMin: designValueSchema,
+  pctAtMax: designValueSchema,
+});
+export type EnemyDropItem = z.infer<typeof enemyDropItemSchema>;
+
+/**
+ * An enemy's own weight for one (base-kind) rarity (GDD 9.3/9.6 v2.4), at `minLevel`/`maxLevel`,
+ * same interpolation as `enemyDropItemSchema`. Only for Uncommon/Rare/Legendary - Common is
+ * always the remainder (100 - the others, floored at 0) and Unique/Set are their own drop-table
+ * entry with a fixed rarity (never rolled here).
+ */
+export const enemyRarityWeightSchema = z.object({
+  rarityId: idSchema,
+  weightAtMin: designValueSchema,
+  weightAtMax: designValueSchema,
+});
+export type EnemyRarityWeight = z.infer<typeof enemyRarityWeightSchema>;
+
+/** An enemy's whole loot setup (GDD 9.3/9.6 v2.4): its own drop table and rarity weights. */
+export const enemyLootSchema = z
+  .object({
+    /** Anchor levels for interpolation (own to this enemy, independent of the tile). */
+    minLevel: z.number().int().min(1),
+    maxLevel: z.number().int().min(1),
+    items: z.array(enemyDropItemSchema),
+    rarities: z.array(enemyRarityWeightSchema),
+  })
+  .refine((l) => l.maxLevel >= l.minLevel, { message: 'maxLevel must not be less than minLevel' })
+  .refine((l) => new Set(l.items.map((i) => i.itemId)).size === l.items.length, {
+    message: 'duplicate itemId in an enemy loot table',
+  })
+  .refine((l) => new Set(l.rarities.map((r) => r.rarityId)).size === l.rarities.length, {
+    message: 'duplicate rarityId in an enemy loot table',
+  });
+export type EnemyLoot = z.infer<typeof enemyLootSchema>;
+
 export const enemySchema = z
   .object({
     id: idSchema,
@@ -69,6 +112,8 @@ export const enemySchema = z
     dodgePct: percentSchema,
     /** XP granted when defeated at `baseLevel` (GDD 6.2, 8.3); scales with the rolled level. */
     xp: designValueSchema,
+    /** Drop table and rarity weights (GDD 9.3/9.6 v2.4), own minLevel/maxLevel for interpolation. */
+    loot: enemyLootSchema,
   })
   .refine(damageRangeValid, { message: 'damageMin must not be greater than damageMax' });
 export type Enemy = z.infer<typeof enemySchema>;
@@ -170,21 +215,18 @@ export const itemsSchema = z
   });
 
 /**
- * A rarity (GDD 9.2, 9.6). Weights are per 100; the `isRemainder` one gets 100 - the rest.
- * Array order = rank (Common first), used by the pity guarantee ("at least X").
+ * A rarity (GDD 9.2, 9.6): metadata only - weights now live per enemy (`enemyLootSchema`,
+ * GDD 9.3/9.6 v2.4). Array order = rank (Common first), used by the pity guarantee ("at least X").
  */
 export const raritySchema = z.object({
   id: idSchema,
-  weight: designValueSchema,
   isRemainder: z.boolean(),
   statMultPct: z.number().int().min(1),
   affixCount: z.number().int().min(0),
-  /** How Magic Find scales this weight (GDD 9.6). */
+  /** How Magic Find scales an enemy's weight for this rarity (GDD 9.6). */
   mfScaling: z.enum(['none', 'linear', 'diminishing']),
-  /** Which base items it draws from; unique/set fall back to Rare +1 affix when none exist (9.5). */
+  /** Unique/Set always drop as themselves at this rarity - no roll, no fallback (9.5 v2.4). */
   itemKind: z.enum(['base', 'unique', 'set']),
-  /** Only drops on tiles of this tier or higher (e.g. Set only T3+, GDD 9.6). */
-  minTileTier: z.number().int().min(1),
   /** Quest id that unlocks this rarity (e.g. Legendary, GDD 9.6 v2.1); null = always. */
   unlockedBy: idSchema.nullable(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'must be a #rrggbb colour'),
@@ -200,9 +242,6 @@ export const raritiesSchema = z
   .min(1)
   .refine((r) => r.filter((x) => x.isRemainder).length === 1, {
     message: 'exactly one rarity must be the remainder (Common)',
-  })
-  .refine((r) => r.filter((x) => !x.isRemainder).reduce((s, x) => s + x.weight, 0) <= 100, {
-    message: 'non-remainder weights must add up to at most 100',
   })
   .refine((r) => new Set(r.map((x) => x.id)).size === r.length, { message: 'rarity ids must be unique' });
 
@@ -274,9 +313,8 @@ export const balanceSchema = z.object({
     .refine((c) => c.minHitPct <= c.maxHitPct, {
       message: 'minHitPct must not be greater than maxHitPct',
     }),
-  /** Item drops (GDD 9.3, 9.6). */
+  /** Item drops (GDD 9.3, 9.6). Drop chance itself is per-enemy now (v2.4, see enemySchema). */
   loot: z.object({
-    dropChancePct: percentSchema,
     /**
      * Pity guarantees (GDD 9.6 v2.2): after `kills` kills without a drop of `rarity` or better,
      * the next drop is at least that rarity. Each counter resets on such a drop.

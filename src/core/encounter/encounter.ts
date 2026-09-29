@@ -48,14 +48,17 @@ import {
   type ProgressionState,
 } from '../progression/progression';
 import {
+  createEnemyLootTable,
   createLootConfig,
   createLootState,
   rollKillDrop,
+  type EnemyLootTable,
   type Item,
   type LootConfig,
   type LootConfigInput,
   type LootState,
 } from '../loot/loot';
+import type { EnemyLoot } from '../content/schemas';
 import { branch, nextInt, type RngState } from '../rng/rng';
 import { composeStats, type ComposedStats } from '../stats/stats';
 import { secondsToMs, TICK_MS } from '../time/fixedStep';
@@ -83,6 +86,8 @@ export interface EncounterEnemyDef {
   readonly attackIntervalMs: number;
   /** XP granted when defeated at `baseLevel` (hundredths); scaled per level, see enemyXpAt(). */
   readonly xp: number;
+  /** Its own drop table and rarity weights (GDD 9.3/9.6 v2.4). */
+  readonly loot: EnemyLootTable;
 }
 
 /** Design values for one enemy species, as written in data/enemies.json. */
@@ -92,6 +97,7 @@ export interface EncounterEnemyInput extends FighterStatsInput {
   readonly attackIntervalS: number;
   /** XP granted when defeated at `baseLevel` (design value, GDD 6.2/8.3). */
   readonly xp: number;
+  readonly loot: EnemyLoot;
 }
 
 export interface EncounterConfig {
@@ -256,6 +262,7 @@ export function createEncounterConfig(input: EncounterConfigInput): EncounterCon
       baseLevel: enemy.baseLevel,
       attackIntervalMs,
       xp: toHundredths(enemy.xp),
+      loot: createEnemyLootTable(enemy.loot),
     };
   });
   return {
@@ -310,6 +317,11 @@ function enemyDefOf(config: EncounterConfig, enemyId: string): EncounterEnemyDef
   const def = config.enemies.find((e) => e.id === enemyId);
   if (!def) throw new Error(`Unknown enemy id "${enemyId}" for this tile`);
   return def;
+}
+
+/** The current (or next, while searching) enemy's own drop table (GDD 9.3 v2.4), e.g. for a pity countdown UI. */
+export function enemyLootOf(config: EncounterConfig, enemyId: string): EnemyLootTable {
+  return enemyDefOf(config, enemyId).loot;
 }
 
 /**
@@ -660,17 +672,24 @@ function tickFight(state: EncounterState, config: EncounterConfig): EncounterSte
     events.push({ type: 'attack', attacker: 'player', ...attack.result });
     if (enemyHp === 0) {
       events.push({ type: 'enemyDefeated' });
-      // GDD 9.6: drop roll per kill. Magic Find is locked until quest Q4 (GDD 6.1).
-      const drop = rollKillDrop(state.loot, config.loot, state.lootRng, {
-        tileTier: config.tileTier,
-        magicFindPct: 0,
-        unlocked: NO_UNLOCKS,
-      });
+      // GDD 9.3/9.6 v2.4: each entry in the enemy's own drop table rolls independently -
+      // zero, one or several items. Magic Find is locked until quest Q4 (GDD 6.1).
+      const drop = rollKillDrop(
+        state.loot,
+        config.loot,
+        state.lootRng,
+        { magicFindPct: 0, unlocked: NO_UNLOCKS },
+        enemyDefOf(config, state.enemyId).loot,
+        state.enemyLevel,
+      );
       const loot = drop.state;
       const lootRng = drop.rng;
-      const bagFull = drop.item !== null && state.inventory.bag.length >= BAG_CAPACITY;
-      const inventory = drop.item ? addToBag(state.inventory, drop.item) : state.inventory;
-      if (drop.item) events.push({ type: 'itemFound', item: drop.item, bagFull });
+      let inventory = state.inventory;
+      for (const item of drop.items) {
+        const bagFull = inventory.bag.length >= BAG_CAPACITY;
+        inventory = addToBag(inventory, item);
+        events.push({ type: 'itemFound', item, bagFull });
+      }
       const gain = gainXp(progression, enemyXpAt(config, state.enemyId, state.enemyLevel));
       progression = gain.state;
       // Every level gained heals by exactly its HP bonus (GDD 6.2) - never a full heal.

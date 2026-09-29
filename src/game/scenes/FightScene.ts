@@ -34,6 +34,7 @@ import {
   switchTile,
   tick,
   discardBagRarity,
+  enemyLootOf,
   enemyStats,
   toggleItemLock,
   unequipItem,
@@ -85,7 +86,6 @@ export class FightScene extends Phaser.Scene {
   private accumulatorMs = 0;
   private speedIndex = 0;
   private dropRateIndex = 0;
-  private baseDropChanceBp = 0;
 
   private tiles: TileData[] = [];
   /** Unmodified per-tile configs (M6.2); `this.config` may additionally have the debug drop rate applied. */
@@ -119,6 +119,9 @@ export class FightScene extends Phaser.Scene {
   private lootButton!: Button;
   private lootPanel!: ItemsPanel;
   private rarityColors = new Map<string, string>();
+  /** Multiple items can drop from one kill now (GDD 9.3 v2.4) - their dice rolls queue up. */
+  private diceQueue: { item: Item; bagFull: boolean }[] = [];
+  private diceAnimating = false;
   /** M5.2b2: rarities.json order = value, for the bag's "Sort: Rarity". */
   private rarityRanks = new Map<string, number>();
   /** Simulated game time (counts faster at x4/x20/x50 - it follows the simulation). */
@@ -156,7 +159,6 @@ export class FightScene extends Phaser.Scene {
         ),
       ]),
     );
-    this.baseDropChanceBp = this.baseConfigByTileId.get(firstTile.id)!.loot.dropChanceBp;
     this.config = this.configFor(firstTile.id);
     // Seeded Rng (GDD 5); a new seed per session until saves arrive in M8.
     this.state = createEncounter(this.config, createRng(now()), firstTile.id);
@@ -392,13 +394,28 @@ export class FightScene extends Phaser.Scene {
     this.dropRateButtons.forEach((button, index) => button.setSelected(index === this.dropRateIndex));
   }
 
-  /** `tileId`'s base config (M6.2) with the debug drop rate override (Tomas) applied. */
+  /**
+   * `tileId`'s base config (M6.2) with the debug drop rate override (Tomas) applied: scales
+   * every enemy's per-item drop chance (GDD 9.3 v2.4) by the selected multiplier, capped at 100 %.
+   */
   private configFor(tileId: string): EncounterConfig {
     const base = this.baseConfigByTileId.get(tileId);
     if (!base) throw new Error(`No config for tile "${tileId}"`);
     const multiplier = DROP_RATE_OPTIONS[this.dropRateIndex] ?? 1;
-    const dropChanceBp = multiplier === 100 ? 10000 : Math.min(10000, this.baseDropChanceBp * multiplier);
-    return { ...base, loot: { ...base.loot, dropChanceBp } };
+    if (multiplier === 1) return base;
+    const scale = (bp: number) => (multiplier === 100 ? 10000 : Math.min(10000, bp * multiplier));
+    const enemies = base.enemies.map((enemy) => ({
+      ...enemy,
+      loot: {
+        ...enemy.loot,
+        items: enemy.loot.items.map((item) => ({
+          ...item,
+          pctBpAtMin: scale(item.pctBpAtMin),
+          pctBpAtMax: scale(item.pctBpAtMax),
+        })),
+      },
+    }));
+    return { ...base, enemies };
   }
 
   /** Player clicked a tile button (GDD 8.1, M6.2). No-op in core if it's already current or still locked. */
@@ -493,11 +510,12 @@ export class FightScene extends Phaser.Scene {
     this.refreshTileButtons();
     this.timeText.setText(`${t('hud.time')}: ${formatDuration(this.simElapsedMs)}`);
     // One line per pity rarity that can drop here (GDD 9.6 v2.2); locked ones stay hidden.
-    const countdowns = pityCountdowns(this.state.loot, this.config.loot, {
-      tileTier: this.config.tileTier,
-      magicFindPct: 0,
-      unlocked: new Set(),
-    });
+    const countdowns = pityCountdowns(
+      this.state.loot,
+      this.config.loot,
+      enemyLootOf(this.config, this.state.enemyId),
+      { magicFindPct: 0, unlocked: new Set() },
+    );
     this.pityText.setText(
       `${t('loot.luckyAcorn')}: ` +
         countdowns
@@ -559,7 +577,7 @@ export class FightScene extends Phaser.Scene {
         });
         break;
       case 'itemFound':
-        this.rollDice(event.item, event.bagFull);
+        this.queueDice(event.item, event.bagFull);
         break;
       case 'leveledUp':
         this.floatingText(PLAYER_X, FIGHTER_Y - 100, t('fight.leveledUp'), '#ffe08a', 1200);
@@ -600,8 +618,27 @@ export class FightScene extends Phaser.Scene {
     this.findButton.setVisible(false);
   }
 
+  /**
+   * A kill can now drop several items at once (GDD 9.3 v2.4: each drop-table entry rolls
+   * independently) - their dice rolls/popups queue and play one after another.
+   */
+  private queueDice(item: Item, bagFull: boolean): void {
+    this.diceQueue.push({ item, bagFull });
+    if (!this.diceAnimating) this.processDiceQueue();
+  }
+
+  private processDiceQueue(): void {
+    const next = this.diceQueue.shift();
+    if (!next) {
+      this.diceAnimating = false;
+      return;
+    }
+    this.diceAnimating = true;
+    this.rollDice(next.item, next.bagFull, () => this.processDiceQueue());
+  }
+
   /** GDD 9.6: one d20 (two for Unique/Set/Legendary), then the "Found: ..." popup. */
-  private rollDice(item: Item, bagFull: boolean): void {
+  private rollDice(item: Item, bagFull: boolean, onDone: () => void): void {
     const faces = diceFaces(item, this.config.loot);
     const dice: Dice[] = [faces.second === null ? new Dice(this, W / 2, 220) : new Dice(this, W / 2 - 40, 220)];
     let remaining = 1;
@@ -612,6 +649,7 @@ export class FightScene extends Phaser.Scene {
       // M5.2a: bag was at BAG_CAPACITY, the item was rolled but not kept.
       const label = bagFull ? `${t('loot.found')}: ${itemName(item)} (${t('loot.bagFull')})` : `${t('loot.found')}: ${itemName(item)}`;
       this.floatingText(PLAYER_X, FIGHTER_Y - 130, label, bagFull ? '#ff9f9f' : this.rarityColors.get(item.rarityId) ?? '#ffffff', 1800);
+      onDone();
     };
     if (faces.second !== null) {
       remaining = 2;

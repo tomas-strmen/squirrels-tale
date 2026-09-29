@@ -38,6 +38,12 @@ describe('enemiesSchema / parseEnemies', () => {
     armor: 0,
     dodgePct: 0,
     xp: 2,
+    loot: {
+      minLevel: 1,
+      maxLevel: 1,
+      items: [{ itemId: 'sharp_twig', pctAtMin: 4, pctAtMax: 4 }],
+      rarities: [{ rarityId: 'rare', weightAtMin: 6, weightAtMax: 6 }],
+    },
   };
   const valid = [ant];
 
@@ -85,6 +91,26 @@ describe('enemiesSchema / parseEnemies', () => {
 
   it('throws a readable error for bad data', () => {
     expect(() => parseEnemies([{ ...ant, id: 'Bad Id' }])).toThrow(/snake_case/);
+  });
+
+  describe('loot (GDD 9.3/9.6 v2.4)', () => {
+    it('rejects maxLevel below minLevel', () => {
+      expect(enemiesSchema.safeParse([{ ...ant, loot: { ...ant.loot, minLevel: 5, maxLevel: 4 } }]).success).toBe(false);
+    });
+
+    it('rejects a duplicate itemId in the drop table', () => {
+      const bad = { ...ant.loot, items: [...ant.loot.items, ant.loot.items[0]] };
+      expect(enemiesSchema.safeParse([{ ...ant, loot: bad }]).success).toBe(false);
+    });
+
+    it('rejects a duplicate rarityId in the rarity weights', () => {
+      const bad = { ...ant.loot, rarities: [...ant.loot.rarities, ant.loot.rarities[0]] };
+      expect(enemiesSchema.safeParse([{ ...ant, loot: bad }]).success).toBe(false);
+    });
+
+    it('an empty drop table (no items, no rarities) is valid - the enemy just never drops anything', () => {
+      expect(enemiesSchema.safeParse([{ ...ant, loot: { minLevel: 1, maxLevel: 1, items: [], rarities: [] } }]).success).toBe(true);
+    });
   });
 });
 
@@ -193,25 +219,23 @@ describe('items / rarities / affixes schemas (M4.1)', () => {
 
   const rarity = {
     id: 'common',
-    weight: 0,
     isRemainder: true,
     statMultPct: 100,
     affixCount: 0,
     mfScaling: 'none',
     itemKind: 'base',
-    minTileTier: 1,
     unlockedBy: null,
     color: '#b8b8b8',
     diceRange: [1, 14] as [number, number],
     goldDiceRange: null,
   };
 
-  it('needs exactly one remainder rarity and weights <= 100', () => {
+  it('needs exactly one remainder rarity (v2.4: weights moved to per-enemy tables)', () => {
     expect(raritiesSchema.safeParse([rarity]).success).toBe(true);
     expect(raritiesSchema.safeParse([{ ...rarity, isRemainder: false }]).success).toBe(false);
     expect(
-      raritiesSchema.safeParse([rarity, { ...rarity, id: 'uncommon', isRemainder: false, weight: 100.1 }]).success,
-    ).toBe(false);
+      raritiesSchema.safeParse([rarity, { ...rarity, id: 'uncommon', isRemainder: false }]).success,
+    ).toBe(true);
     expect(raritiesSchema.safeParse([{ ...rarity, color: 'grey' }]).success).toBe(false);
   });
 

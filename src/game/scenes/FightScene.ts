@@ -298,10 +298,10 @@ export class FightScene extends Phaser.Scene {
 
     // Tile picker (GDD 8.1, M6.2): one button per tile, locked ones show kills still needed.
     this.tileButtons = this.tiles.map((tile, index) =>
-      new Button(this, 640 + index * 190, 140, '', () => this.onSelectTile(tile.id), {
-        width: 180,
+      new Button(this, 540 + index * 170, 140, '', () => this.onSelectTile(tile.id), {
+        width: 160,
         height: 60,
-        fontSize: 16,
+        fontSize: 14,
       }),
     );
     this.refreshTileButtons();
@@ -437,13 +437,23 @@ export class FightScene extends Phaser.Scene {
       const tile = this.tiles[index];
       if (!tile) return;
       const name = tDynamic(`tile.${tile.id}.name`);
-      button.setLabel(
-        unlocked.has(tile.id)
-          ? name
-          : `🔒 ${name}\n${t('tile.locked').replace('{kills}', String(killsToUnlock(this.tiles, this.state.killsByTile, tile.id)))}`,
-      );
+      button.setLabel(unlocked.has(tile.id) ? name : `🔒 ${name}\n${this.lockLabel(tile)}`);
       button.setSelected(tile.id === this.state.tileId);
     });
+  }
+
+  /** "N kills to unlock" / "Lv N to unlock" / both, for a still-locked tile button (GDD 8.2, M6.2c). */
+  private lockLabel(tile: TileData): string {
+    const kills = killsToUnlock(this.tiles, this.state.killsByTile, tile.id);
+    const levelNeeded =
+      tile.unlockLevel !== undefined ? Math.max(0, tile.unlockLevel - this.state.progression.level) : 0;
+    if (levelNeeded > 0 && kills > 0) {
+      return t('tile.lockedLevelAndKills').replace('{level}', String(tile.unlockLevel)).replace('{kills}', String(kills));
+    }
+    if (levelNeeded > 0) {
+      return t('tile.lockedLevel').replace('{level}', String(tile.unlockLevel));
+    }
+    return t('tile.locked').replace('{kills}', String(kills));
   }
 
   private onToggleStats(): void {

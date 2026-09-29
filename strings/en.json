@@ -81,8 +81,12 @@
   "enemy.worker_ant.name": "Worker Ant",
   "enemy.pill_bug.name": "Pill Bug",
   "enemy.armed_ant.name": "Armed Ant",
+  "enemy.ant_soldier.name": "Ant Soldier",
   "tile.t1.name": "Fallen Nest",
   "tile.t2.name": "Mossy Roots",
   "tile.t3.name": "Ant Trail",
-  "tile.locked": "{kills} kills to unlock"
+  "tile.t4.name": "Anthill",
+  "tile.locked": "{kills} kills to unlock",
+  "tile.lockedLevel": "Lv {level} to unlock",
+  "tile.lockedLevelAndKills": "Lv {level} + {kills} kills to unlock"
 }

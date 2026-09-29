@@ -34,5 +34,17 @@
     "armor": 0,
     "dodgePct": 0,
     "xp": 4
+  },
+  {
+    "id": "ant_soldier",
+    "baseLevel": 6,
+    "maxHp": 3.5,
+    "damageMin": 0.4,
+    "damageMax": 0.6,
+    "attackIntervalS": 2.5,
+    "hitPct": 70,
+    "armor": 0.5,
+    "dodgePct": 0,
+    "xp": 5.5
   }
 ]

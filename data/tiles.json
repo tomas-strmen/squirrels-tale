@@ -22,5 +22,14 @@
     "enemyLevelMin": 4,
     "enemyLevelMax": 6,
     "unlockKills": 15
+  },
+  {
+    "id": "t4",
+    "tier": 4,
+    "enemyIds": ["armed_ant", "ant_soldier"],
+    "enemyLevelMin": 6,
+    "enemyLevelMax": 8,
+    "unlockKills": 30,
+    "unlockLevel": 5
   }
 ]

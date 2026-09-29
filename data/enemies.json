@@ -9,7 +9,23 @@
     "hitPct": 65,
     "armor": 0,
     "dodgePct": 0,
-    "xp": 2
+    "xp": 2,
+    "loot": {
+      "minLevel": 1,
+      "maxLevel": 6,
+      "items": [
+        { "itemId": "sharp_twig", "pctAtMin": 1.0, "pctAtMax": 2.0 },
+        { "itemId": "pebble_club", "pctAtMin": 1.0, "pctAtMax": 2.0 },
+        { "itemId": "leaf_cap", "pctAtMin": 1.5, "pctAtMax": 3.0 },
+        { "itemId": "leaf_vest", "pctAtMin": 1.5, "pctAtMax": 3.0 },
+        { "itemId": "pebble_pendant", "pctAtMin": 1.0, "pctAtMax": 2.0 }
+      ],
+      "rarities": [
+        { "rarityId": "uncommon", "weightAtMin": 22.0, "weightAtMax": 30.0 },
+        { "rarityId": "rare", "weightAtMin": 6.0, "weightAtMax": 12.0 },
+        { "rarityId": "legendary", "weightAtMin": 0.3, "weightAtMax": 1.0 }
+      ]
+    }
   },
   {
     "id": "pill_bug",
@@ -21,7 +37,21 @@
     "hitPct": 65,
     "armor": 1.0,
     "dodgePct": 0,
-    "xp": 3
+    "xp": 3,
+    "loot": {
+      "minLevel": 2,
+      "maxLevel": 4,
+      "items": [
+        { "itemId": "pebble_club", "pctAtMin": 1.5, "pctAtMax": 2.5 },
+        { "itemId": "leaf_vest", "pctAtMin": 2.0, "pctAtMax": 3.5 },
+        { "itemId": "pebble_pendant", "pctAtMin": 1.5, "pctAtMax": 2.5 }
+      ],
+      "rarities": [
+        { "rarityId": "uncommon", "weightAtMin": 22.0, "weightAtMax": 30.0 },
+        { "rarityId": "rare", "weightAtMin": 6.0, "weightAtMax": 12.0 },
+        { "rarityId": "legendary", "weightAtMin": 0.3, "weightAtMax": 1.0 }
+      ]
+    }
   },
   {
     "id": "armed_ant",
@@ -33,7 +63,22 @@
     "hitPct": 70,
     "armor": 0,
     "dodgePct": 0,
-    "xp": 4
+    "xp": 4,
+    "loot": {
+      "minLevel": 4,
+      "maxLevel": 8,
+      "items": [
+        { "itemId": "sharp_twig", "pctAtMin": 1.5, "pctAtMax": 2.5 },
+        { "itemId": "pebble_club", "pctAtMin": 1.5, "pctAtMax": 2.5 },
+        { "itemId": "leaf_cap", "pctAtMin": 1.5, "pctAtMax": 2.5 },
+        { "itemId": "pebble_pendant", "pctAtMin": 1.0, "pctAtMax": 2.0 }
+      ],
+      "rarities": [
+        { "rarityId": "uncommon", "weightAtMin": 22.0, "weightAtMax": 30.0 },
+        { "rarityId": "rare", "weightAtMin": 6.0, "weightAtMax": 12.0 },
+        { "rarityId": "legendary", "weightAtMin": 0.3, "weightAtMax": 1.0 }
+      ]
+    }
   },
   {
     "id": "ant_soldier",
@@ -45,6 +90,20 @@
     "hitPct": 70,
     "armor": 0.5,
     "dodgePct": 0,
-    "xp": 5.5
+    "xp": 5.5,
+    "loot": {
+      "minLevel": 6,
+      "maxLevel": 8,
+      "items": [
+        { "itemId": "pebble_club", "pctAtMin": 2.0, "pctAtMax": 3.0 },
+        { "itemId": "leaf_vest", "pctAtMin": 2.0, "pctAtMax": 3.5 },
+        { "itemId": "leaf_cap", "pctAtMin": 1.5, "pctAtMax": 3.0 }
+      ],
+      "rarities": [
+        { "rarityId": "uncommon", "weightAtMin": 22.0, "weightAtMax": 30.0 },
+        { "rarityId": "rare", "weightAtMin": 6.0, "weightAtMax": 12.0 },
+        { "rarityId": "legendary", "weightAtMin": 0.3, "weightAtMax": 1.0 }
+      ]
+    }
   }
 ]

@@ -52,6 +52,16 @@ const antInput: EncounterEnemyInput = {
   armor: 0,
   dodgePct: 0,
   xp: 2,
+  loot: {
+    minLevel: 1,
+    maxLevel: 1,
+    items: [{ itemId: 'sharp_twig', pctAtMin: 4, pctAtMax: 4 }],
+    rarities: [
+      { rarityId: 'uncommon', weightAtMin: 22, weightAtMax: 22 },
+      { rarityId: 'rare', weightAtMin: 6, weightAtMax: 6 },
+      { rarityId: 'legendary', weightAtMin: 0.3, weightAtMax: 0.3 },
+    ],
+  },
 };
 // GDD 8.4. Zeroed out in tests that need a fixed enemy level with no stat scaling confound.
 const enemyLeveling = { hpPctPerLevel: 10, damagePctPerLevel: 5, xpPctPerLevel: 10, dodgePctPerLevel: 0.5, maxDodgePct: 40 };
@@ -61,7 +71,7 @@ const lootInput = {
   items: parseItems(itemsData),
   rarities: parseRarities(raritiesData),
   affixes: parseAffixes(affixesData),
-  balance: { dropChancePct: 4, pity: [{ rarity: 'rare', kills: 1000 }, { rarity: 'unique', kills: 5000 }, { rarity: 'legendary', kills: 20000 }], affixTierGrowthPct: 35, upgradeGrowthPct: 8 },
+  balance: { pity: [{ rarity: 'rare', kills: 1000 }, { rarity: 'unique', kills: 5000 }, { rarity: 'legendary', kills: 20000 }], affixTierGrowthPct: 35, upgradeGrowthPct: 8 },
 };
 
 function makeConfig(patch: Partial<EncounterConfigInput> = {}): EncounterConfig {
@@ -438,8 +448,14 @@ describe('encounter', () => {
 
   it('kills can drop items (GDD 9.6): itemFound right after enemyDefeated, kept in foundItems', () => {
     const lucky = makeConfig({
-      enemies: [{ ...antInput, maxHp: 0.1, hitPct: 0 }],
-      loot: { ...lootInput, balance: { ...lootInput.balance, dropChancePct: 100 } },
+      enemies: [
+        {
+          ...antInput,
+          maxHp: 0.1,
+          hitPct: 0,
+          loot: { ...antInput.loot, items: [{ itemId: 'sharp_twig', pctAtMin: 100, pctAtMax: 100 }] },
+        },
+      ],
     });
     const { state, log } = runUntil(fighting(lucky), lucky, (e) => e.type === 'enemyDefeated');
     const defeatTick = log.find((l) => l.event.type === 'enemyDefeated')?.tick;
@@ -533,8 +549,12 @@ describe('encounter', () => {
   });
 
   it('loot uses its own Rng stream: drops never change how the fight plays out', () => {
-    const noDrops = makeConfig({ loot: { ...lootInput, balance: { ...lootInput.balance, dropChancePct: 0 } } });
-    const allDrops = makeConfig({ loot: { ...lootInput, balance: { ...lootInput.balance, dropChancePct: 100 } } });
+    const noDrops = makeConfig({
+      enemies: [{ ...antInput, loot: { ...antInput.loot, items: [{ itemId: 'sharp_twig', pctAtMin: 0, pctAtMax: 0 }] } }],
+    });
+    const allDrops = makeConfig({
+      enemies: [{ ...antInput, loot: { ...antInput.loot, items: [{ itemId: 'sharp_twig', pctAtMin: 100, pctAtMax: 100 }] } }],
+    });
     const attacksOf = (cfg: EncounterConfig) =>
       run(startSearch(fresh(cfg, 77)).state, 3000, cfg).log.filter((l) => l.event.type === 'attack');
     expect(attacksOf(allDrops)).toEqual(attacksOf(noDrops));

@@ -35,6 +35,8 @@ regenerates passively over time in `idle`/`searching`/`fighting` (GDD
 - `enemyStats(config, enemyId, level)` / `enemyXpAt(config, enemyId, level)` – that species'
   effective stats/XP at `level` (GDD 8.4: +hpPctPerLevel/damagePctPerLevel/xpPctPerLevel/dodgePctPerLevel
   per level above its own `baseLevel`, dodge capped at `maxDodgePct`; crit is locked, not implemented yet).
+- `enemyLootOf(config, enemyId)` – that species' own drop table and rarity weights (GDD 9.3/9.6
+  v2.4, `core/loot` `EnemyLootTable`), e.g. for a pity countdown UI.
 - `state.killsByTile` – kills so far per tile id (M6.2), read by `core/tiles` to unlock the next one.
 - `switchTile(state, newConfig, tileId, unlockedTileIds)` – player picked a different tile on the
   map (event `tileSwitched { tileId }`); no-op if it's the current tile or not in `unlockedTileIds`.
@@ -59,4 +61,4 @@ regenerates passively over time in `idle`/`searching`/`fighting` (GDD
   (see `FightScene`), not something this module does on its own.
 
 ## Depends on
-- `core/time` (`TICK_MS`, `secondsToMs`), `core/combat`, `core/progression`, `core/numbers` (`toHundredths`/`fromHundredths`), `core/rng` (types).
+- `core/time` (`TICK_MS`, `secondsToMs`), `core/combat`, `core/progression`, `core/loot`, `core/inventory`, `core/stats`, `core/numbers` (`toHundredths`/`fromHundredths`), `core/rng` (types).

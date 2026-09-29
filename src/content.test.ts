@@ -22,6 +22,8 @@ import {
 } from './core/content/schemas';
 import { createEncounterConfig } from './core/encounter/encounter';
 import { EQUIP_SLOTS } from './core/inventory/inventory';
+import { createEnemyLootTable, createLootConfig, createLootState, rollKillDrop } from './core/loot/loot';
+import { createRng } from './core/rng/rng';
 
 const strings: Record<string, string> = en;
 
@@ -66,6 +68,33 @@ describe('data + strings', () => {
       expect(() =>
         createEncounterConfig(toEncounterConfigInput(validBalance, tile, tileEnemies, lootData)),
       ).not.toThrow();
+    }
+  });
+
+  it('every enemy can roll a kill drop at every level in its range without crashing (v2.4)', () => {
+    const validBalance = parseBalance(balance);
+    const allEnemies = parseEnemies(enemies);
+    const lootConfig = createLootConfig({
+      items: parseItems(itemsData),
+      rarities: parseRarities(raritiesData),
+      affixes: parseAffixes(affixesData),
+      balance: validBalance.loot,
+    });
+    const ctx = { magicFindPct: 0, unlocked: new Set<string>() };
+    for (const enemy of allEnemies) {
+      const table = createEnemyLootTable(enemy.loot);
+      const levels = new Set([enemy.loot.minLevel, enemy.loot.maxLevel, Math.round((enemy.loot.minLevel + enemy.loot.maxLevel) / 2)]);
+      let state = createLootState();
+      let rng = createRng(1);
+      for (const level of levels) {
+        for (let i = 0; i < 20; i++) {
+          expect(() => {
+            const r = rollKillDrop(state, lootConfig, rng, ctx, table, level);
+            state = r.state;
+            rng = r.rng;
+          }, `enemy ${enemy.id} at level ${level}`).not.toThrow();
+        }
+      }
     }
   });
 

@@ -2,13 +2,21 @@
 
 ## Aktuálne
 - **Etapa:** M6 Mapa (GDD kap. 8, 22) – M5 Inventár a výbava hotová ✅
-- **Posledný krok:** M6.2a – políčka T1→T2, výber políčka, odomykanie podľa zabití – otestované (Tomas), čaká na merge PR `m6.2a-tiles`
-- **Ďalší krok:** M6.2b – ďalšie políčka (T3+), vrátane odomykania podľa levelu (T3: 30 zabití + Lv 5) a bossa (T4)
+- **Posledný krok:** M6.2b – políčko T3 (Ant Trail), voliteľné odomknutie podľa levelu v schéme – otestované a zmergnuté
+- **Ďalší krok:** M6.2c – ďalšie políčka T4-T9 vrátane bossov (Ant Captain, Grass Snake) a odomykania questom; T4 ako prvé využije `unlockLevel` (30 zabití + Lv 5)
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model: podľa náročnosti kroku (poviem vopred). Od teraz: AI pripraví vetvu/commit/push a dá Tomasovi presné príkazy/odkaz na PR, test a merge robí Tomas sám (šetrí tokeny oproti ovládaniu prehliadača).
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.
 
 ## Hotové
+### M6.2b – políčko T3 (2026-09-29)
+- `data/tiles.json`: T3 Ant Trail (Armed Ant + Worker Ant, Lv 4-6), odomkne sa po 15 zabitiach
+  na T2 (GDD 8.2). Nový nepriateľ Armed Ant (`data/enemies.json`, GDD 8.3).
+- Schéma políčka (`tileSchema`) má voliteľné `unlockLevel` popri `unlockKills` (obe podmienky
+  musia platiť) - zatiaľ nevyužité (T3 potrebuje len zabitia), pripravené pre budúci boss T4
+  (30 zabití + Lv 5). `core/tiles`: `isTileUnlocked`/`unlockedTileIds` teraz berú aj level hráča.
+- 250 testov zelených. Tomas otestoval a zmergoval (PR #24).
+
 ### M6.2a – políčka T1→T2 (2026-09-28)
 - `data/tiles.json` (nové): T1 Fallen Nest (odomknuté), T2 Mossy Roots (odomkne sa po 8 zabitiach
   na T1). Rozsah levelu nepriateľov je teraz vlastnosť políčka (GDD 8.4 „z rozsahu políčka"), nie
@@ -20,8 +28,8 @@
   `switchTile()` prepne políčko (len ak odomknuté) bez straty HP/levelu/výbavy.
 - Nový modul `core/tiles`: čistá logika odomykania (`isTileUnlocked`/`unlockedTileIds`/`killsToUnlock`).
 - `FightScene`: tlačidlá políčok vedľa boja, zamknuté ukáže „🔒 N kills to unlock".
-- 270 testov zelených (bolo 249). Overené v prehliadači (AI): odomykanie sa dekrementuje po
-  zabitiach, klik na zamknuté políčko nič nerobí, boj beží ďalej. Tomas otestoval a schválil.
+- Overené v prehliadači (AI): odomykanie sa dekrementuje po zabitiach, klik na zamknuté políčko
+  nič nerobí, boj beží ďalej. Tomas otestoval a zmergoval (PR #24, spolu s M6.2b).
 
 ### M6.1 – levely nepriateľov (2026-09-28)
 - Worker Ant má na T1 rozsah levelu 1–2 (`data/enemies.json` `levelMax`); level sa hodí náhodne

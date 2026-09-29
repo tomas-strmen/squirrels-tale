@@ -9,6 +9,7 @@ import {
   createLootConfig,
   createLootState,
   diceFaces,
+  eligibleItems,
   effectiveMagicFind,
   generateItem,
   pityCountdowns,
@@ -109,11 +110,37 @@ describe('item rarity distribution over 10 000 drops on T1 (GDD M4 test)', () =>
   });
 });
 
+describe('eligibleItems (GDD 9.3)', () => {
+  it('only items of tier <= t and >= t - 2 when that window has any', () => {
+    expect(eligibleItems(config, 1, 'base').every((i) => i.tier === 1)).toBe(true);
+  });
+
+  it('falls back to the newest tier <= t once the map has moved past all item content (M6.2 bugfix)', () => {
+    // items.json is still tier-1 only; a tile far beyond it must not come back empty.
+    const pool = eligibleItems(config, 4, 'base');
+    expect(pool.length).toBeGreaterThan(0);
+    expect(pool.every((i) => i.tier === 1)).toBe(true);
+  });
+
+  it('is empty only when no item of that kind exists at or below t at all', () => {
+    expect(eligibleItems(config, 4, 'unique')).toEqual([]);
+  });
+});
+
 describe('generateItem (GDD 9.3)', () => {
   it('only drops items of tier <= t and >= t - 2', () => {
     let rng: RngState = createRng(1);
     for (let i = 0; i < 200; i++) {
       const gen = generateItem(config, rng, t1, rarity('common'), i);
+      rng = gen.rng;
+      expect(gen.item.tier).toBe(1);
+    }
+  });
+
+  it('still drops a (tier-1) item on a tile tier far beyond current item content (M6.2 bugfix)', () => {
+    let rng: RngState = createRng(1);
+    for (let i = 0; i < 20; i++) {
+      const gen = generateItem(config, rng, { ...t1, tileTier: 9 }, rarity('common'), i);
       rng = gen.rng;
       expect(gen.item.tier).toBe(1);
     }

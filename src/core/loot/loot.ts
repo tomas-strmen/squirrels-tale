@@ -168,9 +168,19 @@ export function rollRarity(
   return { rarity: last.rarity, rng: draw.state };
 }
 
-/** Base items that can drop on this tile: tier <= t and >= t - 2 (GDD 9.3). */
+/**
+ * Base items that can drop on this tile: tier <= t and >= t - 2 (GDD 9.3). Once nothing is
+ * left in that window (map tiles have moved on to a tier no item content covers yet), falls
+ * back to the newest tier at or below `t` instead of dropping nothing - keeps working with
+ * only tier-1 items until higher-tier gear is added.
+ */
 export function eligibleItems(config: LootConfig, tileTier: number, kind: ItemData['kind']): ItemData[] {
-  return config.items.filter((i) => i.kind === kind && i.tier <= tileTier && i.tier >= tileTier - 2);
+  const inWindow = config.items.filter((i) => i.kind === kind && i.tier <= tileTier && i.tier >= tileTier - 2);
+  if (inWindow.length > 0) return inWindow;
+  const atOrBelow = config.items.filter((i) => i.kind === kind && i.tier <= tileTier);
+  if (atOrBelow.length === 0) return atOrBelow;
+  const newestTier = Math.max(...atOrBelow.map((i) => i.tier));
+  return atOrBelow.filter((i) => i.tier === newestTier);
 }
 
 /**

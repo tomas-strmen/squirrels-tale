@@ -22,6 +22,8 @@ import {
 } from './core/content/schemas';
 import { createEncounterConfig } from './core/encounter/encounter';
 import { EQUIP_SLOTS } from './core/inventory/inventory';
+import { createLootState, rollKillDrop } from './core/loot/loot';
+import { createRng } from './core/rng/rng';
 
 const strings: Record<string, string> = en;
 
@@ -66,6 +68,30 @@ describe('data + strings', () => {
       expect(() =>
         createEncounterConfig(toEncounterConfigInput(validBalance, tile, tileEnemies, lootData)),
       ).not.toThrow();
+    }
+  });
+
+  it('every tile can actually roll a kill drop without crashing (M6.2 regression: T4 had no item content)', () => {
+    const validBalance = parseBalance(balance);
+    const allEnemies = parseEnemies(enemies);
+    const lootData = {
+      items: parseItems(itemsData),
+      rarities: parseRarities(raritiesData),
+      affixes: parseAffixes(affixesData),
+    };
+    for (const tile of parseTiles(tilesData)) {
+      const tileEnemies = allEnemies.filter((e) => tile.enemyIds.includes(e.id));
+      const config = createEncounterConfig(toEncounterConfigInput(validBalance, tile, tileEnemies, lootData));
+      let state = createLootState();
+      let rng = createRng(1);
+      const ctx = { tileTier: config.tileTier, magicFindPct: 0, unlocked: new Set<string>() };
+      for (let i = 0; i < 50; i++) {
+        expect(() => {
+          const drop = rollKillDrop(state, { ...config.loot, dropChanceBp: 10000 }, rng, ctx);
+          state = drop.state;
+          rng = drop.rng;
+        }, `tile ${tile.id} (tier ${tile.tier})`).not.toThrow();
+      }
     }
   });
 

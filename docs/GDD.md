@@ -300,8 +300,8 @@ ak stun (šanca stun%) → cieľ má ďalší útok oneskorený o 1.5 s (boss 0.
 **Legendárne črty [MVP, 4 ks]:** *+3 levely skillu typu zbrane*, *crit lieči 0.1 HP*, *+20 % poškodenie proti letiacim*, *10 % šanca neminúť oriešok (sčíta sa)*.
 
 ### 9.3 Generovanie predmetu
-1. Vyber základný predmet z drop tabuľky políčka (tier ≤ t a ≥ t−2).
-2. Hoď na vzácnosť (9.6).
+1. **Drop tabuľka (v2.4):** každý nepriateľ má vlastný zoznam predmetov, každý so šancou na jeho vlastnom `minLevel` a na jeho vlastnom `maxLevel` (nezávisle od políčka). Pri zabití sa **každá položka hodí samostatne** – z jedného zabitia môže padnúť aj 0, aj viac predmetov naraz. Šanca pre aktuálny (rolnutý, 8.4) level sa počíta lineárnou interpoláciou medzi `minLevel` a `maxLevel`; boss s `minLevel = maxLevel` má jedno pevné číslo.
+2. Pre každý predmet, čo takto padol a je **základný** (base – Common/Uncommon/Rare/Legendary variant), sa hodí jeho vzácnosť z **vlastnej tabuľky váh nepriateľa** (váha na `minLevel`/`maxLevel` za každú vzácnosť, rovnaká interpolácia; Magic Find a zámok questu na Legendary platia navyše, 9.6). **Unikátne** a **set** predmety sú v tabuľke vlastným riadkom a padajú vždy vo svojej pevnej vzácnosti – žiadny hod, žiadny fallback netreba (predtým: keď hod padol na *unique* bez dostupného kusu → Rare s 3 afixmi; to už nemôže nastať).
 3. Každá hodnota: náhodne v rozsahu `base × rarityMult × (1 + 0.08 × upgradeLevel)`, na **0.01** (zobrazenie floor na 0.1, kap. 5). Zbraň: rozsah poškodenia `min–max × rarityMult` (hod na úder je v boji); ostatné hodnoty (armor, +HP…) sa hodia raz pri vzniku predmetu.
 4. Afixy: náhodne z poolu (bez zamknutých štatistík, bez duplicít); hodnota podľa tieru `base × (1 + 0.35 × (tier − 1))`.
 
@@ -358,19 +358,19 @@ ak stun (šanca stun%) → cieľ má ďalší útok oneskorený o 1.5 s (boss 0.
 
 ### 9.5 Unikátne predmety (fixné vlastnosti)
 - **Apple Branch:** vždy +8 % stun (aj pred odomknutím stunu).
-- **Ant Captain's Pike:** +15 % poškodenie proti mravcom. Istý drop pri prvom zabití Kapitána, potom 25 %.
-- **Snake Fang:** +10 % crit šanca. Istý drop pri prvom zabití Užovky, potom 25 %.
-- Keď hod padne na *unique*, ale na políčku nie je dostupný žiadny unikát → namiesto neho Rare s 3 afixmi.
+- **Ant Captain's Pike:** +15 % poškodenie proti mravcom. Istý drop pri prvom zabití Kapitána, potom 25 % (v drop tabuľke, 9.3 – presné previazanie na „prvý kill" doriešime pri implementácii bossov).
+- **Snake Fang:** +10 % crit šanca. Istý drop pri prvom zabití Užovky, potom 25 % (rovnako).
+- V drop tabuľke nepriateľa (9.3) sú vlastným riadkom so svojou šancou; padajú vždy vo svojej pevnej vzácnosti (žiadny fallback na Rare netreba, v2.4).
 
 **Set Leaf Guardian (Strážca listov):** 2 ks: +1.0 max HP · 3 ks: +10 % dodge (pred odomknutím dodge: +0.5 armor) · 4 ks: +15 % rýchlosť útoku a +20 % regenerácia.
 
 ### 9.6 Drop, hod kockou, Magic Find, pity
-- **Šanca na predmet:** 4 % za bežné zabitie (cieľ Tomasa: ~100–150 predmetov za 6–8 h), šampión 100 %, boss 2 predmety.
-- **Základné váhy vzácnosti:** Common 70 · Uncommon 22 · Rare 6.0 · Unique 0.9 · Set 0.8 (len T3+; pred T3 pripadne Common) · Legendary 0.3.
-- Kontrola: pri ~4 000 zabitiach do T7 (vrátane farmenia) padne ~160 predmetov, z toho zo šampiónov (~80 × 10× váhy) ~6–10 kúskov setu + pity každých 1000 zabití → celý Leaf Guardian set je reálny okolo T7–T8.
-- **Magic Find:** váhy Uncommon a Rare × (1 + MF/100); váhy Unique/Set/Legendary × (1 + MF_eff/100), kde `MF_eff = MF × 100 / (MF + 100)` (klesajúci účinok). Common = zvyšok do 100 (min. 0).
-- **Hod kockou (vizuál):** k20 kocka sa zakotúľa, výsledok je určený vopred z tabuľky; animácia vyberie stenu, ktorá zodpovedá vzácnosti (1–14 common, 15–18 uncommon, 19 rare, 20 → druhá zlatá kocka pre unique/set/legendary). Počas offline sa kocky ukážu až v súhrne (len pre rare+).
-- **Pity (garantovaný progres, v2.2):** samostatné počítadlo pre každú vzácnosť – **Rare 1000**, **Unique 5000**, **Legendary 20 000** zabití. Keď počítadlo dobehne, ďalší drop je istý a aspoň danej vzácnosti. Keď padne predmet, vynulujú sa počítadlá jeho vzácnosti a nižších (Legendary vynuluje aj Rare a Unique). Počítadlo beží, len keď daná vzácnosť môže padnúť (odomknutá, predmety na políčku). V UI je odpočet („Lucky acorn: Rare in 266 kills“). Keystone stromu skráti Rare na 800.
+- **Šanca na predmet (v2.4):** vlastná pre každého nepriateľa – súčet % v jeho drop tabuľke (9.3), rastie s jeho levelom. Žiadne spoločné číslo pre všetkých; šampión a boss majú vo svojej tabuľke vyššie/isté hodnoty.
+- **Váhy vzácnosti (v2.4):** vlastné pre každého nepriateľa (9.3 bod 2), rastú s jeho levelom – vyšší level = lepšia šanca na kvalitnejší kus. Štartovacie hodnoty pri napĺňaní tabuliek (krok „migrácia obsahu“): Common 70 · Uncommon 22 · Rare 6.0 · Unique 0.9 · Set 0.8 · Legendary 0.3 (Set/Unique dávam len do tabuliek nepriateľov, kde má dávať zmysel – napr. Set až od T3, obsahom, nie kódom).
+- Kontrola z pôvodného návrhu (pri ~4 000 zabitiach do T7 vyjde ~160 predmetov, z toho okolo T7–T8 reálny celý Leaf Guardian set) – prepočítame znova, až budú tabuľky naplnené (krok 3 nižšie).
+- **Magic Find:** násobí váhy z vlastnej tabuľky nepriateľa rovnako ako doteraz – Uncommon a Rare × (1 + MF/100); Unique/Set/Legendary × (1 + MF_eff/100), kde `MF_eff = MF × 100 / (MF + 100)` (klesajúci účinok). Common = zvyšok do 100 (min. 0).
+- **Hod kockou (vizuál):** k20 kocka sa zakotúľa, výsledok je určený vopred z tabuľky; animácia vyberie stenu, ktorá zodpovedá vzácnosti (1–14 common, 15–18 uncommon, 19 rare, 20 → druhá zlatá kocka pre unique/set/legendary). Keď z jedného zabitia padne viac predmetov naraz (v2.4), kocky/popupy idú jeden po druhom. Počas offline sa kocky ukážu až v súhrne (len pre rare+).
+- **Pity (garantovaný progres, v2.2/v2.4):** samostatné počítadlo pre každú vzácnosť – **Rare 1000**, **Unique 5000**, **Legendary 20 000** zabití. Keď počítadlo dobehne, ďalší kill istotne pridá aspoň jeden predmet danej (alebo vyššej) vzácnosti – aj keby podľa tabuliek nemal padnúť žiadny. Keď padne predmet, vynulujú sa počítadlá jeho vzácnosti a nižších (Legendary vynuluje aj Rare a Unique). Počítadlo beží, len keď daná vzácnosť môže padnúť (odomknutá, je v tabuľke aspoň jedného nepriateľa na tomto políčku). V UI je odpočet („Lucky acorn: Rare in 266 kills“). Keystone stromu skráti Rare na 800.
 - **Legendary je zamknutý** (v2.1), kým ho neodomkne quest (ktorý – otvorené, kap. 24); dovtedy jeho váha pripadne Common.
 
 ---
@@ -711,3 +711,4 @@ tools/sim/         # headless simulácia tempa (npm run sim) → tabuľka čas/l
 | 2.1 | 2026-09-26 | 9.6: pity garantuje aspoň Rare (bolo Unique+), UI odpočet; Legendary zamknutý do questu (24: ktorý – otvorené). |
 | 2.2 | 2026-09-26 | 9.6: pity samostatne pre Rare 1000 / Unique 5000 / Legendary 20 000 zabití; drop vynuluje počítadlá svojej a nižších vzácností. |
 | 2.3 | 2026-09-27 | 9.1: 9 slotov (pravá/ľavá labka, ranged, head, body, legs, ring, amulet, tail); ľavá labka = štít alebo druhá zbraň (50 % poškodenia, interval nemení). 9.4/7.2: zbraň posúva interval postavy o pevné sekundy (posun = pôvodný interval − 2.4 s). 24: otázka intervalu uzavretá. |
+| 2.4 | 2026-09-29 | 9.3/9.5/9.6: drop predmetov aj vzácnosti sú teraz vlastné pre každého nepriateľa (drop tabuľka + tabuľka váh vzácnosti, obe s vlastným `minLevel`/`maxLevel` nepriateľa), nie podľa políčka. Každá položka v drop tabuľke sa hodí samostatne – z jedného zabitia môže padnúť aj viac predmetov naraz. Unikátne/set predmety sú vlastný riadok s pevnou vzácnosťou (fallback na Rare už netreba). Pity garantuje aspoň jeden predmet danej vzácnosti aj mimo tabuliek. Nahrádza „drop tabuľku políčka" a globálne váhy vzácnosti z 9.3/9.6. |

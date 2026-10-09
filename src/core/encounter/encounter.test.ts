@@ -7,6 +7,7 @@ import { createRng } from '../rng/rng';
 import {
   activeWeaponMode,
   attackProgress,
+  currentAmmo,
   classifyEquip,
   compareEquip,
   createEncounter,
@@ -19,6 +20,7 @@ import {
   playerAttackIntervalMs,
   playerHitMultiplier,
   playerStats,
+  setKeepNuts,
   eatFood,
   equipItem,
   hideoutProgress,
@@ -46,6 +48,7 @@ const rules = {
   fistsVsFlyingHitPct: 50,
 };
 const food = { berryHeal: 0.3, seedHeal: 0.5, nutHeal: 1.0, eatCooldownS: 3.0, autoEatBelowPct: 40, autoFoodUnlockS: 60.0 };
+const ammo = { nutsPerShot: 1, groundAmmoDamagePct: 50, keepNutsDefault: 5 };
 const squirrelInput = { maxHp: 5.0, damageMin: 0.3, damageMax: 0.4, hitPct: 85, armor: 0, dodgePct: 0 };
 /** A tile's only enemy, base level 1 (so `enemyLevelMin: 1` means "no levels above base"). */
 const antInput: EncounterEnemyInput = {
@@ -101,6 +104,7 @@ function makeConfig(patch: Partial<EncounterConfigInput> = {}): EncounterConfig 
     hideoutRegenS: 10.0,
     deathXpLossPct: 10,
     food,
+    ammo,
     loot: lootInput,
     tileTier: 1,
     ...patch,
@@ -974,9 +978,10 @@ describe('ranged weapon and auto-switching (GDD 7.1, M7.3a)', () => {
     enemies: [{ ...antInput, maxHp: 999.0, flying: true }],
     regenAmount: 0,
   });
-  function wearing(cfg: EncounterConfig, items: { club?: boolean; sling?: boolean }): EncounterState {
+  function wearing(cfg: EncounterConfig, items: { club?: boolean; sling?: boolean }, nuts = 10000): EncounterState {
     let s = fresh(cfg);
-    s = { ...s, inventory: { ...s.inventory, bag: [club, sling] } };
+    // Plenty of nuts by default, so slingshot shots are full damage (ammo: M7.3b tests below).
+    s = { ...s, inventory: { ...s.inventory, bag: [club, sling] }, wallet: { ...s.wallet, nuts } };
     if (items.club) s = equipItem(s, cfg, 1, 'rightPaw');
     if (items.sling) s = equipItem(s, cfg, 2, 'ranged');
     return s;
@@ -1030,5 +1035,52 @@ describe('ranged weapon and auto-switching (GDD 7.1, M7.3a)', () => {
     const diff = compareEquip(tanky, 1, s.inventory.equipment, sling, 'ranged');
     expect(diff.damageMax).toBe(50);
     expect(diff.attackIntervalMs).toBe(-200);
+  });
+
+  describe('ammo (GDD 7.3, M7.3b)', () => {
+    const shots = (start: EncounterState, cfg: EncounterConfig, ticks: number) =>
+      run(run(startSearch(start).state, 10, cfg).state, ticks, cfg);
+
+    it('starts with "keep at least 5 nuts" from balance', () => {
+      expect(fresh(tanky).keepNuts).toBe(5);
+      expect(setKeepNuts(fresh(tanky), 12).keepNuts).toBe(12);
+      expect(setKeepNuts(fresh(tanky), -3).keepNuts).toBe(0);
+    });
+
+    it('every shot (hit or miss) spends one nut while above the reserve', () => {
+      const s = wearing(flyingTanky, { sling: true }, 20);
+      expect(currentAmmo(s, flyingTanky)).toBe('nuts');
+      const r = shots(s, flyingTanky, 18 * 4); // 1.8 s interval -> 4 shots
+      const fired = attacks(r.log, 'player');
+      expect(fired).toHaveLength(4);
+      expect(fired.every((l) => l.event.type === 'attack' && l.event.ammo === 'nuts')).toBe(true);
+      expect(r.state.wallet.nuts).toBe(16);
+    });
+
+    it('at the reserve it switches to ground pebbles: free, half damage', () => {
+      const s = wearing(flyingTanky, { sling: true }, 6);
+      const r = shots(s, flyingTanky, 18 * 4);
+      const fired = attacks(r.log, 'player').map((l) => (l.event.type === 'attack' ? l.event.ammo : null));
+      expect(fired).toEqual(['nuts', 'ground', 'ground', 'ground']);
+      expect(r.state.wallet.nuts).toBe(5);
+      expect(currentAmmo(r.state, flyingTanky)).toBe('ground');
+      expect(fightingPlayer(r.state, flyingTanky).fighter.damageMax).toBe(45); // 0.9 x 50 %
+    });
+
+    it('a lower reserve lets it shoot more nuts; eating ignores the reserve', () => {
+      const s = setKeepNuts(wearing(flyingTanky, { sling: true }, 3), 0);
+      expect(currentAmmo(s, flyingTanky)).toBe('nuts');
+      const hurt = { ...wearing(tanky, {}, 3), playerHp: 100 };
+      expect(eatFood(hurt, tanky, 'nuts').state.wallet.nuts).toBe(2);
+    });
+
+    it('a slingshot on ground enemies (no paw weapon) uses nuts too; melee and fists never do', () => {
+      const ranged = shots(wearing(tanky, { sling: true }, 20), tanky, 18);
+      expect(ranged.state.wallet.nuts).toBe(19);
+      const melee = shots(wearing(tanky, { club: true, sling: true }, 20), tanky, 40);
+      expect(attacks(melee.log, 'player').length).toBeGreaterThan(0);
+      expect(melee.state.wallet.nuts).toBe(20);
+      expect(currentAmmo(wearing(tanky, { club: true, sling: true }), tanky)).toBeNull();
+    });
   });
 });

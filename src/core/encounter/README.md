@@ -32,6 +32,11 @@ regenerates passively over time in `idle`/`searching`/`fighting` (GDD
   `flying` enemy (data `enemies.json`, default false) → ranged, none → fists; otherwise paws → ranged → fists.
 - `fightingPlayer(state, config)` – stats + interval actually used in the fight (with that weapon mode).
 - `playerHitMultiplier(state, config)` – 0.5 for fists vs a flying enemy (`fistsVsFlyingHitPct`), else 1.
+- Ammo (GDD 7.3, M7.3b, `core/ammo`): `currentAmmo(state, config)` – `nuts` / `ground` for the next slingshot
+  shot, null when it isn't the active weapon. Each shot (hit or miss) spends a nut from `state.wallet` while
+  above `state.keepNuts`; ground pebbles are free, damage × `groundAmmoDamagePct` % (already in
+  `fightingPlayer`). Player `attack` events carry `ammo` for slingshot shots.
+  `setKeepNuts(state, n)` – the "keep at least N nuts" reserve (default `ammo.keepNutsDefault`); eating ignores it.
 - `compareEquip` compares a ranged-slot item as it shoots (`ranged` mode), paw items in `melee` mode.
 - `state.enemyId` / `state.enemyLevel` – species and level of the current (or next, while
   searching) enemy; level is rolled within `[config.enemyLevelMin, config.enemyLevelMax]`
@@ -66,4 +71,4 @@ regenerates passively over time in `idle`/`searching`/`fighting` (GDD
   (see `FightScene`), not something this module does on its own.
 
 ## Depends on
-- `core/time` (`TICK_MS`, `secondsToMs`), `core/combat`, `core/progression`, `core/loot`, `core/inventory`, `core/stats`, `core/numbers` (`toHundredths`/`fromHundredths`), `core/rng` (types).
+- `core/time` (`TICK_MS`, `secondsToMs`), `core/combat`, `core/progression`, `core/loot`, `core/inventory`, `core/stats`, `core/ammo`, `core/numbers` (`toHundredths`/`fromHundredths`), `core/rng` (types).

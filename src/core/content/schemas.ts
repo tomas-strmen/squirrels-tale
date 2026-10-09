@@ -388,6 +388,15 @@ export const balanceSchema = z.object({
     /** One "watch an ad" unlocks auto-food for this long (mock ad, GDD 18.1). */
     autoFoodUnlockS: designSecondsSchema.refine((v) => v > 0, 'must be greater than 0'),
   }),
+  /** Ranged weapon ammo (GDD 7.3, M7.3b). */
+  ammo: z.object({
+    /** Nuts spent per shot. */
+    nutsPerShot: z.number().int().min(1),
+    /** Damage of a shot with pebbles from the ground (no nuts to spare), % of normal. */
+    groundAmmoDamagePct: percentSchema.refine((v) => v > 0, 'must be greater than 0'),
+    /** Starting value of "keep at least N nuts" (reserve for food/trade, not shot). */
+    keepNutsDefault: z.number().int().min(0),
+  }),
   /** Enemy stat scaling per level above its tile's base level (GDD 8.4, M6.1). Crit is locked (GDD 6.1). */
   enemyLeveling: z.object({
     hpPctPerLevel: percentSchema,

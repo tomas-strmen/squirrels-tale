@@ -21,6 +21,7 @@ import {
   activeWeaponMode,
   attackProgress,
   classifyEquip,
+  currentAmmo,
   compareEquip,
   createEncounter,
   createEncounterConfig,
@@ -32,6 +33,7 @@ import {
   playerHitMultiplier,
   playerStats,
   searchProgress,
+  setKeepNuts,
   startSearch,
   switchTile,
   tick,
@@ -142,6 +144,7 @@ export class FightScene extends Phaser.Scene {
   private foodButtons: Button[] = [];
   private autoFoodText!: Phaser.GameObjects.Text;
   private autoFoodBar!: ProgressBar;
+  private keepNutsText!: Phaser.GameObjects.Text;
 
   constructor() {
     super('FightScene');
@@ -397,6 +400,19 @@ export class FightScene extends Phaser.Scene {
       .setOrigin(0, 0.5);
     this.autoFoodBar = new ProgressBar(this, 1160, 360, { width: 220, height: 16, fillColor: 0x6fbf6f });
     new Button(this, 1140, 405, t('food.watchAd'), () => this.onWatchAd(), { width: 200, height: 40, fontSize: 16 });
+
+    // Ammo (GDD 7.3, M7.3b): "keep at least N nuts" - the slingshot never shoots below it.
+    this.keepNutsText = this.add
+      .text(1020, 458, '', { ...textStyle, fontSize: '18px', color: '#c8c8c8' })
+      .setOrigin(0, 0.5);
+    this.add
+      .text(1020, 480, t('ammo.keepNutsHint'), { ...textStyle, fontSize: '13px', color: '#909090' })
+      .setOrigin(0, 0.5);
+    const keepStep = (delta: number) => () => {
+      this.state = setKeepNuts(this.state, this.state.keepNuts + delta);
+    };
+    new Button(this, 1195, 465, '−', keepStep(-1), { width: 36, height: 32, fontSize: 18 });
+    new Button(this, 1240, 465, '+', keepStep(1), { width: 36, height: 32, fontSize: 18 });
   }
 
   private onEat(food: FoodId): void {
@@ -421,6 +437,7 @@ export class FightScene extends Phaser.Scene {
       unlocked ? `${t('food.auto')}  ${Math.ceil(autoFoodMsLeft / 1000)} s` : `🔒 ${t('food.auto')}`,
     );
     this.autoFoodBar.setVisible(unlocked).setProgress(autoFoodMsLeft / this.config.food.autoFoodUnlockMs);
+    this.keepNutsText.setText(t('ammo.keepNuts').replace('{n}', String(this.state.keepNuts)));
   }
 
   private onToggleLoot(): void {
@@ -533,16 +550,19 @@ export class FightScene extends Phaser.Scene {
     this.statsPanel.setVisible(!this.statsPanel.visible);
   }
 
-  /** "Twig Slingshot (Ranged)" / "Fists" (+ hit penalty vs flying), GDD 7.1 M7.3a. */
-  private weaponLabel(): string {
+  /** "Twig Slingshot (Ranged)" / "Fists", plus a hit penalty vs flying (M7.3a) or the ammo (M7.3b) line. */
+  private weaponLines(): string[] {
     const mode = activeWeaponMode(this.state, this.config);
     const gear = this.state.inventory.equipment;
     const item = mode === 'ranged' ? gear.ranged : mode === 'melee' ? (gear.rightPaw ?? gear.leftPaw) : null;
     const modeName = tDynamic(`weapon.mode.${mode}`);
-    const label = item ? `${itemName(item)} (${modeName})` : modeName;
+    const lines = [`${t('stats.weapon')}: ${item ? `${itemName(item)} (${modeName})` : modeName}`];
     const hitMult = playerHitMultiplier(this.state, this.config);
-    if (hitMult === 1) return label;
-    return `${label}\n${t('weapon.fistsVsFlying').replace('{pct}', String(Math.round(hitMult * 100)))}`;
+    if (hitMult !== 1) lines.push(t('weapon.fistsVsFlying').replace('{pct}', String(Math.round(hitMult * 100))));
+    const ammo = currentAmmo(this.state, this.config);
+    if (ammo === 'nuts') lines.push(t('ammo.nuts'));
+    if (ammo === 'ground') lines.push(t('ammo.ground').replace('{pct}', String(this.config.ammo.groundAmmoDamagePct)));
+    return lines;
   }
 
   private refreshStatsPanel(): void {
@@ -557,7 +577,7 @@ export class FightScene extends Phaser.Scene {
       `${t('stats.level')}: ${level}`,
       `${t('stats.xp')}: ${formatHundredths(xp)} / ${formatHundredths(needed)}`,
       `${t('stats.maxHp')}: ${formatHundredths(stats.maxHp)}`,
-      `${t('stats.weapon')}: ${this.weaponLabel().replace('\n', ' - ')}`,
+      this.weaponLines().join(' - '),
       `${t('stats.damage')}: ${formatHundredths(stats.damageMin)} - ${formatHundredths(stats.damageMax)}`,
       // Explicit 2 decimals here (not the usual floor-to-0.1) so small per-level changes show up.
       `${t('stats.attackInterval')}: ${intervalS.toFixed(2)} s`,
@@ -610,7 +630,7 @@ export class FightScene extends Phaser.Scene {
     const playerMaxHp = playerStats(this.config, this.state.progression.level, this.state.inventory.equipment).maxHp;
     this.playerHpText.setText(`${formatHpHundredths(this.state.playerHp)} / ${formatHundredths(playerMaxHp)}`);
     this.levelText.setText(`${t('stats.level')} ${this.state.progression.level}`);
-    this.weaponText.setText(`${t('stats.weapon')}: ${this.weaponLabel()}`);
+    this.weaponText.setText(this.weaponLines().join('\n'));
     if (this.statsPanel.visible) this.refreshStatsPanel();
     if (this.lootPanel.visible) this.refreshLootPanel();
     this.refreshTileButtons();

@@ -46,6 +46,11 @@
     "autoEatBelowPct": 40,
     "autoFoodUnlockS": 60.0
   },
+  "ammo": {
+    "nutsPerShot": 1,
+    "groundAmmoDamagePct": 50,
+    "keepNutsDefault": 5
+  },
   "enemyLeveling": {
     "hpPctPerLevel": 10,
     "damagePctPerLevel": 5,

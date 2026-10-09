@@ -13,6 +13,8 @@ import {
 
 /** Real seconds between autosaves (GDD 19). */
 const AUTOSAVE_INTERVAL_MS = 30_000;
+/** Which open tab may save: the one that loaded last. An older tab stops saving instead of overwriting. */
+const OWNER_KEY = 'squirrels-tale.save.owner';
 
 /** `window.localStorage`, or null where it's blocked (private mode, sandboxed iframe). */
 function browserStorage(): SaveStorage | null {
@@ -31,6 +33,10 @@ function browserStorage(): SaveStorage | null {
  * Glue between the running game and `core/save` (M8.1): loads at start, autosaves every
  * 30 s of real time, when the page is hidden/closed and soon after important actions
  * (`requestSave`). Without localStorage the game still runs, it just doesn't save.
+ *
+ * Only one open tab saves: each page claims `OWNER_KEY` when it starts; a page that finds
+ * another tab took over stops saving (`otherTabActive`) - otherwise two tabs would keep
+ * overwriting each other's progress (last writer wins).
  */
 export class SaveManager {
   private readonly storage = browserStorage();
@@ -40,10 +46,18 @@ export class SaveManager {
   private pending = false;
   /** After a reset/import the page reloads - don't let the closing page save over it. */
   private suspended = false;
+  private readonly sessionId = `${now()}-${Math.random().toString(36).slice(2)}`;
+  private lostOwnership = false;
+
+  /** True once the game was opened in another tab: this one no longer saves. */
+  get otherTabActive(): boolean {
+    return this.lostOwnership;
+  }
 
   /** The newest readable save, or null for a new game. */
   load(): SaveData | null {
     if (!this.storage) return null;
+    this.storage.setItem(OWNER_KEY, this.sessionId);
     const loaded = loadSave(this.storage);
     if (!loaded) {
       if (backupUnreadable(this.storage) > 0) console.error('Save could not be read - a copy was kept, starting a new game.');
@@ -69,7 +83,12 @@ export class SaveManager {
   save(state: EncounterState, playTimeMs: number): void {
     this.pending = false;
     this.sinceSaveMs = 0;
-    if (!this.storage || this.suspended) return;
+    if (!this.storage || this.suspended || this.lostOwnership) return;
+    if (this.storage.getItem(OWNER_KEY) !== this.sessionId) {
+      this.lostOwnership = true;
+      console.warn('The game was opened in another tab - this tab stops saving.');
+      return;
+    }
     const data = snapshot(state, { createdAt: this.createdAt, now: now(), maxSeenTime: this.maxSeenTime, playTimeMs });
     try {
       writeSave(this.storage, data);

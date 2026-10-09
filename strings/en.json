@@ -22,6 +22,7 @@
   "save.importPrompt": "Paste a save:",
   "save.importInvalid": "This save can't be loaded: {error}",
   "save.resetConfirm": "Delete the save and start a new game?",
+  "save.otherTab": "Opened in another tab - this tab no longer saves. Close it.",
   "stats.button": "Show stats",
   "stats.title": "STATS",
   "stats.level": "Level",

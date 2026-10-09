@@ -23,7 +23,8 @@ An old save must always load (CLAUDE.md).
   when current is corrupt. `SaveStorage` = the `getItem/setItem/removeItem` part of `localStorage`.
 - `backupUnreadable(storage)` – if no slot is readable, copies the raw texts to `UNREADABLE_KEYS` (kept,
   never overwritten) before a new game starts saving over them.
-- Known limit: two open tabs of the game both autosave - the last one wins.
+- Two open tabs: `src/game/SaveManager` lets only the most recently opened tab save (owner key); an older
+  tab stops saving and shows a warning, so tabs never overwrite each other.
 
 ## Depends on
 `core/encounter` (`createEncounter`, `playerStats`), `core/content` (schemas), `core/inventory`, `core/loot`,

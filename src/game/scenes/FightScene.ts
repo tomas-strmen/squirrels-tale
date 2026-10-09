@@ -153,6 +153,7 @@ export class FightScene extends Phaser.Scene {
   private keepNutsText!: Phaser.GameObjects.Text;
   /** Save game (GDD 19, M8.1): load at start, autosave. */
   private readonly saves = new SaveManager();
+  private otherTabText!: Phaser.GameObjects.Text;
 
   constructor() {
     super('FightScene');
@@ -428,6 +429,10 @@ export class FightScene extends Phaser.Scene {
     saveButton(W / 2 - 120, t('save.export'), () => void this.onExportSave());
     saveButton(W / 2, t('save.import'), () => this.onImportSave());
     saveButton(W / 2 + 120, t('save.reset'), () => this.onResetGame());
+    this.otherTabText = this.add
+      .text(W / 2, 562, t('save.otherTab'), { ...textStyle, fontSize: '17px', color: '#ff7a7a' })
+      .setOrigin(0.5)
+      .setVisible(false);
     this.timeText = this.add.text(10, 640, '', { ...textStyle, fontSize: '16px', color: '#a0a0a0' });
     this.pityText = this.add.text(10, 662, '', { ...textStyle, fontSize: '16px', color: '#a0a0a0' });
     // Wallet (GDD 11.1): the three currencies, top right under the Drop rate row's tile picker.
@@ -728,6 +733,7 @@ export class FightScene extends Phaser.Scene {
     this.timeText.setText(`${t('hud.time')}: ${formatDuration(this.simElapsedMs)}`);
     // Autosave every 30 s of real time, or right after an important action (M8.1).
     this.saves.update(delta, this.state, this.simElapsedMs);
+    if (this.saves.otherTabActive && !this.otherTabText.visible) this.otherTabText.setVisible(true);
     // One line per pity rarity that can drop here (GDD 9.6 v2.2); locked ones stay hidden.
     const countdowns = pityCountdowns(
       this.state.loot,

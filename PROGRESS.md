@@ -2,16 +2,29 @@
 
 ## Aktuálne
 - **Etapa:** M7 Meny, jedlo, diaľkový boj (GDD kap. 22) – M5 hotová ✅, M6 uzavretá (zvyšok čaká na M7/M13/M14)
-- **Posledný krok:** M7.2 – jedlo + auto-jedlo zamknuté reklamou (GDD v2.6) – otestované a zmergnuté (PR #28). Pred ním M7.1 meny + spawn tabuľka (PR #27).
-- **Rozpracované:** M7.3a – prak v boji + auto-prepínanie zbraní (GDD v2.7), vetva `m7.3a-ranged-weapon`, čaká na test Tomasa.
-  Plán M7.3: a) prak + prepínanie (teraz), b) munícia (oriešky, kamienky 50 %, „keep at least N nuts“),
-  c) lietajúci nepriatelia Moth/Dragonfly/Wasp + ako sa dostať na T5 pred bossom (M14).
-- **Ďalší krok:** M7.3 diaľkový boj – diaľkové zbrane (slot ranged), munícia + náhradné kamienky, lietajúci nepriatelia (Moth/Dragonfly/Wasp na T5+), auto-prepínanie zbraní (GDD 7.1, 8.3, 9.4; rozdeliť na malé kroky a navrhnúť prvý). Odporúčaný model: Opus. Potom M8 Save (Opus, save sa nesmie rozbiť), neskôr loot krok 3 (čísla v tabuľkách) a 4 (editor tabuliek).
+- **Posledný krok:** M7.3a – prak v boji + auto-prepínanie zbraní (GDD v2.7) – Tomas otestoval („všetko funguje“), merge cez PR robí Tomas. Pred ním M7.2 jedlo (PR #28).
+- **Rozpracované:** nič (po merge M7.3a)
+- **Ďalší krok:** M7.3b munícia – 1 oriešok na výstrel, po minutí kamienky zo zeme s 50 % poškodenia (nekonečné),
+  nastavenie „keep at least N nuts“ (GDD 7.3). Potom M7.3c lietajúci nepriatelia Moth/Dragonfly/Wasp + ako sa dostať
+  na T5 pred bossom (M14). Odporúčaný model: Opus. Potom M8 Save (Opus, save sa nesmie rozbiť), neskôr loot krok 3
+  (čísla v tabuľkách) a 4 (editor tabuliek).
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model: podľa náročnosti kroku (poviem vopred). Od teraz: AI pripraví vetvu/commit/push a dá Tomasovi presné príkazy/odkaz na PR, test a merge robí Tomas sám (šetrí tokeny oproti ovládaniu prehliadača).
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.
 
 ## Hotové
+### M7.3a – prak + auto-prepínanie zbraní (2026-10-09, GDD v2.7)
+- Nový predmet **Twig Slingshot** (ranged, 0.3–0.5, interval −0.2 s), padá z Armed Ant (T3). Slot „Ranged“ vo výbave
+  existoval už od M5 (hromadné zahadzovanie berie len batoh, nasadený prak je v bezpečí).
+- **Auto-prepínanie (GDD 7.1):** letiaci nepriateľ → prak (bez praku päste s **polovičnou šancou na zásah**,
+  `balance.json` `combat.fistsVsFlyingHitPct`); inak zbraň v labke → prak → päste. Prak zaberá **obe labky**
+  (zbrane v labkách sa pri streľbe nepočítajú); štatistiky a afixy celej výbavy platia vždy.
+- `core/stats` (`chooseWeaponMode`, `weaponMode`), `core/combat` (násobok šance na zásah), `core/encounter`
+  (`flying` u nepriateľa, `activeWeaponMode`/`fightingPlayer`/`playerHitMultiplier`, porovnanie praku ako strieľa).
+- UI: riadok „Weapon: …“ vpravo od veveričky + v Stats; debug tlačidlo **Flying ON/off** (všetci nepriatelia letia).
+- Test spawn váh už nepáli 4 mil. tickov (bol tesne pod 5 s limitom) – celá sada 7 s → 2 s. 295 testov zelených.
+- Tomas otestoval v hre: všetko funguje.
+
 ### M7.2 – jedlo a auto-jedlo (2026-10-09, GDD v2.6)
 - Jedlo = počítadlá v peňaženke: **Berries** (nové, len jedlo; padajú z drop tabuľky nepriateľa, štart 10 %), **Seeds**
   a **Nuts** (aj meny). Liečia 0.3 / 0.5 / 1.0 (`balance.json` `food`). Zjesť sa dá ručne 3 tlačidlami (aj počet kusov);

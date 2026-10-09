@@ -99,7 +99,10 @@ export function rollStock(
   return { merchant: { day, stock, rng }, nextUid: uid };
 }
 
-/** Rolls a new stock if `day` is a new day; otherwise the same state object. */
+/**
+ * Rolls a new stock if `day` is later than the stock's day; otherwise the same state object
+ * (an earlier day - clock wound back - never rerolls the stock, GDD 17.3).
+ */
 export function refreshStock(
   state: EncounterState,
   loot: LootConfig,
@@ -107,7 +110,7 @@ export function refreshStock(
   day: number,
   maxTier: number,
 ): EncounterState {
-  if (state.merchant.day === day) return state;
+  if (day <= state.merchant.day) return state;
   const rolled = rollStock(state.merchant, loot, config, day, maxTier, state.loot.nextUid);
   return { ...state, merchant: rolled.merchant, loot: { ...state.loot, nextUid: rolled.nextUid } };
 }

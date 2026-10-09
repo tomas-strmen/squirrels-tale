@@ -1,7 +1,7 @@
-# Veverička – Game Design Document (GDD) v2.12
+# Veverička – Game Design Document (GDD) v2.13
 
 > **Pracovný názov hry:** *Squirrel's Tale* (dočasný – finálny názov vybrať pred vydaním; nesmie pripomínať „Hero Tale“).
-> **Stav:** v2.12, 10. 10. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
+> **Stav:** v2.13, 10. 10. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
 > **Súvisiace:** `claude/ROADMAP.md` (technológia, architektúra, etapy vydania), `claude/PROMPT-vyvoj.md` (ako má AI pracovať).
 
 ---
@@ -411,6 +411,7 @@ ak stun (šanca stun%) → cieľ má ďalší útok oneskorený o 1.5 s (boss 0.
 - Cena predmetu tieru t: `V(t) = round(5 × 1.5^(t−1))` (t1: 5, t3: 11, t5: 25, t9: 128). Uncommon ×3.
 - **Platí sa menou podľa slotu:** zbrane = kamienky, brnenie = semienka, šperky = oriešky. Rovnako **výkup**:
   Common 0.2 V · Uncommon 0.6 V · Rare 1.5 V · Unique 4 V · Set 3 V · Legendary 10 V (min. 1); +20 % za každé +1 vylepšenie.
+- **Implementácia (v2.13, M10):** kým nie sú questy (M13), Straka sa **odomkne spolu s T2** (jej domov; `balance.json` `merchant.unlockTile`), Q2 to neskôr prevezme. Tovar sa obnoví o **polnoci UTC** (podľa času, nie počítadla; posunutie hodín dozadu tovar nezmení), je rovnaký celý deň aj po reštarte (save v3). Tovar = náhodné základné predmety s tierom ≤ najvyšší tier odomknutého políčka. Násobky nákupu/výkupu sú pri vzácnostiach v `data/rarities.json` (`buyPct`, `sellPct`). Predať sa dá len nezamknutý predmet z batohu. Bonus za vylepšenie príde s kováčom (M16).
 
 ---
 
@@ -724,6 +725,7 @@ tools/sim/         # headless simulácia tempa (npm run sim) → tabuľka čas/l
 | 2.3 | 2026-09-27 | 9.1: 9 slotov (pravá/ľavá labka, ranged, head, body, legs, ring, amulet, tail); ľavá labka = štít alebo druhá zbraň (50 % poškodenia, interval nemení). 9.4/7.2: zbraň posúva interval postavy o pevné sekundy (posun = pôvodný interval − 2.4 s). 24: otázka intervalu uzavretá. |
 | 2.4 | 2026-09-29 | 9.3/9.5/9.6: drop predmetov aj vzácnosti sú teraz vlastné pre každého nepriateľa (drop tabuľka + tabuľka váh vzácnosti, obe s vlastným `minLevel`/`maxLevel` nepriateľa), nie podľa políčka. Každá položka v drop tabuľke sa hodí samostatne – z jedného zabitia môže padnúť aj viac predmetov naraz. Unikátne/set predmety sú vlastný riadok s pevnou vzácnosťou (fallback na Rare už netreba). Pity garantuje aspoň jeden predmet danej vzácnosti aj mimo tabuliek. Nahrádza „drop tabuľku políčka" a globálne váhy vzácnosti z 9.3/9.6. |
 | 2.5 | 2026-10-09 | 8.2: spawn tabuľka políčka (nepriateľ + váha) v `data/tiles.json`. 11.1: drop mien je súčasťou vlastnej drop tabuľky každého nepriateľa (mena, šanca podľa levelu, počet kusov), nie jeden vzorec podľa tieru políčka. |
+| 2.13 | 2026-10-10 | 11.2: obchodníčka Straka (M10) – dočasne sa odomkne s T2 (Q2 v M13), tovar sa obnovuje o polnoci UTC, nákup/výkup podľa vzácnosti z `rarities.json`, len nezamknuté predmety z batohu. |
 | 2.12 | 2026-10-10 | 10: Rare+ sa pri plnom batohu nestratí (ide nad limit); pravidlá triedenia a „Keep only upgrades“ presunuté k M10/M16. 17.2: dopočíta sa aj čas v pozadí. |
 | 2.11 | 2026-10-10 | 17.2: offline progres sa simuluje skutočnými pravidlami boja (nie odhad TTK); smrť offline → farmenie polovice času; súhrn od 60 s; save v2 si pamätá farmenie vs. Peace!. |
 | 2.10 | 2026-10-10 | 19: po načítaní hra začína v pokoji na uloženom políčku (boj/úkryt sa neobnovujú); ukladajú sa všetky Rng prúdy, „Keep nuts“ a odohraný čas. |

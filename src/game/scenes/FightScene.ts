@@ -59,6 +59,18 @@ import { createRng } from '../../core/rng/rng';
 import { restore } from '../../core/save/save';
 import { createOfflineConfig, offlineMs, simulateOffline, type OfflineConfig, type OfflineSummary } from '../../core/offline/offline';
 import { SummaryPanel, type SummaryLine } from '../ui/SummaryPanel';
+import { ShopPanel } from '../ui/ShopPanel';
+import {
+  buyItem,
+  buyPrice,
+  dayIndex,
+  MS_PER_DAY,
+  refreshStock,
+  sellItem,
+  sellPrice,
+  type MerchantConfig,
+} from '../../core/merchant/merchant';
+import type { Item as LootItem } from '../../core/loot/loot';
 import { SaveManager } from '../SaveManager';
 import { slotsFor } from '../../core/inventory/inventory';
 import { diceFaces, pityCountdowns, type Item } from '../../core/loot/loot';
@@ -157,6 +169,10 @@ export class FightScene extends Phaser.Scene {
   private readonly saves = new SaveManager();
   private otherTabText!: Phaser.GameObjects.Text;
   private offlineConfig!: OfflineConfig;
+  private merchantConfig!: MerchantConfig;
+  private shopPanel!: ShopPanel;
+  private shopButton!: Button;
+  private shopButtonLabel = '';
   /** M9.3: when the page was hidden (Phaser pauses the game then) and whether she was farming. */
   private hidden: { readonly at: number; readonly farming: boolean } | null = null;
 
@@ -187,6 +203,7 @@ export class FightScene extends Phaser.Scene {
     );
     // M8.1: continue the saved game, or start a new one (seeded Rng, GDD 5).
     this.offlineConfig = createOfflineConfig(balance.offline);
+    this.merchantConfig = balance.merchant;
     const saved = this.saves.load();
     let playTimeMs = 0;
     /** M9: time away since the save, caught up once the UI exists (end of create). */
@@ -439,6 +456,26 @@ export class FightScene extends Phaser.Scene {
     });
     this.lootPanel.setVisible(false);
 
+    // M10.2: the Magpie's shop (GDD 11.2) - same spot as Found items, one of them open at a time.
+    const price = (p: { currencyId: string; amount: number }) => `${p.amount} ${tDynamic(`currency.${p.currencyId}.name`)}`;
+    this.shopPanel = new ShopPanel(this, 10, 70, {
+      buyLabel: (item) => price(buyPrice(item, this.config.loot, this.merchantConfig)),
+      sellLabel: (item) => `+${price(sellPrice(item, this.config.loot, this.merchantConfig))}`,
+      canAfford: (item) => {
+        const p = buyPrice(item, this.config.loot, this.merchantConfig);
+        return this.state.wallet[p.currencyId] >= p.amount;
+      },
+      colorOf: (item) => this.rarityColors.get(item.rarityId) ?? '#ffffff',
+      restockText: () =>
+        t('shop.restock').replace('{time}', formatAway((this.state.merchant.day + 1) * MS_PER_DAY - now())),
+      onBuy: (uid) => this.onBuy(uid),
+      onSell: (uid) => {
+        this.state = sellItem(this.state, this.config.loot, this.merchantConfig, uid);
+        this.saves.requestSave();
+      },
+    });
+    this.shopPanel.setVisible(false);
+
     // Bottom-left info: game time (follows the simulation speed) and the pity countdown (GDD 9.6).
     this.simElapsedMs = playTimeMs;
     // Save tools (GDD 19 export/import, debug reset - M8.2): bottom row under Find enemy, clear of
@@ -483,6 +520,9 @@ export class FightScene extends Phaser.Scene {
     };
     new Button(this, 1195, 465, '−', keepStep(-1), { width: 36, height: 32, fontSize: 18 });
     new Button(this, 1240, 465, '+', keepStep(1), { width: 36, height: 32, fontSize: 18 });
+
+    this.shopButton = new Button(this, 1140, 535, '', () => this.onToggleShop(), { width: 200, height: 36, fontSize: 15 });
+    this.refreshShopButton();
 
     // Debug time skip (CLAUDE.md debug tools, GDD 22 M9 test): as if the game was closed for 1 h / 3 h.
     this.add.text(W / 2 + 190, 692, t('debug.skip'), { ...textStyle, fontSize: '14px', color: '#909090' }).setOrigin(0, 0.5);
@@ -593,6 +633,54 @@ export class FightScene extends Phaser.Scene {
 
   private onToggleLoot(): void {
     this.lootPanel.setVisible(!this.lootPanel.visible);
+    if (this.lootPanel.visible) this.shopPanel.setVisible(false);
+  }
+
+  /** M10: the shop opens once the Magpie's tile is unlocked (quest Q2 in M13). */
+  private isShopOpen(): boolean {
+    return unlockedTileIds(this.tiles, this.state.killsByTile, this.state.progression.level).has(this.merchantConfig.unlockTile);
+  }
+
+  private onToggleShop(): void {
+    if (!this.isShopOpen()) return;
+    this.refreshShopStock();
+    this.shopPanel.setVisible(!this.shopPanel.visible);
+    if (this.shopPanel.visible) this.lootPanel.setVisible(false);
+  }
+
+  /** A new stock on a new UTC day, from base items of every unlocked tile (GDD 11.2). */
+  private refreshShopStock(): void {
+    const unlocked = unlockedTileIds(this.tiles, this.state.killsByTile, this.state.progression.level);
+    const maxTier = Math.max(1, ...this.tiles.filter((tile) => unlocked.has(tile.id)).map((tile) => tile.tier));
+    const next = refreshStock(this.state, this.config.loot, this.merchantConfig, dayIndex(now()), maxTier);
+    if (next !== this.state) {
+      this.state = next;
+      this.saves.requestSave();
+    }
+  }
+
+  private onBuy(uid: number): void {
+    const item: LootItem | undefined = this.state.merchant.stock.find((i) => i.uid === uid);
+    const r = buyItem(this.state, this.config.loot, this.merchantConfig, uid);
+    this.state = r.state;
+    if (r.result === 'bought') {
+      this.saves.requestSave();
+    } else if (item && (r.result === 'notEnough' || r.result === 'bagFull')) {
+      const currency = tDynamic(`currency.${buyPrice(item, this.config.loot, this.merchantConfig).currencyId}.name`);
+      const text = r.result === 'bagFull' ? t('shop.bagFull') : t('shop.notEnough').replace('{currency}', currency);
+      this.floatingText(W / 2, BUTTON_Y - 60, text, '#ff8a8a', 1500);
+    }
+  }
+
+  private refreshShopButton(): void {
+    const tile = this.tiles.find((x) => x.id === this.merchantConfig.unlockTile);
+    const label = this.isShopOpen()
+      ? t('shop.button')
+      : `🔒 ${t('shop.locked').replace('{tile}', tile ? tDynamic(`tile.${tile.id}.name`) : '')}`;
+    if (label !== this.shopButtonLabel) {
+      this.shopButtonLabel = label;
+      this.shopButton.setLabel(label);
+    }
   }
 
   private refreshLootPanel(): void {
@@ -828,6 +916,11 @@ export class FightScene extends Phaser.Scene {
     this.weaponText.setText(this.weaponLines().join('\n'));
     if (this.statsPanel.visible) this.refreshStatsPanel();
     if (this.lootPanel.visible) this.refreshLootPanel();
+    this.refreshShopButton();
+    if (this.shopPanel.visible) {
+      this.refreshShopStock();
+      this.shopPanel.show(this.state);
+    }
     this.refreshTileButtons();
     this.refreshFoodPanel();
     this.timeText.setText(`${t('hud.time')}: ${formatDuration(this.simElapsedMs)}`);

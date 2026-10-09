@@ -64,6 +64,8 @@ describe('daily stock', () => {
     expect(tomorrow.merchant.day).toBe(day + 1);
     expect(tomorrow.merchant.stock.map((i) => i.uid)).not.toEqual(today.merchant.stock.map((i) => i.uid));
     expect(dayIndex(MS_PER_DAY * 3 + 5)).toBe(3);
+    // Clock wound back a day: the stock doesn't reroll (GDD 17.3).
+    expect(refreshStock(tomorrow, loot, config, day, 3)).toBe(tomorrow);
   });
 });
 

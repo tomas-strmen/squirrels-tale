@@ -52,6 +52,7 @@ export function toEncounterConfigInput(
     regenGrowthPctPerLevel: balance.player.regenGrowthPctPerLevel,
     hideoutRegenS: balance.death.hideoutRegenS,
     deathXpLossPct: balance.death.xpLossPct,
+    food: balance.food,
     loot: { ...lootData, balance: balance.loot },
     tileTier: tile.tier,
   };

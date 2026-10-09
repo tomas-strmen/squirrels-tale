@@ -15,7 +15,7 @@ export { CURRENCY_IDS, type CurrencyId };
 
 export type Wallet = Readonly<Record<CurrencyId, number>>;
 
-export const EMPTY_WALLET: Wallet = { pebbles: 0, seeds: 0, nuts: 0 };
+export const EMPTY_WALLET: Wallet = { pebbles: 0, seeds: 0, nuts: 0, berries: 0 };
 
 export interface CurrencyDrop {
   readonly currencyId: CurrencyId;

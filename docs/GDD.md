@@ -1,7 +1,7 @@
-# Veverička – Game Design Document (GDD) v2.5
+# Veverička – Game Design Document (GDD) v2.6
 
 > **Pracovný názov hry:** *Squirrel's Tale* (dočasný – finálny názov vybrať pred vydaním; nesmie pripomínať „Hero Tale“).
-> **Stav:** v2.5, 9. 10. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
+> **Stav:** v2.6, 9. 10. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
 > **Súvisiace:** `claude/ROADMAP.md` (technológia, architektúra, etapy vydania), `claude/PROMPT-vyvoj.md` (ako má AI pracovať).
 
 ---
@@ -195,12 +195,12 @@ ak stun (šanca stun%) → cieľ má ďalší útok oneskorený o 1.5 s (boss 0.
 ### 7.4 Jedlo
 | Jedlo | Lieči | Zdroj |
 |---|---|---|
-| Berry (bobuľa) | 0.3 | drop 10 % z nepriateľov |
+| Berry (bobuľa) | 0.3 | drop z nepriateľov (v2.5: záznam v ich drop tabuľke, začiatok 10 %); počíta sa v peňaženke ako ďalšie počítadlo |
 | Seed (semienko) | 0.5 | mena |
 | Nut (oriešok) | 1.0 | mena + munícia |
 
-- **Auto-jedlo:** keď HP < prah (predvolene 40 %), zje jedlo podľa poradia (predvolene bobule → semienka → oriešky), cooldown 3 s. Nastaviteľné.
-- **Rýchle tlačidlá** na HUD: zjesť ručne (rovnaký cooldown).
+- **Auto-jedlo (v2.6, Tomas):** keď HP < prah (predvolene 40 %), zje jedlo podľa poradia (predvolene bobule → semienka → oriešky), cooldown 3 s (spoločný s ručným jedením). Prah a poradie nastaviteľné (Settings, neskôr). **Je zamknuté, kým hráč nepozrie reklamu**: tlačidlo „Watch ad“ ho odomkne na **1 minútu** (opakované pozretie čas obnoví na plnú minútu), pod „Auto-eat“ je bar, ktorý sa míňa; po vypršaní sa auto-jedlo zamkne (ikona zámku) a odomkne sa zasa tlačidlom. Čas beží len v hre (ako boosty, 18.1). V MVP je reklama mock (M19). Ručné jedenie je vždy zadarmo.
+- **Rýchle tlačidlá** na HUD (3, jedno na každé jedlo): zjesť ručne, ukazujú počet kusov (rovnaký cooldown 3 s). Jedlo sa nezje pri plnom HP.
 
 ### 7.5 Aktívne hranie (len keď je hra otvorená)
 - **Akcia** každých 10–20 s (náhodne), bublina 3 s: *Power Strike* (ďalší úder = istý crit ×2) alebo *Dodge!* (ďalší úder nepriateľa minie). Ignorovanie nič nestojí.
@@ -691,6 +691,7 @@ tools/sim/         # headless simulácia tempa (npm run sim) → tabuľka čas/l
 - Presné čísla (všetko v kap. 6–18) – ladenie v M20 a pri hraní.
 - Šanca na kúsky setu – overiť v M20, či je celý set dosiahnuteľný okolo T7–T8.
 - Cena Premium a (neskôr) balíčkov ✦.
+- Má Premium (bez reklám, 18.2) odomknúť auto-jedlo natrvalo? Odporúčanie: áno – rozhodnúť pri M19.
 - Zlato, gemy, šišky ako ďalšie meny – až s mestom / neskôr?
 
 ---
@@ -715,3 +716,4 @@ tools/sim/         # headless simulácia tempa (npm run sim) → tabuľka čas/l
 | 2.3 | 2026-09-27 | 9.1: 9 slotov (pravá/ľavá labka, ranged, head, body, legs, ring, amulet, tail); ľavá labka = štít alebo druhá zbraň (50 % poškodenia, interval nemení). 9.4/7.2: zbraň posúva interval postavy o pevné sekundy (posun = pôvodný interval − 2.4 s). 24: otázka intervalu uzavretá. |
 | 2.4 | 2026-09-29 | 9.3/9.5/9.6: drop predmetov aj vzácnosti sú teraz vlastné pre každého nepriateľa (drop tabuľka + tabuľka váh vzácnosti, obe s vlastným `minLevel`/`maxLevel` nepriateľa), nie podľa políčka. Každá položka v drop tabuľke sa hodí samostatne – z jedného zabitia môže padnúť aj viac predmetov naraz. Unikátne/set predmety sú vlastný riadok s pevnou vzácnosťou (fallback na Rare už netreba). Pity garantuje aspoň jeden predmet danej vzácnosti aj mimo tabuliek. Nahrádza „drop tabuľku políčka" a globálne váhy vzácnosti z 9.3/9.6. |
 | 2.5 | 2026-10-09 | 8.2: spawn tabuľka políčka (nepriateľ + váha) v `data/tiles.json`. 11.1: drop mien je súčasťou vlastnej drop tabuľky každého nepriateľa (mena, šanca podľa levelu, počet kusov), nie jeden vzorec podľa tieru políčka. |
+| 2.6 | 2026-10-09 | 7.4: auto-jedlo je zamknuté, kým hráč nepozrie (mock) reklamu – odomkne ho na 1 minútu (bar, potom zámok, opäť tlačidlom); ručné jedenie zadarmo, 3 rýchle tlačidlá, jedlo sa nezje pri plnom HP; bobuľa je počítadlo v peňaženke a padá z drop tabuľky nepriateľa. 24: otázka Premium vs. auto-jedlo. |

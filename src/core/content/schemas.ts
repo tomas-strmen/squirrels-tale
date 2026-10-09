@@ -76,8 +76,8 @@ export const enemyRarityWeightSchema = z.object({
 });
 export type EnemyRarityWeight = z.infer<typeof enemyRarityWeightSchema>;
 
-/** Currencies (GDD 11.1). Time Needles come later (M17). */
-export const CURRENCY_IDS = ['pebbles', 'seeds', 'nuts'] as const;
+/** Wallet counters (GDD 11.1, 7.4): the three currencies plus Berries (food only). Time Needles come later (M17). */
+export const CURRENCY_IDS = ['pebbles', 'seeds', 'nuts', 'berries'] as const;
 export const currencyIdSchema = z.enum(CURRENCY_IDS);
 export type CurrencyId = z.infer<typeof currencyIdSchema>;
 
@@ -370,6 +370,19 @@ export const balanceSchema = z.object({
     hideoutRegenS: designSecondsSchema.refine((v) => v > 0, 'must be greater than 0'),
     /** % of the current level's XP progress lost on an online death (GDD 6.3). Level never drops. */
     xpLossPct: percentSchema,
+  }),
+  /** Food (GDD 7.4, M7.2). */
+  food: z.object({
+    /** HP healed by one piece. */
+    berryHeal: designValueSchema,
+    seedHeal: designValueSchema,
+    nutHeal: designValueSchema,
+    /** Shared cooldown after eating, manual or auto. */
+    eatCooldownS: designSecondsSchema,
+    /** Auto-food eats below this % of max HP. */
+    autoEatBelowPct: percentSchema,
+    /** One "watch an ad" unlocks auto-food for this long (mock ad, GDD 18.1). */
+    autoFoodUnlockS: designSecondsSchema.refine((v) => v > 0, 'must be greater than 0'),
   }),
   /** Enemy stat scaling per level above its tile's base level (GDD 8.4, M6.1). Crit is locked (GDD 6.1). */
   enemyLeveling: z.object({

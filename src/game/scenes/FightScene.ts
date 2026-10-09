@@ -34,10 +34,12 @@ import {
   switchTile,
   tick,
   discardBagRarity,
+  eatFood,
   enemyLootOf,
   enemyStats,
   toggleItemLock,
   unequipItem,
+  unlockAutoFood,
   type Combatant,
   type EncounterConfig,
   type EncounterEvent,
@@ -48,6 +50,7 @@ import { killsToUnlock, unlockedTileIds } from '../../core/tiles/tiles';
 import { formatHpHundredths, formatHundredths, fromHundredths } from '../../core/numbers/numbers';
 import { regenAmountHundredths, xpToNextLevelHundredths } from '../../core/progression/progression';
 import { CURRENCY_IDS } from '../../core/currency/currency';
+import { FOOD_IDS, type FoodId } from '../../core/food/food';
 import { createRng } from '../../core/rng/rng';
 import { slotsFor } from '../../core/inventory/inventory';
 import { diceFaces, pityCountdowns, type Item } from '../../core/loot/loot';
@@ -130,6 +133,9 @@ export class FightScene extends Phaser.Scene {
   private timeText!: Phaser.GameObjects.Text;
   private pityText!: Phaser.GameObjects.Text;
   private walletText!: Phaser.GameObjects.Text;
+  private foodButtons: Button[] = [];
+  private autoFoodText!: Phaser.GameObjects.Text;
+  private autoFoodBar!: ProgressBar;
 
   constructor() {
     super('FightScene');
@@ -362,6 +368,41 @@ export class FightScene extends Phaser.Scene {
     this.walletText = this.add
       .text(W - 20, 190, '', { ...textStyle, fontSize: '20px', color: '#e8d9a0' })
       .setOrigin(1, 0.5);
+
+    // Food (GDD 7.4, M7.2): quick-eat buttons + auto-food, which is locked until a (mock) ad is watched.
+    this.add.text(1020, 236, t('food.title'), { ...textStyle, fontSize: '18px', color: '#c8c8c8' }).setOrigin(0, 0.5);
+    this.foodButtons = FOOD_IDS.map((id, index) =>
+      new Button(this, 1060 + index * 80, 275, '', () => this.onEat(id), { width: 76, height: 44, fontSize: 13 }),
+    );
+    this.autoFoodText = this.add
+      .text(1020, 330, '', { ...textStyle, fontSize: '18px', color: '#c8c8c8' })
+      .setOrigin(0, 0.5);
+    this.autoFoodBar = new ProgressBar(this, 1160, 360, { width: 220, height: 16, fillColor: 0x6fbf6f });
+    new Button(this, 1140, 405, t('food.watchAd'), () => this.onWatchAd(), { width: 200, height: 40, fontSize: 16 });
+  }
+
+  private onEat(food: FoodId): void {
+    const step = eatFood(this.state, this.config, food);
+    this.state = step.state;
+    step.events.forEach((e) => this.onEvent(e));
+  }
+
+  /** Mock ad (GDD 18.1/M19): pressing the button counts as having watched one. */
+  private onWatchAd(): void {
+    this.state = unlockAutoFood(this.state, this.config);
+  }
+
+  private refreshFoodPanel(): void {
+    const { wallet, autoFoodMsLeft, eatCooldownMs } = this.state;
+    this.foodButtons.forEach((button, index) => {
+      const id = FOOD_IDS[index];
+      if (id) button.setLabel(`${tDynamic(`currency.${id}.name`)} ×${wallet[id]}`).setAlpha(eatCooldownMs > 0 || wallet[id] <= 0 ? 0.55 : 1);
+    });
+    const unlocked = autoFoodMsLeft > 0;
+    this.autoFoodText.setText(
+      unlocked ? `${t('food.auto')}  ${Math.ceil(autoFoodMsLeft / 1000)} s` : `🔒 ${t('food.auto')}`,
+    );
+    this.autoFoodBar.setVisible(unlocked).setProgress(autoFoodMsLeft / this.config.food.autoFoodUnlockMs);
   }
 
   private onToggleLoot(): void {
@@ -526,6 +567,7 @@ export class FightScene extends Phaser.Scene {
     if (this.statsPanel.visible) this.refreshStatsPanel();
     if (this.lootPanel.visible) this.refreshLootPanel();
     this.refreshTileButtons();
+    this.refreshFoodPanel();
     this.timeText.setText(`${t('hud.time')}: ${formatDuration(this.simElapsedMs)}`);
     // One line per pity rarity that can drop here (GDD 9.6 v2.2); locked ones stay hidden.
     const countdowns = pityCountdowns(
@@ -607,6 +649,16 @@ export class FightScene extends Phaser.Scene {
             '#e8d9a0',
             1400,
           ),
+        );
+        break;
+      case 'ate':
+        // GDD 7.4: "+0.3 HP" above the squirrel (green; a bit lower than the level-up text).
+        this.floatingText(
+          PLAYER_X,
+          FIGHTER_Y - 70,
+          t('food.healed').replace('{hp}', formatHundredths(event.healed)),
+          '#7fe08a',
+          1000,
         );
         break;
       case 'leveledUp':

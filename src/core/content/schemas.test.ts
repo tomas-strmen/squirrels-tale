@@ -187,6 +187,7 @@ describe('balanceSchema / parseBalance', () => {
       minDamage: 0.1,
       hitPctPerLevelDiff: 0.5,
       minAttackIntervalS: 0.5,
+      fistsVsFlyingHitPct: 50,
     },
     loot: { dropChancePct: 4, pity: [{ rarity: 'rare', kills: 1000 }, { rarity: 'unique', kills: 5000 }, { rarity: 'legendary', kills: 20000 }], affixTierGrowthPct: 35, upgradeGrowthPct: 8 },
     death: { hideoutRegenS: 10.0, xpLossPct: 10 },

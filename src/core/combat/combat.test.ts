@@ -18,6 +18,7 @@ const rules = createCombatRules({
   minDamage: 0.1,
   hitPctPerLevelDiff: 0.5,
   minAttackIntervalS: 0.5,
+  fistsVsFlyingHitPct: 50,
 });
 
 const squirrel = createFighterStats({
@@ -52,6 +53,7 @@ describe('createCombatRules / createFighterStats', () => {
       minDamage: 10,
       hitPctPerLevelDiff: 0.5,
       minAttackIntervalMs: 500,
+      fistsVsFlyingHitPct: 50,
     });
     expect(squirrel).toEqual({
       maxHp: 500,
@@ -87,6 +89,11 @@ describe('hitChancePct (GDD 7.2)', () => {
     expect(hitChancePct(squirrel, ant, rules, 100)).toBe(98);
     expect(hitChancePct(withStats(squirrel, { hitPct: 100 }), ant, rules)).toBe(98);
     expect(hitChancePct(withStats(squirrel, { hitPct: 10 }), withStats(ant, { dodgePct: 40 }), rules)).toBe(5);
+  });
+
+  it('a hit multiplier scales the clamped chance (fists vs flying, GDD 7.1 v2.7)', () => {
+    expect(hitChancePct(squirrel, ant, rules, 0, 0.5)).toBe(42.5);
+    expect(hitChancePct(squirrel, ant, rules, 100, 0.5)).toBe(49);
   });
 });
 

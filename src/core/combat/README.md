@@ -7,11 +7,12 @@ the seeded Rng and returns the advanced one. Values are internal integers
 ## Public API
 - `createCombatRules(input)` – formula constants from `data/balance.json` `combat`.
 - `createFighterStats(input)` – one fighter's stats from design values.
-- `hitChancePct(attacker, defender, rules, levelDiff?)` – `clamp(hit + 0.5 % × levelDiff − dodge, 5 %, 98 %)`
-  (GDD 7.2 v1.7; `levelDiff` = attacker level − defender level).
+- `hitChancePct(attacker, defender, rules, levelDiff?, hitMultiplier?)` – `clamp(hit + 0.5 % × levelDiff − dodge, 5 %, 98 %)`
+  (GDD 7.2 v1.7; `levelDiff` = attacker level − defender level), then × `hitMultiplier`
+  (e.g. 0.5 = `rules.fistsVsFlyingHitPct` for fists vs a flying enemy, GDD 7.1 v2.7).
 - `damageReduction(armor, rules)` – `armor / (armor + 10)`, max 75 %.
 - `finalDamage(raw, armor, rules)` – reduced by armor, rounded to 0.01, min 0.1.
-- `resolveAttack(attacker, defender, rules, rng, levelDiff?)` – hit roll (0.01 % steps), damage roll
+- `resolveAttack(attacker, defender, rules, rng, levelDiff?, hitMultiplier?)` – hit roll (0.01 % steps), damage roll
   (uniform, 0.01 steps, both ends included), armor → `{ result: { hit, damage }, rng }`.
 
 ## Not yet (later stages)

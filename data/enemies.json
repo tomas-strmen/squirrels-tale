@@ -82,6 +82,7 @@
         { "itemId": "sharp_twig", "pctAtMin": 1.5, "pctAtMax": 2.5 },
         { "itemId": "pebble_club", "pctAtMin": 1.5, "pctAtMax": 2.5 },
         { "itemId": "leaf_cap", "pctAtMin": 1.5, "pctAtMax": 2.5 },
+        { "itemId": "twig_slingshot", "pctAtMin": 1.5, "pctAtMax": 2.5 },
         { "itemId": "pebble_pendant", "pctAtMin": 1.0, "pctAtMax": 2.0 }
       ],
       "rarities": [

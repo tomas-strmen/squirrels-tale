@@ -140,6 +140,8 @@ export const enemySchema = z
     xp: designValueSchema,
     /** Drop table and rarity weights (GDD 9.3/9.6 v2.4), own minLevel/maxLevel for interpolation. */
     loot: enemyLootSchema,
+    /** Flying enemies are fought with the ranged weapon (GDD 7.1, M7.3). Omitted = false. */
+    flying: z.boolean().default(false),
   })
   .refine(damageRangeValid, { message: 'damageMin must not be greater than damageMax' });
 export type Enemy = z.infer<typeof enemySchema>;
@@ -344,6 +346,8 @@ export const balanceSchema = z.object({
       hitPctPerLevelDiff: designValueSchema,
       /** Attack interval never goes below this (GDD 6.1). */
       minAttackIntervalS: designSecondsSchema,
+      /** Hit chance multiplier (%) for bare fists against a flying enemy (GDD 7.1 v2.7). */
+      fistsVsFlyingHitPct: percentSchema,
     })
     .refine((c) => c.minHitPct <= c.maxHitPct, {
       message: 'minHitPct must not be greater than maxHitPct',

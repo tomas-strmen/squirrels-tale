@@ -27,7 +27,12 @@ regenerates passively over time in `idle`/`searching`/`fighting` (GDD
   1-decimal stats, whole percentages, one or more enemy species); see `core/content/encounterInput.ts`.
 - `createEncounter(config, rng, tileId)` – new state in phase `idle`, squirrel at full HP, level 1, on `tileId`.
 - `playerStats(config, level)` – the player's effective stats at `level` (base + level bonuses).
-- `playerAttackIntervalMs(config, level)` – attack interval at `level` (×1.01 per level, min 0.5 s).
+- `playerAttackIntervalMs(config, level, equipment?, weaponMode?)` – attack interval at `level` (×1.01 per level, min 0.5 s).
+- `activeWeaponMode(state, config)` – weapon auto-switched for the current enemy (GDD 7.1, M7.3a):
+  `flying` enemy (data `enemies.json`, default false) → ranged, none → fists; otherwise paws → ranged → fists.
+- `fightingPlayer(state, config)` – stats + interval actually used in the fight (with that weapon mode).
+- `playerHitMultiplier(state, config)` – 0.5 for fists vs a flying enemy (`fistsVsFlyingHitPct`), else 1.
+- `compareEquip` compares a ranged-slot item as it shoots (`ranged` mode), paw items in `melee` mode.
 - `state.enemyId` / `state.enemyLevel` – species and level of the current (or next, while
   searching) enemy; level is rolled within `[config.enemyLevelMin, config.enemyLevelMax]`
   (GDD 8.4, the tile's own range); hit chance of both sides shifts 0.5 % per level of

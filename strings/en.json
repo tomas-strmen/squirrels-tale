@@ -89,7 +89,12 @@
   "currency.pebbles.name": "Pebbles",
   "currency.seeds.name": "Seeds",
   "currency.nuts.name": "Nuts",
+  "currency.berries.name": "Berries",
   "currency.wallet": "Wallet",
+  "food.title": "Food",
+  "food.auto": "Auto-eat",
+  "food.watchAd": "Watch ad (1 min)",
+  "food.healed": "+{hp} HP",
   "tile.locked": "{kills} kills to unlock",
   "tile.lockedLevel": "Lv {level} to unlock",
   "tile.lockedLevelAndKills": "Lv {level} + {kills} kills to unlock"

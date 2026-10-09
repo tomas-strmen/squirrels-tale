@@ -16,6 +16,7 @@ import {
   makePeace,
   playerAttackIntervalMs,
   playerStats,
+  eatFood,
   equipItem,
   hideoutProgress,
   searchProgress,
@@ -23,6 +24,7 @@ import {
   switchTile,
   tick,
   unequipItem,
+  unlockAutoFood,
   type EncounterConfig,
   type EncounterConfigInput,
   type EncounterEnemyInput,
@@ -39,6 +41,7 @@ const rules = {
   hitPctPerLevelDiff: 0.5,
   minAttackIntervalS: 0.5,
 };
+const food = { berryHeal: 0.3, seedHeal: 0.5, nutHeal: 1.0, eatCooldownS: 3.0, autoEatBelowPct: 40, autoFoodUnlockS: 60.0 };
 const squirrelInput = { maxHp: 5.0, damageMin: 0.3, damageMax: 0.4, hitPct: 85, armor: 0, dodgePct: 0 };
 /** A tile's only enemy, base level 1 (so `enemyLevelMin: 1` means "no levels above base"). */
 const antInput: EncounterEnemyInput = {
@@ -93,6 +96,7 @@ function makeConfig(patch: Partial<EncounterConfigInput> = {}): EncounterConfig 
     regenGrowthPctPerLevel: 3,
     hideoutRegenS: 10.0,
     deathXpLossPct: 10,
+    food,
     loot: lootInput,
     tileTier: 1,
     ...patch,
@@ -496,12 +500,12 @@ describe('encounter', () => {
     const defeatTick = log.find((l) => l.event.type === 'enemyDefeated')?.tick;
     const types = log.filter((l) => l.tick === defeatTick).map((l) => l.event.type);
     expect(types).toEqual(['attack', 'enemyDefeated', 'currencyFound', 'searchStarted']);
-    expect(state.wallet).toEqual({ pebbles: 0, seeds: 2, nuts: 0 });
+    expect(state.wallet).toEqual({ pebbles: 0, seeds: 2, nuts: 0, berries: 0 });
     // An empty currency table drops nothing and emits no event.
     const none = withCoins([]);
     const after = runUntil(fighting(none), none, (e) => e.type === 'enemyDefeated');
     expect(after.log.some((l) => l.event.type === 'currencyFound')).toBe(false);
-    expect(after.state.wallet).toEqual({ pebbles: 0, seeds: 0, nuts: 0 });
+    expect(after.state.wallet).toEqual({ pebbles: 0, seeds: 0, nuts: 0, berries: 0 });
   });
 
   it('equipping a weapon changes the fight: more damage, shorter interval (GDD 9.1/9.4 v2.3)', () => {
@@ -851,5 +855,79 @@ describe('progress helpers', () => {
     const inHideout = { ...fresh(), phase: 'hideout' as const, hideoutElapsedMs: 5000 };
     expect(hideoutProgress(inHideout, config)).toBeCloseTo(0.5);
     expect(hideoutProgress(inHideout, config, 50)).toBeCloseTo(0.505);
+  });
+});
+
+describe('food and auto-food (GDD 7.4, M7.2)', () => {
+  const wounded = (cfg: EncounterConfig, hp: number, wallet: Partial<EncounterState['wallet']> = {}, patch: Partial<EncounterState> = {}) => ({
+    ...fresh(cfg),
+    playerHp: hp,
+    wallet: { pebbles: 0, seeds: 0, nuts: 0, berries: 0, ...wallet },
+    ...patch,
+  });
+
+  it('manual eating heals by the food value, spends one piece and starts the shared cooldown', () => {
+    const s = wounded(config, 100, { berries: 2, nuts: 1 });
+    const a = eatFood(s, config, 'berries');
+    expect(a.state.playerHp).toBe(130);
+    expect(a.state.wallet.berries).toBe(1);
+    expect(a.state.eatCooldownMs).toBe(3000);
+    expect(a.events).toEqual([{ type: 'ate', food: 'berries', healed: 30, auto: false }]);
+    // cooldown blocks even another food type
+    expect(eatFood(a.state, config, 'nuts').state).toBe(a.state);
+  });
+
+  it('does nothing at full HP, with no such food, or in the hideout', () => {
+    const full = wounded(config, playerStats(config, 1).maxHp, { berries: 1 });
+    expect(eatFood(full, config, 'berries').events).toEqual([]);
+    expect(eatFood(wounded(config, 100, { berries: 0 }), config, 'berries').events).toEqual([]);
+    expect(eatFood(wounded(config, 100, { berries: 1 }, { phase: 'hideout' }), config, 'berries').events).toEqual([]);
+  });
+
+  it('never heals above max HP (the heal is trimmed)', () => {
+    const max = playerStats(config, 1).maxHp;
+    const a = eatFood(wounded(config, max - 20, { nuts: 1 }), config, 'nuts');
+    expect(a.state.playerHp).toBe(max);
+    expect(a.events).toEqual([{ type: 'ate', food: 'nuts', healed: 20, auto: false }]);
+  });
+
+  it('the cooldown runs down with ticks', () => {
+    let s = eatFood(wounded(config, 100, { berries: 2 }), config, 'berries').state;
+    s = run(s, 29, config).state;
+    expect(s.eatCooldownMs).toBe(100);
+    s = run(s, 1, config).state;
+    expect(s.eatCooldownMs).toBe(0);
+  });
+
+  it('auto-food is locked until "an ad is watched": no auto-eating below the threshold', () => {
+    const s = wounded(config, 100, { berries: 3 }); // 1.0 of 5.0 HP = 20 % < 40 %
+    const after = run(s, 5, config);
+    expect(after.log.some((l) => l.event.type === 'ate')).toBe(false);
+    expect(after.state.wallet.berries).toBe(3);
+  });
+
+  it('unlocked auto-food eats berries -> seeds -> nuts below 40 % HP, one per cooldown', () => {
+    const s = unlockAutoFood(wounded(config, 50, { berries: 1, seeds: 1, nuts: 1 }), config);
+    const { state, log } = run(s, 100, config); // 10 s: three meals 3 s apart
+    const ate = log.flatMap((l) => (l.event.type === 'ate' ? [l.event] : []));
+    expect(ate.map((e) => e.food)).toEqual(['berries', 'seeds', 'nuts']);
+    expect(ate.every((e) => e.auto)).toBe(true);
+    expect(state.wallet.berries).toBe(0);
+  });
+
+  it('auto-food stops at the threshold and does not eat when HP is above it', () => {
+    const max = playerStats(config, 1).maxHp; // 500
+    const above = unlockAutoFood(wounded(config, Math.round(max * 0.41), { berries: 3 }), config);
+    expect(run(above, 5, config).log.some((l) => l.event.type === 'ate')).toBe(false);
+  });
+
+  it('the unlock lasts one minute of game time, then it locks again; watching again re-unlocks', () => {
+    let s = unlockAutoFood(fresh(), config);
+    expect(s.autoFoodMsLeft).toBe(60000);
+    s = run(s, 599, config).state;
+    expect(s.autoFoodMsLeft).toBe(100);
+    s = run(s, 1, config).state;
+    expect(s.autoFoodMsLeft).toBe(0);
+    expect(unlockAutoFood(s, config).autoFoodMsLeft).toBe(60000);
   });
 });

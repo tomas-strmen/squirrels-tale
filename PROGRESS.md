@@ -2,14 +2,26 @@
 
 ## Aktuálne
 - **Etapa:** M6 Mapa (GDD kap. 8, 22) – M5 Inventár a výbava hotová ✅
-- **Posledný krok:** M6.2c – políčko T4 (Anthill) – otestované a zmergnuté (PR #26). M6 ďalej čaká na M7 (lietajúci nepriatelia, diaľkový boj) a M14 (boss Ant Captain odomyká T5), preto M6 zatiaľ uzatvárame.
-- **Rozpracované:** M7.1 – meny v drop tabuľke nepriateľa + spawn tabuľka políčka (GDD v2.5) – hotové na vetve `m7.1-currency-spawn-tables`, čaká na Tomasov test/merge
-- **Ďalší krok:** M7.2 jedlo (bobuľa 10 % drop, auto-jedlo, rýchle tlačidlá), potom diaľkový boj/lietajúci (M7.3+, Opus); neskôr loot krok 3 (doladenie čísel v drop tabuľkách) a krok 4 (editor tabuliek - dnes `data/enemies.json` + `data/tiles.json`)
+- **Posledný krok:** M7.1 – meny v drop tabuľke + spawn tabuľka políčka (GDD v2.5) – otestované a zmergnuté (PR #27)
+- **Rozpracované:** M7.2 – jedlo + auto-jedlo zamknuté reklamou (GDD v2.6) – hotové na vetve `m7.2-food`, čaká na Tomasov test/merge
+- **Ďalší krok:** M7.3+ diaľkový boj, munícia, lietajúci nepriatelia, auto-prepínanie zbraní (Opus); M8 Save (Opus); neskôr loot krok 3 (čísla v tabuľkách) a 4 (editor tabuliek)
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model: podľa náročnosti kroku (poviem vopred). Od teraz: AI pripraví vetvu/commit/push a dá Tomasovi presné príkazy/odkaz na PR, test a merge robí Tomas sám (šetrí tokeny oproti ovládaniu prehliadača).
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.
 
 ## Hotové
+### M7.2 – jedlo a auto-jedlo (2026-10-09, GDD v2.6)
+- Jedlo = počítadlá v peňaženke: **Berries** (nové, len jedlo; padajú z drop tabuľky nepriateľa, štart 10 %), **Seeds**
+  a **Nuts** (aj meny). Liečia 0.3 / 0.5 / 1.0 (`balance.json` `food`). Zjesť sa dá ručne 3 tlačidlami (aj počet kusov);
+  spoločný cooldown 3 s; nezje sa pri plnom HP, bez kusu ani v úkryte; liečenie sa orezáva na max HP.
+- **Auto-jedlo** zje pod 40 % HP v poradí bobule → semienka → oriešky. Je **zamknuté** (🔒), kým sa nepozrie reklama:
+  „Watch ad (1 min)“ (mock) ho odomkne na 1 minútu (zase kliknutím obnoví), pod „Auto-eat“ sa míňa bar so sekundami,
+  po vypršaní sa zamkne. Čas beží v simulácii (ticky), nie v reálnom čase - pri ×50 debug rýchlosti ubúda 50× rýchlejšie.
+- `core/food` (nové), `core/encounter`: `eatFood`, `unlockAutoFood`, `state.eatCooldownMs/autoFoodMsLeft`, event `ate`.
+- 282 testov zelených. V prehliadači overené: rozloženie panelu, klik na reklamu → „Auto-eat 57 s“ a bar. Samotné
+  jedenie (potrebuje padnuté bobule) a vypršanie minúty over ty.
+- Práh 40 % a poradie zatiaľ pevné (Settings neskôr). Premium vs. auto-jedlo: otvorená otázka v GDD 24.
+
 ### M7.1 – meny a spawn tabuľka (2026-10-09, GDD v2.5)
 - **Meny v drop tabuľke nepriateľa** (`data/enemies.json` `loot.currencies`): záznam = mena (pebbles/seeds/nuts) +
   šanca na `minLevel`/`maxLevel` nepriateľa (interpolácia ako pri predmetoch) + počet kusov od–do. Mena,

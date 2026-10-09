@@ -66,8 +66,8 @@ describe('addToWallet', () => {
       { currencyId: 'pebbles', amount: 1 },
       { currencyId: 'nuts', amount: 1 },
     ]);
-    expect(w).toEqual({ pebbles: 3, seeds: 0, nuts: 1 });
-    expect(EMPTY_WALLET).toEqual({ pebbles: 0, seeds: 0, nuts: 0 });
+    expect(w).toEqual({ pebbles: 3, seeds: 0, nuts: 1, berries: 0 });
+    expect(EMPTY_WALLET).toEqual({ pebbles: 0, seeds: 0, nuts: 0, berries: 0 });
   });
 
   it('returns the same wallet when nothing dropped', () => {

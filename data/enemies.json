@@ -26,6 +26,7 @@
         { "rarityId": "legendary", "weightAtMin": 0.3, "weightAtMax": 1.0 }
       ],
       "currencies": [
+        { "currencyId": "berries", "pctAtMin": 10.0, "pctAtMax": 10.0, "amountMin": 1, "amountMax": 1 },
         { "currencyId": "pebbles", "pctAtMin": 35.0, "pctAtMax": 35.0, "amountMin": 1, "amountMax": 1 },
         { "currencyId": "seeds", "pctAtMin": 35.0, "pctAtMax": 35.0, "amountMin": 1, "amountMax": 1 },
         { "currencyId": "nuts", "pctAtMin": 20.0, "pctAtMax": 20.0, "amountMin": 1, "amountMax": 1 }
@@ -57,6 +58,7 @@
         { "rarityId": "legendary", "weightAtMin": 0.3, "weightAtMax": 1.0 }
       ],
       "currencies": [
+        { "currencyId": "berries", "pctAtMin": 10.0, "pctAtMax": 10.0, "amountMin": 1, "amountMax": 1 },
         { "currencyId": "seeds", "pctAtMin": 40.0, "pctAtMax": 40.0, "amountMin": 1, "amountMax": 1 },
         { "currencyId": "nuts", "pctAtMin": 20.0, "pctAtMax": 20.0, "amountMin": 1, "amountMax": 1 }
       ]
@@ -88,6 +90,7 @@
         { "rarityId": "legendary", "weightAtMin": 0.3, "weightAtMax": 1.0 }
       ],
       "currencies": [
+        { "currencyId": "berries", "pctAtMin": 10.0, "pctAtMax": 10.0, "amountMin": 1, "amountMax": 1 },
         { "currencyId": "pebbles", "pctAtMin": 35.0, "pctAtMax": 35.0, "amountMin": 2, "amountMax": 2 },
         { "currencyId": "nuts", "pctAtMin": 20.0, "pctAtMax": 20.0, "amountMin": 1, "amountMax": 1 }
       ]
@@ -118,6 +121,7 @@
         { "rarityId": "legendary", "weightAtMin": 0.3, "weightAtMax": 1.0 }
       ],
       "currencies": [
+        { "currencyId": "berries", "pctAtMin": 10.0, "pctAtMax": 10.0, "amountMin": 1, "amountMax": 1 },
         { "currencyId": "pebbles", "pctAtMin": 35.0, "pctAtMax": 35.0, "amountMin": 2, "amountMax": 2 },
         { "currencyId": "seeds", "pctAtMin": 35.0, "pctAtMax": 35.0, "amountMin": 2, "amountMax": 2 },
         { "currencyId": "nuts", "pctAtMin": 20.0, "pctAtMax": 20.0, "amountMin": 1, "amountMax": 1 }

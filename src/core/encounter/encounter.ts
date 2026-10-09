@@ -25,6 +25,7 @@ import {
   type FighterStatsInput,
 } from '../combat/combat';
 import { addToWallet, EMPTY_WALLET, rollCurrencyDrops, type CurrencyDrop, type Wallet } from '../currency/currency';
+import { createFoodConfig, nextAutoFood, type FoodConfig, type FoodConfigInput, type FoodId } from '../food/food';
 import { fromHundredths, toHundredths } from '../numbers/numbers';
 import {
   addToBag,
@@ -132,6 +133,8 @@ export interface EncounterConfig {
   readonly hideoutMs: number;
   /** % of the current level's XP progress lost on an online death (GDD 6.3). */
   readonly deathXpLossPct: number;
+  /** Food heals, eat cooldown and auto-food numbers (GDD 7.4, M7.2). */
+  readonly food: FoodConfig;
   readonly loot: LootConfig;
   /** Tier of the tile this config is for (GDD 8.2/9.3), e.g. 2 for T2. */
   readonly tileTier: number;
@@ -155,6 +158,7 @@ export interface EncounterConfigInput {
   readonly regenGrowthPctPerLevel: number;
   readonly hideoutRegenS: number;
   readonly deathXpLossPct: number;
+  readonly food: FoodConfigInput;
   readonly loot: LootConfigInput;
   readonly tileTier: number;
 }
@@ -188,8 +192,12 @@ export interface EncounterState {
   readonly lootRng: RngState;
   /** Found items (bag) and equipped gear (GDD 9.1, 10). */
   readonly inventory: InventoryState;
-  /** Currencies collected so far (GDD 11.1 v2.5). */
+  /** Currencies collected so far (GDD 11.1 v2.5), incl. Berries (food only). */
   readonly wallet: Wallet;
+  /** Time until the next meal is allowed (ms, 0 = ready); shared by manual and auto eating (GDD 7.4). */
+  readonly eatCooldownMs: number;
+  /** Time auto-food stays unlocked (ms, 0 = locked); one mock ad gives `config.food.autoFoodUnlockMs`. */
+  readonly autoFoodMsLeft: number;
   /** Separate stream for currency drops, so they never change item drops or fights. */
   readonly currencyRng: RngState;
   /** Id of the tile currently being fought on (GDD 8.1/8.2, M6.2). */
@@ -213,6 +221,8 @@ export type EncounterEvent =
   | { readonly type: 'itemFound'; readonly item: Item; readonly bagFull: boolean }
   /** A killed enemy dropped currencies (GDD 11.1 v2.5); only emitted when something dropped. */
   | { readonly type: 'currencyFound'; readonly drops: readonly CurrencyDrop[] }
+  /** The squirrel ate one piece of food (GDD 7.4); `healed` in hundredths, `auto` = auto-food did it. */
+  | { readonly type: 'ate'; readonly food: FoodId; readonly healed: number; readonly auto: boolean }
   /** Player leveled up (GDD 6.2): +1.0 max HP (healed at once), +0.1 max damage, and +0.1 min damage on even levels. */
   | { readonly type: 'leveledUp'; readonly level: number }
   /** Squirrel was defeated (GDD 6.3, online death): fight over, she goes to the hideout. */
@@ -296,6 +306,7 @@ export function createEncounterConfig(input: EncounterConfigInput): EncounterCon
     regenGrowthPctPerLevel: input.regenGrowthPctPerLevel,
     hideoutMs,
     deathXpLossPct: input.deathXpLossPct,
+    food: createFoodConfig(input.food),
     loot: createLootConfig(input.loot),
     tileTier: input.tileTier,
   };
@@ -323,6 +334,8 @@ export function createEncounter(config: EncounterConfig, rng: RngState, tileId: 
     lootRng: branch(rng, 'loot'),
     inventory: createInventory(),
     wallet: EMPTY_WALLET,
+    eatCooldownMs: 0,
+    autoFoodMsLeft: 0,
     currencyRng: branch(rng, 'currency'),
     tileId,
     killsByTile: {},
@@ -609,6 +622,64 @@ export function switchTile(
  * if that attack kills the enemy, the enemy does not attack.
  */
 export function tick(state: EncounterState, config: EncounterConfig): EncounterStep {
+  const step = tickPhase(state, config);
+  // GDD 7.4: the eat cooldown and the auto-food unlock run on simulation time.
+  const timed = {
+    ...step.state,
+    eatCooldownMs: Math.max(0, step.state.eatCooldownMs - TICK_MS),
+    autoFoodMsLeft: Math.max(0, step.state.autoFoodMsLeft - TICK_MS),
+  };
+  const auto = autoEat(timed, config);
+  return auto ? { state: auto.state, events: [...step.events, auto.event] } : { state: timed, events: step.events };
+}
+
+/**
+ * Eats one piece of `food` (GDD 7.4). Does nothing (same state, no events) while the cooldown runs,
+ * in the hideout, at full HP or without that food. Heals up to the current max HP.
+ */
+export function eatFood(state: EncounterState, config: EncounterConfig, food: FoodId): EncounterStep {
+  const eaten = tryEat(state, config, food, false);
+  return eaten ? { state: eaten.state, events: [eaten.event] } : { state, events: [] };
+}
+
+/** Mock "watch an ad" (GDD 18.1): unlocks auto-food for `config.food.autoFoodUnlockMs` (refills if already on). */
+export function unlockAutoFood(state: EncounterState, config: EncounterConfig): EncounterState {
+  return { ...state, autoFoodMsLeft: config.food.autoFoodUnlockMs };
+}
+
+type Ate = Extract<EncounterEvent, { type: 'ate' }>;
+
+function tryEat(
+  state: EncounterState,
+  config: EncounterConfig,
+  food: FoodId,
+  auto: boolean,
+): { readonly state: EncounterState; readonly event: Ate } | null {
+  if (state.phase === 'hideout' || state.eatCooldownMs > 0 || state.wallet[food] <= 0) return null;
+  const maxHp = playerStats(config, state.progression.level, state.inventory.equipment).maxHp;
+  if (state.playerHp >= maxHp) return null;
+  const playerHp = Math.min(maxHp, state.playerHp + config.food.healHundredths[food]);
+  return {
+    state: {
+      ...state,
+      playerHp,
+      wallet: { ...state.wallet, [food]: state.wallet[food] - 1 },
+      eatCooldownMs: config.food.eatCooldownMs,
+    },
+    event: { type: 'ate', food, healed: playerHp - state.playerHp, auto },
+  };
+}
+
+/** GDD 7.4 auto-food: while unlocked and HP is below the threshold, eats the first food in order. */
+function autoEat(state: EncounterState, config: EncounterConfig): { state: EncounterState; event: Ate } | null {
+  if (state.autoFoodMsLeft <= 0 || state.phase === 'hideout') return null;
+  const maxHp = playerStats(config, state.progression.level, state.inventory.equipment).maxHp;
+  if (state.playerHp * 100 >= maxHp * config.food.autoEatBelowPct) return null;
+  const food = nextAutoFood(state.wallet, config.food.autoOrder);
+  return food === null ? null : tryEat(state, config, food, true);
+}
+
+function tickPhase(state: EncounterState, config: EncounterConfig): EncounterStep {
   switch (state.phase) {
     case 'idle':
       return { state: applyRegen(state, config), events: [] };

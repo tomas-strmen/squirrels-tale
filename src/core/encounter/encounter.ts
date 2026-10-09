@@ -63,6 +63,7 @@ import {
 import type { EnemyLoot } from '../content/schemas';
 import { branch, next, nextInt, type RngState } from '../rng/rng';
 import { chooseWeaponMode, composeStats, type ComposedStats, type WeaponMode } from '../stats/stats';
+import { ammoDamagePct, createAmmoConfig, nextAmmo, spendAmmo, type AmmoConfig, type AmmoConfigInput, type AmmoKind } from '../ammo/ammo';
 import { secondsToMs, TICK_MS } from '../time/fixedStep';
 
 export type EncounterPhase = 'idle' | 'searching' | 'fighting' | 'hideout';
@@ -139,6 +140,8 @@ export interface EncounterConfig {
   readonly deathXpLossPct: number;
   /** Food heals, eat cooldown and auto-food numbers (GDD 7.4, M7.2). */
   readonly food: FoodConfig;
+  /** Ranged weapon ammo (GDD 7.3, M7.3b). */
+  readonly ammo: AmmoConfig;
   readonly loot: LootConfig;
   /** Tier of the tile this config is for (GDD 8.2/9.3), e.g. 2 for T2. */
   readonly tileTier: number;
@@ -163,6 +166,7 @@ export interface EncounterConfigInput {
   readonly hideoutRegenS: number;
   readonly deathXpLossPct: number;
   readonly food: FoodConfigInput;
+  readonly ammo: AmmoConfigInput;
   readonly loot: LootConfigInput;
   readonly tileTier: number;
 }
@@ -204,6 +208,8 @@ export interface EncounterState {
   readonly autoFoodMsLeft: number;
   /** Separate stream for currency drops, so they never change item drops or fights. */
   readonly currencyRng: RngState;
+  /** "Keep at least N nuts" (GDD 7.3): the slingshot never shoots the wallet below this; eating may. */
+  readonly keepNuts: number;
   /** Id of the tile currently being fought on (GDD 8.1/8.2, M6.2). */
   readonly tileId: string;
   /** Kills so far on each tile ever visited, keyed by tile id (M6.2: unlocks the next tile). */
@@ -219,6 +225,8 @@ export type EncounterEvent =
       readonly hit: boolean;
       /** Damage dealt in hundredths (0 on a miss). */
       readonly damage: number;
+      /** Player shots with the ranged weapon only (GDD 7.3, M7.3b): what was shot. */
+      readonly ammo?: AmmoKind;
     }
   | { readonly type: 'enemyDefeated' }
   /** A killed enemy dropped an item (GDD 9.6). `bagFull`: bag was at capacity, item was lost (M5.2a). */
@@ -312,6 +320,7 @@ export function createEncounterConfig(input: EncounterConfigInput): EncounterCon
     hideoutMs,
     deathXpLossPct: input.deathXpLossPct,
     food: createFoodConfig(input.food),
+    ammo: createAmmoConfig(input.ammo),
     loot: createLootConfig(input.loot),
     tileTier: input.tileTier,
   };
@@ -342,6 +351,7 @@ export function createEncounter(config: EncounterConfig, rng: RngState, tileId: 
     eatCooldownMs: 0,
     autoFoodMsLeft: 0,
     currencyRng: branch(rng, 'currency'),
+    keepNuts: config.ammo.keepNutsDefault,
     tileId,
     killsByTile: {},
   };
@@ -461,9 +471,31 @@ export function activeWeaponMode(state: EncounterState, config: EncounterConfig)
   return chooseWeaponMode(state.inventory.equipment, enemyDefOf(config, state.enemyId).flying);
 }
 
-/** The squirrel's stats and interval against the current enemy, with the auto-switched weapon. */
+/** What the next ranged shot uses (GDD 7.3, M7.3b), or null when the slingshot isn't the active weapon. */
+export function currentAmmo(state: EncounterState, config: EncounterConfig): AmmoKind | null {
+  if (activeWeaponMode(state, config) !== 'ranged') return null;
+  return nextAmmo(state.wallet, state.keepNuts, config.ammo);
+}
+
+/**
+ * The squirrel's stats and interval against the current enemy, with the auto-switched weapon
+ * and its ammo (ground pebbles: damage x groundAmmoDamagePct %, GDD 7.2 ammoMult).
+ */
 export function fightingPlayer(state: EncounterState, config: EncounterConfig): ComposedStats {
-  return composedPlayer(config, state.progression.level, state.inventory.equipment, activeWeaponMode(state, config));
+  const composed = composedPlayer(config, state.progression.level, state.inventory.equipment, activeWeaponMode(state, config));
+  const ammo = currentAmmo(state, config);
+  const pct = ammo === null ? 100 : ammoDamagePct(ammo, config.ammo);
+  if (pct === 100) return composed;
+  const scale = (v: number) => Math.round((v * pct) / 100);
+  return {
+    ...composed,
+    fighter: { ...composed.fighter, damageMin: scale(composed.fighter.damageMin), damageMax: scale(composed.fighter.damageMax) },
+  };
+}
+
+/** Sets "keep at least N nuts" (GDD 7.3); whole number, never below 0. */
+export function setKeepNuts(state: EncounterState, keepNuts: number): EncounterState {
+  return { ...state, keepNuts: Math.max(0, Math.floor(keepNuts)) };
 }
 
 /**
@@ -787,7 +819,7 @@ function applyRegen(state: EncounterState, config: EncounterConfig): EncounterSt
 
 function tickFight(state: EncounterState, config: EncounterConfig): EncounterStep {
   const events: EncounterEvent[] = [];
-  let { rng, playerHp, enemyHp, progression } = state;
+  let { rng, playerHp, enemyHp, progression, wallet } = state;
   let playerAttackElapsedMs = state.playerAttackElapsedMs + TICK_MS;
   let enemyAttackElapsedMs = state.enemyAttackElapsedMs + TICK_MS;
   // GDD 7.1 (M7.3a): weapons switch automatically by enemy (flying -> ranged).
@@ -804,7 +836,10 @@ function tickFight(state: EncounterState, config: EncounterConfig): EncounterSte
     const attack = resolveAttack(player, enemy, config.rules, rng, levelDiff, playerHitMultiplier(state, config));
     rng = attack.rng;
     enemyHp = Math.max(0, enemyHp - attack.result.damage);
-    events.push({ type: 'attack', attacker: 'player', ...attack.result });
+    // GDD 7.3: every slingshot shot (hit or miss) spends its ammo; `player` already has the damage for it.
+    const ammo = currentAmmo(state, config);
+    if (ammo !== null) wallet = spendAmmo(wallet, ammo, config.ammo);
+    events.push({ type: 'attack', attacker: 'player', ...attack.result, ...(ammo !== null ? { ammo } : {}) });
     if (enemyHp === 0) {
       events.push({ type: 'enemyDefeated' });
       // GDD 9.3/9.6 v2.4: each entry in the enemy's own drop table rolls independently -
@@ -857,7 +892,7 @@ function tickFight(state: EncounterState, config: EncounterConfig): EncounterSte
           loot,
           lootRng,
           inventory,
-          wallet: addToWallet(state.wallet, coins.drops),
+          wallet: addToWallet(wallet, coins.drops),
           currencyRng: coins.rng,
           killsByTile,
         },
@@ -889,6 +924,7 @@ function tickFight(state: EncounterState, config: EncounterConfig): EncounterSte
           hideoutElapsedMs: 0,
           progression,
           rng,
+          wallet,
         },
         events,
       };
@@ -896,7 +932,7 @@ function tickFight(state: EncounterState, config: EncounterConfig): EncounterSte
   }
 
   return {
-    state: { ...state, playerAttackElapsedMs, enemyAttackElapsedMs, playerHp, enemyHp, progression, rng },
+    state: { ...state, playerAttackElapsedMs, enemyAttackElapsedMs, playerHp, enemyHp, progression, rng, wallet },
     events,
   };
 }

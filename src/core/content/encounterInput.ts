@@ -53,6 +53,7 @@ export function toEncounterConfigInput(
     hideoutRegenS: balance.death.hideoutRegenS,
     deathXpLossPct: balance.death.xpLossPct,
     food: balance.food,
+    ammo: balance.ammo,
     loot: { ...lootData, balance: balance.loot },
     tileTier: tile.tier,
   };

@@ -1,7 +1,7 @@
-# Veverička – Game Design Document (GDD) v2.7
+# Veverička – Game Design Document (GDD) v2.8
 
 > **Pracovný názov hry:** *Squirrel's Tale* (dočasný – finálny názov vybrať pred vydaním; nesmie pripomínať „Hero Tale“).
-> **Stav:** v2.7, 9. 10. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
+> **Stav:** v2.8, 9. 10. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
 > **Súvisiace:** `claude/ROADMAP.md` (technológia, architektúra, etapy vydania), `claude/PROMPT-vyvoj.md` (ako má AI pracovať).
 
 ---
@@ -193,6 +193,7 @@ ak stun (šanca stun%) → cieľ má ďalší útok oneskorený o 1.5 s (boss 0.
 - Diaľkové zbrane míňajú **1 oriešok na výstrel** (skill „strelné“ dáva šancu ušetriť, kap. 13.2).
 - Keď oriešky dôjdu: prak strieľa **kamienky zo zeme**, luk **pohodené vetvičky** – **50 % poškodenia**, nekonečné.
 - Hráč si sám určí, koľko orieškov chce držať (nastavenie „keep at least N nuts for food/trade“ – pod túto hranicu sa na streľbu nepoužijú).
+- **(v2.8, Tomas)** Predvolená rezerva **N = 5** (`balance.json` `ammo.keepNutsDefault`), mení sa tlačidlami −/+ pri jedle. Rezerva **neobmedzuje jedenie** (ručné ani auto-jedlo môže zjesť aj posledné oriešky). Oriešok sa minie pri každom výstrele (aj pri minutí) a aj vtedy, keď prak strieľa na nelietajúceho nepriateľa, lebo veverička nemá zbraň na blízko (7.1). Kamienky zo zeme nie sú mena *Pebbles* – peňaženku nemenia.
 
 ### 7.4 Jedlo
 | Jedlo | Lieči | Zdroj |
@@ -718,5 +719,6 @@ tools/sim/         # headless simulácia tempa (npm run sim) → tabuľka čas/l
 | 2.3 | 2026-09-27 | 9.1: 9 slotov (pravá/ľavá labka, ranged, head, body, legs, ring, amulet, tail); ľavá labka = štít alebo druhá zbraň (50 % poškodenia, interval nemení). 9.4/7.2: zbraň posúva interval postavy o pevné sekundy (posun = pôvodný interval − 2.4 s). 24: otázka intervalu uzavretá. |
 | 2.4 | 2026-09-29 | 9.3/9.5/9.6: drop predmetov aj vzácnosti sú teraz vlastné pre každého nepriateľa (drop tabuľka + tabuľka váh vzácnosti, obe s vlastným `minLevel`/`maxLevel` nepriateľa), nie podľa políčka. Každá položka v drop tabuľke sa hodí samostatne – z jedného zabitia môže padnúť aj viac predmetov naraz. Unikátne/set predmety sú vlastný riadok s pevnou vzácnosťou (fallback na Rare už netreba). Pity garantuje aspoň jeden predmet danej vzácnosti aj mimo tabuliek. Nahrádza „drop tabuľku políčka" a globálne váhy vzácnosti z 9.3/9.6. |
 | 2.5 | 2026-10-09 | 8.2: spawn tabuľka políčka (nepriateľ + váha) v `data/tiles.json`. 11.1: drop mien je súčasťou vlastnej drop tabuľky každého nepriateľa (mena, šanca podľa levelu, počet kusov), nie jeden vzorec podľa tieru políčka. |
+| 2.8 | 2026-10-09 | 7.3: rezerva orieškov predvolene 5, neobmedzuje jedenie; oriešok na každý výstrel (aj minutie, aj prak proti nelietajúcemu); kamienky zo zeme nemenia peňaženku. |
 | 2.7 | 2026-10-09 | 7.1: diaľková zbraň zaberá obe labky (zbrane v labkách sa pri streľbe nepočítajú, afixy výbavy áno); proti letiacemu bez diaľkovej zbrane päste s polovičnou šancou na zásah. |
 | 2.6 | 2026-10-09 | 7.4: auto-jedlo je zamknuté, kým hráč nepozrie (mock) reklamu – odomkne ho na 1 minútu (bar, potom zámok, opäť tlačidlom); ručné jedenie zadarmo, 3 rýchle tlačidlá, jedlo sa nezje pri plnom HP; bobuľa je počítadlo v peňaženke a padá z drop tabuľky nepriateľa. 24: otázka Premium vs. auto-jedlo. |

@@ -3,7 +3,7 @@
 ## Aktuálne
 - **Etapa:** M7 Meny, jedlo, diaľkový boj (GDD kap. 22) – M5 hotová ✅, M6 uzavretá (zvyšok čaká na M7/M13/M14)
 - **Posledný krok:** M7.3a – prak v boji + auto-prepínanie zbraní (GDD v2.7) – Tomas otestoval („všetko funguje“), merge cez PR robí Tomas. Pred ním M7.2 jedlo (PR #28).
-- **Rozpracované:** nič (po merge M7.3a)
+- **Rozpracované:** M7.3b – munícia (GDD v2.8), vetva `m7.3b-ammo`, čaká na test Tomasa.
 - **Ďalší krok:** M7.3b munícia – 1 oriešok na výstrel, po minutí kamienky zo zeme s 50 % poškodenia (nekonečné),
   nastavenie „keep at least N nuts“ (GDD 7.3). Potom M7.3c lietajúci nepriatelia Moth/Dragonfly/Wasp + ako sa dostať
   na T5 pred bossom (M14). Odporúčaný model: Opus. Potom M8 Save (Opus, save sa nesmie rozbiť), neskôr loot krok 3

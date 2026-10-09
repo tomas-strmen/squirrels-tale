@@ -192,6 +192,7 @@ describe('balanceSchema / parseBalance', () => {
     loot: { dropChancePct: 4, pity: [{ rarity: 'rare', kills: 1000 }, { rarity: 'unique', kills: 5000 }, { rarity: 'legendary', kills: 20000 }], affixTierGrowthPct: 35, upgradeGrowthPct: 8 },
     death: { hideoutRegenS: 10.0, xpLossPct: 10 },
     food: { berryHeal: 0.3, seedHeal: 0.5, nutHeal: 1.0, eatCooldownS: 3.0, autoEatBelowPct: 40, autoFoodUnlockS: 60.0 },
+    ammo: { nutsPerShot: 1, groundAmmoDamagePct: 50, keepNutsDefault: 5 },
     enemyLeveling: { hpPctPerLevel: 10, damagePctPerLevel: 5, xpPctPerLevel: 10, dodgePctPerLevel: 0.5, maxDodgePct: 40 },
   };
 

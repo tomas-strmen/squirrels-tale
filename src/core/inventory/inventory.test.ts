@@ -29,7 +29,7 @@ describe('equip / unequip', () => {
   const twig = item(1, 'melee');
   const club = item(2, 'melee', 'pebble_club');
   const cap = item(3, 'head', 'leaf_cap');
-  const bagged = [twig, club, cap].reduce(addToBag, createInventory());
+  const bagged = [twig, club, cap].reduce((s, i) => addToBag(s, i), createInventory());
 
   it('moves an item from the bag into a fitting slot', () => {
     const s = equip(bagged, 1, 'rightPaw');
@@ -72,7 +72,7 @@ describe('toggleLock (M5.2b2)', () => {
   it('flips locked on the matching bag item, leaves others alone', () => {
     const twig = item(1, 'melee');
     const club = item(2, 'melee', 'pebble_club');
-    const bagged = [twig, club].reduce(addToBag, createInventory());
+    const bagged = [twig, club].reduce((s, i) => addToBag(s, i), createInventory());
     const locked = toggleLock(bagged, 1);
     expect(locked.bag.find((i) => i.uid === 1)?.locked).toBe(true);
     expect(locked.bag.find((i) => i.uid === 2)?.locked).toBeFalsy();
@@ -94,7 +94,7 @@ describe('discardRarity (M5.2b3)', () => {
 
   it('removes every unlocked item of that rarity, keeps the rest', () => {
     const bagged = [withRarity(1, 'common'), withRarity(2, 'common'), withRarity(3, 'uncommon')].reduce(
-      addToBag,
+      (s, i) => addToBag(s, i),
       createInventory(),
     );
     const s = discardRarity(bagged, 'common');
@@ -102,7 +102,7 @@ describe('discardRarity (M5.2b3)', () => {
   });
 
   it('keeps a locked item of that rarity', () => {
-    const bagged = [withRarity(1, 'common', true), withRarity(2, 'common')].reduce(addToBag, createInventory());
+    const bagged = [withRarity(1, 'common', true), withRarity(2, 'common')].reduce((s, i) => addToBag(s, i), createInventory());
     const s = discardRarity(bagged, 'common');
     expect(s.bag.map((i) => i.uid)).toEqual([1]);
   });
@@ -121,5 +121,11 @@ describe('bag capacity (GDD 22, M5.2a)', () => {
     const full = addToBag(s, item(999, 'head'));
     expect(full).toBe(s); // unchanged: no room
     expect(full.bag).toHaveLength(BAG_CAPACITY);
+  });
+
+  it('overLimit (Rare+, GDD 10) still goes in, past the limit', () => {
+    let s = createInventory();
+    for (let i = 0; i < BAG_CAPACITY; i++) s = addToBag(s, item(i, 'head'));
+    expect(addToBag(s, item(999, 'head'), true).bag).toHaveLength(BAG_CAPACITY + 1);
   });
 });

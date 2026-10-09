@@ -32,6 +32,7 @@
       { "rarity": "legendary", "kills": 20000 }
     ],
     "affixTierGrowthPct": 35,
+    "keepWhenBagFullFrom": "rare",
     "upgradeGrowthPct": 8
   },
   "death": {

@@ -5,7 +5,9 @@
 - **Posledný krok:** M7.3b – munícia (GDD v2.8) – otestované a zmergnuté (PR #31). Pred ním M7.3a prak (PR #30).
 - **Rozpracované:** vetva `m7.3c-t5-moth` (autonómny beh 10. 10. v noci, všetko na jednej vetve, čaká na test Tomasa):
   M7.3c políčko T5 s lietajúcou Morou (GDD v2.9) → **M7 hotová**; M8.1 save/load + autosave (GDD v2.10); M8.2 export/import/reset + záloha nečitateľného save; M8.3 ukladá len najnovšia karta; M9.1–9.2 offline
-  progres (simulácia, save v2 + migrácia) + „While You Were Away“ + debug Skip +1 h/+3 h (GDD v2.11).
+  progres (simulácia, save v2 + migrácia) + „While You Were Away“ + debug Skip +1 h/+3 h (GDD v2.11); M9.3 Rare+
+  sa pri plnom batohu nestratí + dopočítanie času v pozadí (GDD v2.12). Pravidlá triedenia/„Keep only upgrades“/
+  tutoriál prvého návratu presunuté k M10/M16.
 - **Ďalší krok:** **M8 Save** (model Opus – save sa nesmie rozbiť: verzie, migrácie, autosave, 2 sloty,
   export/import, ochrana hodín; uloží aj „Keep nuts“). Neskôr loot krok 3 (čísla v tabuľkách + predmety T5:
   Reed Slingshot, Acorn Cap/Helmet…) a 4 (editor tabuliek). Dragonfly (T6) a Wasp (T8) prídu s ich políčkami.

@@ -53,6 +53,7 @@ import {
   createEnemyLootTable,
   createLootConfig,
   createLootState,
+  keepsWhenBagFull,
   rollKillDrop,
   type EnemyLootTable,
   type Item,
@@ -870,8 +871,10 @@ function tickFight(state: EncounterState, config: EncounterConfig, mode: TickMod
       const lootRng = drop.rng;
       let inventory = state.inventory;
       for (const item of drop.items) {
-        const bagFull = inventory.bag.length >= BAG_CAPACITY;
-        inventory = addToBag(inventory, item);
+        // GDD 10: with a full bag a common item is lost, Rare+ goes over the limit instead.
+        const keep = keepsWhenBagFull(config.loot, item);
+        const bagFull = inventory.bag.length >= BAG_CAPACITY && !keep;
+        inventory = addToBag(inventory, item, keep);
         events.push({ type: 'itemFound', item, bagFull });
       }
       // GDD 11.1 v2.5: currencies come from the same per-enemy table, own Rng stream.

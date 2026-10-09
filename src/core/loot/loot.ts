@@ -22,6 +22,8 @@ export interface LootBalanceInput {
   readonly pity: readonly { readonly rarity: string; readonly kills: number }[];
   readonly affixTierGrowthPct: number;
   readonly upgradeGrowthPct: number;
+  /** GDD 10: this rarity and better are never lost to a full bag. Omitted = every item can be lost. */
+  readonly keepWhenBagFullFrom?: string;
 }
 
 export interface LootConfigInput {
@@ -38,6 +40,8 @@ export interface LootConfig {
   /** Pity guarantees, lowest rarity first; `rank` = index in `rarities`. */
   readonly pity: readonly PityRule[];
   readonly affixTierGrowthPct: number;
+  /** Rank (index in `rarities`) from which a drop is kept even with a full bag (GDD 10); Infinity = none. */
+  readonly keepWhenBagFullRank: number;
 }
 
 /** One entry in an enemy's own drop table, resolved to internal units (GDD 9.3 v2.4). */
@@ -162,13 +166,22 @@ export function createLootConfig(input: LootConfigInput): LootConfig {
       return { rarityId: p.rarity, rank, kills: p.kills };
     })
     .sort((a, b) => a.rank - b.rank);
+  const keepFrom = input.balance.keepWhenBagFullFrom;
+  const keepWhenBagFullRank = keepFrom === undefined ? Infinity : input.rarities.findIndex((r) => r.id === keepFrom);
+  if (keepWhenBagFullRank < 0) throw new Error(`Unknown keepWhenBagFullFrom rarity "${keepFrom}"`);
   return {
     items: input.items,
     rarities: input.rarities,
     affixes: input.affixes,
     pity,
     affixTierGrowthPct: input.balance.affixTierGrowthPct,
+    keepWhenBagFullRank,
   };
+}
+
+/** GDD 10: true if `item` must be kept even when the bag is full (Rare and better by default). */
+export function keepsWhenBagFull(config: LootConfig, item: Item): boolean {
+  return rankOf(config, item.rarityId) >= config.keepWhenBagFullRank;
 }
 
 export function createLootState(): LootState {

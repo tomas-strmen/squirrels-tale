@@ -365,6 +365,8 @@ export const balanceSchema = z.object({
       }),
     /** Affix value growth per item tier: base x (1 + pct/100 x (tier - 1)) (9.3). */
     affixTierGrowthPct: percentSchema,
+    /** GDD 10: items of this rarity or better are never lost to a full bag (the bag goes over its limit). */
+    keepWhenBagFullFrom: idSchema,
     /** Value growth per upgrade level (9.3, 12.2 - used from M16). */
     upgradeGrowthPct: percentSchema,
   }),

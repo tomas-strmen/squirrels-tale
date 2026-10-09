@@ -623,6 +623,34 @@ describe('encounter', () => {
     expect(attacksOf(allDrops)).toEqual(attacksOf(noDrops));
   });
 
+  it('with a full bag Common/Uncommon drops are lost, Rare+ goes over the limit (GDD 10, M9.3)', () => {
+    const cfg = makeConfig({
+      player: { ...squirrelInput, maxHp: 999.0 },
+      enemies: [{ ...antInput, loot: { ...antInput.loot, items: [{ itemId: 'sharp_twig', pctAtMin: 100, pctAtMax: 100 }] } }],
+      loot: { ...lootInput, balance: { ...lootInput.balance, keepWhenBagFullFrom: 'rare' } },
+    });
+    const filler = (uid: number) => ({
+      uid: 1000 + uid,
+      baseId: 'leaf_cap',
+      slot: 'head' as const,
+      tier: 1,
+      rarityId: 'common',
+      weapon: null,
+      stats: [],
+      affixes: [],
+    });
+    const base = fresh(cfg);
+    const full = { ...base, inventory: { ...base.inventory, bag: Array.from({ length: 20 }, (_, i) => filler(i)) } };
+    const { state, log } = run(startSearch(full).state, 30_000, cfg);
+    const found = log.flatMap((l) => (l.event.type === 'itemFound' ? [l.event] : []));
+    const kept = found.filter((e) => !e.bagFull);
+    expect(found.some((e) => e.bagFull)).toBe(true);
+    expect(kept.length).toBeGreaterThan(0);
+    expect(kept.every((e) => !['common', 'uncommon'].includes(e.item.rarityId))).toBe(true);
+    expect(found.filter((e) => e.bagFull).every((e) => ['common', 'uncommon'].includes(e.item.rarityId))).toBe(true);
+    expect(state.inventory.bag).toHaveLength(20 + kept.length);
+  });
+
   it('a killed enemy does not attack in the same tick', () => {
     // Both attack every 3.0 s, so every player attack lands in a tick where the
     // enemy is due too. The enemy has 0.1 HP, so the first hit kills it.

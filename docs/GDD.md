@@ -1,7 +1,7 @@
-# Veverička – Game Design Document (GDD) v2.11
+# Veverička – Game Design Document (GDD) v2.12
 
 > **Pracovný názov hry:** *Squirrel's Tale* (dočasný – finálny názov vybrať pred vydaním; nesmie pripomínať „Hero Tale“).
-> **Stav:** v2.11, 10. 10. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
+> **Stav:** v2.12, 10. 10. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
 > **Súvisiace:** `claude/ROADMAP.md` (technológia, architektúra, etapy vydania), `claude/PROMPT-vyvoj.md` (ako má AI pracovať).
 
 ---
@@ -388,6 +388,7 @@ ak stun (šanca stun%) → cieľ má ďalší útok oneskorený o 1.5 s (boss 0.
 - **Pravidlá podľa vzácnosti** (pre každú vzácnosť: *Keep / Salvage / Sell*). Predvolene: Common → Salvage, ostatné → Keep.
 - **Checkbox „Keep only upgrades“:** predmet so skóre nižším ako nasadený v rovnakom slote sa automaticky rozoberie. Skóre = vážený súčet štatistík (váhy v `balance.json`).
 - **Plný inventár:** nový predmet → (po odomknutí mravcov) do truhlice → ak je plná aj tá: Common/Uncommon sa automaticky rozoberú; **Rare a vyššie sa nikdy nestratia** (inventár môže prekročiť limit, s červeným upozornením).
+  - **(v2.12, M9.3)** Kým nie sú truhlica, mravce ani kováč: Common/Uncommon pri plnom batohu prepadnú (v súhrne „Lost, bag full“), Rare+ idú nad limit a počítadlo batohu sčervenie. Hranica je v `balance.json` `loot.keepWhenBagFullFrom`. Pravidlá *Keep/Salvage/Sell*, „Keep only upgrades“ a tutoriál prvého návratu prídu s kováčom (M16) a obchodníkom (M10), lebo bez nich nie je čo „rozobrať“ ani „predať“.
 - **Prvý návrat z idle (tutoriál):** hra ukáže, čo padlo a čo by prepadlo, **prvýkrát ponechá všetko zadarmo** a vyzve hráča nastaviť pravidlá. Pri ďalších návratoch: predmety, ktoré sa nezmestili (Common/Uncommon), sa dajú zachrániť **dobrovoľnou reklamou** (Premium: automaticky).
 - **Ovládanie:** zamknúť predmet (ochrana), porovnanie s nasadeným (zelené/červené šípky), zoradenie (slot/vzácnosť/skóre), hromadné „Salvage all Common“, značka „New“.
 
@@ -550,7 +551,7 @@ Odomkne sa po porazení Ant Captaina (úkryt). Tri služby:
 5. Bossovia sa offline nebojujú; aktívne akcie, motýlik a boosty offline neplatia (offline = 100 % čistého idle tempa).
 6. Výsledok → obrazovka **„While You Were Away“**: čas, zabitia, XP/level, meny, **zoznam nových predmetov (rare+ s animáciou kocky)**, čo sa rozobralo/predalo, čo prepadlo (+ ponuka reklamy / zadarmo prvýkrát), minuté jedlo a oriešky, **počet smrtí a čas strávený regeneráciou v úkryte**.
 
-- **Implementácia (v2.11, M9):** namiesto odhadu TTK (body 3–4) sa offline čas **odsimuluje skutočnými pravidlami boja** (6 h = 216 000 krokov po 100 ms, trvá zlomok sekundy) – jedlo, munícia, loot, pity aj levely fungujú presne ako online a výsledok je deterministický. Ak veverička offline aspoň raz umrie, políčko nie je udržateľné → „čas zabitia ×2“ sa modeluje ako farmenie len **polovice** offline času (počet smrtí a čas v úkryte sa hlásia z celého času). Save si pamätá, či veverička farmila alebo bola v *Peace!* (save v2). Súhrn „While You Were Away“ sa ukáže pri neprítomnosti aspoň **60 s** (`balance.json` `offline.minSummaryS`); kratšia sa dopočíta potichu. Debug: tlačidlá *Skip +1 h / +3 h*.
+- **Implementácia (v2.11, M9):** namiesto odhadu TTK (body 3–4) sa offline čas **odsimuluje skutočnými pravidlami boja** (6 h = 216 000 krokov po 100 ms, trvá zlomok sekundy) – jedlo, munícia, loot, pity aj levely fungujú presne ako online a výsledok je deterministický. Ak veverička offline aspoň raz umrie, políčko nie je udržateľné → „čas zabitia ×2“ sa modeluje ako farmenie len **polovice** offline času (počet smrtí a čas v úkryte sa hlásia z celého času). Save si pamätá, či veverička farmila alebo bola v *Peace!* (save v2). Súhrn „While You Were Away“ sa ukáže pri neprítomnosti aspoň **60 s** (`balance.json` `offline.minSummaryS`); kratšia sa dopočíta potichu. Debug: tlačidlá *Skip +1 h / +3 h*. **(v2.12)** Rovnako sa dopočíta čas, keď bola hra v pozadí (iná karta, iná appka) – Phaser ju vtedy pozastaví.
 
 ### 17.3 Ochrana proti posúvaniu hodín
 - Ukladá sa `maxSeenTime` (najvyšší videný čas). Ak `now < maxSeenTime − 5 min` → offline = 0, nič sa nepripíše a `maxSeenTime` sa nemení.
@@ -723,6 +724,7 @@ tools/sim/         # headless simulácia tempa (npm run sim) → tabuľka čas/l
 | 2.3 | 2026-09-27 | 9.1: 9 slotov (pravá/ľavá labka, ranged, head, body, legs, ring, amulet, tail); ľavá labka = štít alebo druhá zbraň (50 % poškodenia, interval nemení). 9.4/7.2: zbraň posúva interval postavy o pevné sekundy (posun = pôvodný interval − 2.4 s). 24: otázka intervalu uzavretá. |
 | 2.4 | 2026-09-29 | 9.3/9.5/9.6: drop predmetov aj vzácnosti sú teraz vlastné pre každého nepriateľa (drop tabuľka + tabuľka váh vzácnosti, obe s vlastným `minLevel`/`maxLevel` nepriateľa), nie podľa políčka. Každá položka v drop tabuľke sa hodí samostatne – z jedného zabitia môže padnúť aj viac predmetov naraz. Unikátne/set predmety sú vlastný riadok s pevnou vzácnosťou (fallback na Rare už netreba). Pity garantuje aspoň jeden predmet danej vzácnosti aj mimo tabuliek. Nahrádza „drop tabuľku políčka" a globálne váhy vzácnosti z 9.3/9.6. |
 | 2.5 | 2026-10-09 | 8.2: spawn tabuľka políčka (nepriateľ + váha) v `data/tiles.json`. 11.1: drop mien je súčasťou vlastnej drop tabuľky každého nepriateľa (mena, šanca podľa levelu, počet kusov), nie jeden vzorec podľa tieru políčka. |
+| 2.12 | 2026-10-10 | 10: Rare+ sa pri plnom batohu nestratí (ide nad limit); pravidlá triedenia a „Keep only upgrades“ presunuté k M10/M16. 17.2: dopočíta sa aj čas v pozadí. |
 | 2.11 | 2026-10-10 | 17.2: offline progres sa simuluje skutočnými pravidlami boja (nie odhad TTK); smrť offline → farmenie polovice času; súhrn od 60 s; save v2 si pamätá farmenie vs. Peace!. |
 | 2.10 | 2026-10-10 | 19: po načítaní hra začína v pokoji na uloženom políčku (boj/úkryt sa neobnovujú); ukladajú sa všetky Rng prúdy, „Keep nuts“ a odohraný čas. |
 | 2.9 | 2026-10-10 | 8.2: T5 Berry Bushes (Beetle + Moth, letí) – dočasne sa odomkne po 60 zabitiach na T4, kým nie je boss (M14). 8.3: Acorn Cap z Beetle čaká na predmety T5. |

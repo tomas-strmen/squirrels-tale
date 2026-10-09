@@ -125,9 +125,11 @@ export class ItemsPanel extends Phaser.GameObjects.Container {
     y += 4;
     const maxOffset = Math.max(0, inventory.bag.length - BAG_ROWS);
     this.scrollOffset = Math.min(this.scrollOffset, maxOffset);
+    // GDD 10: over the limit (Rare+ kept with a full bag) -> red warning.
     addText(
       PAD,
       t('items.bag').replace('{n}', String(inventory.bag.length)).replace('{cap}', String(BAG_CAPACITY)),
+      inventory.bag.length > BAG_CAPACITY ? '#ff7a7a' : FONT.color,
     );
     if (maxOffset > 0) {
       addButton(220, '▲', () => this.scroll(-1));

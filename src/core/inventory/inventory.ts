@@ -70,9 +70,12 @@ export function slotsFor(slot: ItemSlot): readonly EquipSlot[] {
   }
 }
 
-/** Adds `item` to the bag, or drops it silently if the bag is already full (GDD 22, M5.2a). */
-export function addToBag(state: InventoryState, item: Item): InventoryState {
-  if (state.bag.length >= BAG_CAPACITY) return state;
+/**
+ * Adds `item` to the bag, or drops it silently if the bag is already full (GDD 22, M5.2a) -
+ * unless `overLimit` (GDD 10: Rare and better are never lost, the bag may exceed its limit).
+ */
+export function addToBag(state: InventoryState, item: Item, overLimit = false): InventoryState {
+  if (state.bag.length >= BAG_CAPACITY && !overLimit) return state;
   return { ...state, bag: [...state.bag, item] };
 }
 

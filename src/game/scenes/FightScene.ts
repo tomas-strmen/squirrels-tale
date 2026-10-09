@@ -157,6 +157,8 @@ export class FightScene extends Phaser.Scene {
   private readonly saves = new SaveManager();
   private otherTabText!: Phaser.GameObjects.Text;
   private offlineConfig!: OfflineConfig;
+  /** M9.3: when the page was hidden (Phaser pauses the game then) and whether she was farming. */
+  private hidden: { readonly at: number; readonly farming: boolean } | null = null;
 
   constructor() {
     super('FightScene');
@@ -203,7 +205,17 @@ export class FightScene extends Phaser.Scene {
     // Save when the page is hidden or closed (GDD 19) - the browser may not give us another chance.
     const saveNow = () => this.saves.save(this.state, this.simElapsedMs);
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden') saveNow();
+      if (document.visibilityState === 'hidden') {
+        saveNow();
+        this.hidden = { at: now(), farming: this.state.phase === 'searching' || this.state.phase === 'fighting' };
+      } else if (this.hidden) {
+        // M9.3: Phaser paused while the tab/app was in the background - catch that time up like offline.
+        const { at, farming } = this.hidden;
+        this.hidden = null;
+        // A glance away (< 1 s) isn't worth ending the current fight for.
+        const awayMs = offlineMs(at, at, now(), this.offlineConfig);
+        if (awayMs >= 1000) this.catchUp(awayMs, farming, false);
+      }
     });
     window.addEventListener('pagehide', saveNow);
     this.accumulatorMs = 0;

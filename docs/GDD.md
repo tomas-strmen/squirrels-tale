@@ -1,7 +1,7 @@
-# Veverička – Game Design Document (GDD) v2.9
+# Veverička – Game Design Document (GDD) v2.10
 
 > **Pracovný názov hry:** *Squirrel's Tale* (dočasný – finálny názov vybrať pred vydaním; nesmie pripomínať „Hero Tale“).
-> **Stav:** v2.9, 10. 10. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
+> **Stav:** v2.10, 10. 10. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
 > **Súvisiace:** `claude/ROADMAP.md` (technológia, architektúra, etapy vydania), `claude/PROMPT-vyvoj.md` (ako má AI pracovať).
 
 ---
@@ -587,6 +587,7 @@ Odomkne sa po porazení Ant Captaina (úkryt). Tri služby:
   `{ version, createdAt, savedAt, maxSeenTime, rngState, player, equipment, inventory, chest, stash (meny/materiály/jedlo), tiles, quests, daily, tree, weaponSkills, boosts, settings, flags, stats, pity }`
 - `version` + **migrácie** (starý save sa vždy dá načítať). Autosave každých 30 s, pri pauze/zatvorení a po dôležitej akcii. **2 sloty** (aktuálny + predchádzajúci) pre prípad poškodenia.
 - Export/import save ako text (debug + podpora hráčov).
+- **(v2.10, M8.1)** Po načítaní je veverička na uloženom políčku **v pokoji** (tlačidlo *Find enemy*) – rozbehnutý boj ani pobyt v úkryte sa neobnovujú (uložené v úkryte → plné HP, strata XP už prebehla). Ukladajú sa všetky Rng prúdy, takže načítaná hra pokračuje presne tak, ako by pokračovala bez zatvorenia. Medzi nastaveniami je aj „Keep nuts“ (7.3), medzi štatistikami odohraný čas.
 
 ---
 
@@ -720,6 +721,7 @@ tools/sim/         # headless simulácia tempa (npm run sim) → tabuľka čas/l
 | 2.3 | 2026-09-27 | 9.1: 9 slotov (pravá/ľavá labka, ranged, head, body, legs, ring, amulet, tail); ľavá labka = štít alebo druhá zbraň (50 % poškodenia, interval nemení). 9.4/7.2: zbraň posúva interval postavy o pevné sekundy (posun = pôvodný interval − 2.4 s). 24: otázka intervalu uzavretá. |
 | 2.4 | 2026-09-29 | 9.3/9.5/9.6: drop predmetov aj vzácnosti sú teraz vlastné pre každého nepriateľa (drop tabuľka + tabuľka váh vzácnosti, obe s vlastným `minLevel`/`maxLevel` nepriateľa), nie podľa políčka. Každá položka v drop tabuľke sa hodí samostatne – z jedného zabitia môže padnúť aj viac predmetov naraz. Unikátne/set predmety sú vlastný riadok s pevnou vzácnosťou (fallback na Rare už netreba). Pity garantuje aspoň jeden predmet danej vzácnosti aj mimo tabuliek. Nahrádza „drop tabuľku políčka" a globálne váhy vzácnosti z 9.3/9.6. |
 | 2.5 | 2026-10-09 | 8.2: spawn tabuľka políčka (nepriateľ + váha) v `data/tiles.json`. 11.1: drop mien je súčasťou vlastnej drop tabuľky každého nepriateľa (mena, šanca podľa levelu, počet kusov), nie jeden vzorec podľa tieru políčka. |
+| 2.10 | 2026-10-10 | 19: po načítaní hra začína v pokoji na uloženom políčku (boj/úkryt sa neobnovujú); ukladajú sa všetky Rng prúdy, „Keep nuts“ a odohraný čas. |
 | 2.9 | 2026-10-10 | 8.2: T5 Berry Bushes (Beetle + Moth, letí) – dočasne sa odomkne po 60 zabitiach na T4, kým nie je boss (M14). 8.3: Acorn Cap z Beetle čaká na predmety T5. |
 | 2.8 | 2026-10-09 | 7.3: rezerva orieškov predvolene 5, neobmedzuje jedenie; oriešok na každý výstrel (aj minutie, aj prak proti nelietajúcemu); kamienky zo zeme nemenia peňaženku. |
 | 2.7 | 2026-10-09 | 7.1: diaľková zbraň zaberá obe labky (zbrane v labkách sa pri streľbe nepočítajú, afixy výbavy áno); proti letiacemu bez diaľkovej zbrane päste s polovičnou šancou na zásah. |

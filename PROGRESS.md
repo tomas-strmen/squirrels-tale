@@ -3,8 +3,8 @@
 ## Aktuálne
 - **Etapa:** M7 Meny, jedlo, diaľkový boj (GDD kap. 22) – M5 hotová ✅, M6 uzavretá (zvyšok čaká na M7/M13/M14)
 - **Posledný krok:** M7.3b – munícia (GDD v2.8) – otestované a zmergnuté (PR #31). Pred ním M7.3a prak (PR #30).
-- **Rozpracované:** M7.3c – políčko T5 s lietajúcou Morou (GDD v2.9), vetva `m7.3c-t5-moth`, čaká na test Tomasa.
-  Po ňom je **M7 hotová**.
+- **Rozpracované:** vetva `m7.3c-t5-moth` (autonómny beh 10. 10. v noci, všetko na jednej vetve, čaká na test Tomasa):
+  M7.3c políčko T5 s lietajúcou Morou (GDD v2.9) → **M7 hotová**; M8.1 save/load + autosave (GDD v2.10).
 - **Ďalší krok:** **M8 Save** (model Opus – save sa nesmie rozbiť: verzie, migrácie, autosave, 2 sloty,
   export/import, ochrana hodín; uloží aj „Keep nuts“). Neskôr loot krok 3 (čísla v tabuľkách + predmety T5:
   Reed Slingshot, Acorn Cap/Helmet…) a 4 (editor tabuliek). Dragonfly (T6) a Wasp (T8) prídu s ich políčkami.

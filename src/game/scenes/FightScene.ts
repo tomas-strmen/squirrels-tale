@@ -56,6 +56,8 @@ import { regenAmountHundredths, xpToNextLevelHundredths } from '../../core/progr
 import { CURRENCY_IDS } from '../../core/currency/currency';
 import { FOOD_IDS, type FoodId } from '../../core/food/food';
 import { createRng } from '../../core/rng/rng';
+import { restore } from '../../core/save/save';
+import { SaveManager } from '../SaveManager';
 import { slotsFor } from '../../core/inventory/inventory';
 import { diceFaces, pityCountdowns, type Item } from '../../core/loot/loot';
 import { consumeFrame, DEFAULT_MAX_STEPS_PER_FRAME, TICK_MS } from '../../core/time/fixedStep';
@@ -149,6 +151,8 @@ export class FightScene extends Phaser.Scene {
   private autoFoodText!: Phaser.GameObjects.Text;
   private autoFoodBar!: ProgressBar;
   private keepNutsText!: Phaser.GameObjects.Text;
+  /** Save game (GDD 19, M8.1): load at start, autosave. */
+  private readonly saves = new SaveManager();
 
   constructor() {
     super('FightScene');
@@ -175,9 +179,25 @@ export class FightScene extends Phaser.Scene {
         ),
       ]),
     );
-    this.config = this.configFor(firstTile.id);
-    // Seeded Rng (GDD 5); a new seed per session until saves arrive in M8.
-    this.state = createEncounter(this.config, createRng(now()), firstTile.id);
+    // M8.1: continue the saved game, or start a new one (seeded Rng, GDD 5).
+    const saved = this.saves.load();
+    let playTimeMs = 0;
+    if (saved) {
+      // A tile removed from the data since -> continue on the first tile.
+      const tileId = this.tiles.some((t) => t.id === saved.tiles.current) ? saved.tiles.current : firstTile.id;
+      this.config = this.configFor(tileId);
+      this.state = restore(this.config, { ...saved, tiles: { ...saved.tiles, current: tileId } });
+      playTimeMs = saved.stats.playTimeMs;
+    } else {
+      this.config = this.configFor(firstTile.id);
+      this.state = createEncounter(this.config, createRng(now()), firstTile.id);
+    }
+    // Save when the page is hidden or closed (GDD 19) - the browser may not give us another chance.
+    const saveNow = () => this.saves.save(this.state, this.simElapsedMs);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') saveNow();
+    });
+    window.addEventListener('pagehide', saveNow);
     this.accumulatorMs = 0;
 
     const textStyle = this.textStyle;
@@ -357,9 +377,11 @@ export class FightScene extends Phaser.Scene {
     this.lootPanel = new ItemsPanel(this, 10, 70, {
       onEquip: (uid, slot) => {
         this.state = equipItem(this.state, this.config, uid, slot);
+        this.saves.requestSave();
       },
       onUnequip: (slot) => {
         this.state = unequipItem(this.state, this.config, slot);
+        this.saves.requestSave();
       },
       colorOf: (item) => this.rarityColors.get(item.rarityId) ?? '#ffffff',
       compareToSlot: (item, slot) =>
@@ -377,6 +399,7 @@ export class FightScene extends Phaser.Scene {
         }),
       onToggleLock: (uid) => {
         this.state = toggleItemLock(this.state, this.config, uid);
+        this.saves.requestSave();
       },
       rarityRank: (item) => this.rarityRanks.get(item.rarityId) ?? 0,
       discardGroups: () => {
@@ -391,12 +414,13 @@ export class FightScene extends Phaser.Scene {
       },
       onDiscardRarity: (rarityId) => {
         this.state = discardBagRarity(this.state, this.config, rarityId);
+        this.saves.requestSave();
       },
     });
     this.lootPanel.setVisible(false);
 
     // Bottom-left info: game time (follows the simulation speed) and the pity countdown (GDD 9.6).
-    this.simElapsedMs = 0;
+    this.simElapsedMs = playTimeMs;
     this.timeText = this.add.text(10, 640, '', { ...textStyle, fontSize: '16px', color: '#a0a0a0' });
     this.pityText = this.add.text(10, 662, '', { ...textStyle, fontSize: '16px', color: '#a0a0a0' });
     // Wallet (GDD 11.1): the three currencies, top right under the Drop rate row's tile picker.
@@ -424,6 +448,7 @@ export class FightScene extends Phaser.Scene {
       .setOrigin(0, 0.5);
     const keepStep = (delta: number) => () => {
       this.state = setKeepNuts(this.state, this.state.keepNuts + delta);
+      this.saves.requestSave();
     };
     new Button(this, 1195, 465, '−', keepStep(-1), { width: 36, height: 32, fontSize: 18 });
     new Button(this, 1240, 465, '+', keepStep(1), { width: 36, height: 32, fontSize: 18 });
@@ -528,6 +553,7 @@ export class FightScene extends Phaser.Scene {
     const step = switchTile(this.state, this.configFor(tileId), tileId, unlocked);
     this.state = step.state;
     if (step.events.some((e) => e.type === 'tileSwitched')) {
+      this.saves.requestSave();
       this.config = this.configFor(tileId);
       this.hideFightGroups();
       this.findButton.setVisible(true);
@@ -637,7 +663,10 @@ export class FightScene extends Phaser.Scene {
         if (e.type === 'itemFound') found.push({ item: e.item, bagFull: e.bagFull });
         else this.onEvent(e);
       }
-      if (found.length > 0) this.queueDiceGroup(found);
+      if (found.length > 0) {
+        this.queueDiceGroup(found);
+        this.saves.requestSave();
+      }
     }
     // accumulatorMs (< 1 tick, always > 0) smooths the bars between ticks for
     // rendering only - it never changes the simulation state itself.
@@ -659,6 +688,8 @@ export class FightScene extends Phaser.Scene {
     this.refreshTileButtons();
     this.refreshFoodPanel();
     this.timeText.setText(`${t('hud.time')}: ${formatDuration(this.simElapsedMs)}`);
+    // Autosave every 30 s of real time, or right after an important action (M8.1).
+    this.saves.update(delta, this.state, this.simElapsedMs);
     // One line per pity rarity that can drop here (GDD 9.6 v2.2); locked ones stay hidden.
     const countdowns = pityCountdowns(
       this.state.loot,
@@ -753,9 +784,11 @@ export class FightScene extends Phaser.Scene {
         );
         break;
       case 'leveledUp':
+        this.saves.requestSave();
         this.floatingText(PLAYER_X, FIGHTER_Y - 100, t('fight.leveledUp'), '#ffe08a', 1200);
         break;
       case 'playerDefeated':
+        this.saves.requestSave();
         this.hideFightGroups();
         this.hideoutGroup.setVisible(true);
         this.floatingText(PLAYER_X, FIGHTER_Y - 70, t('fight.knockedOut'), '#ff9f9f', 1500);

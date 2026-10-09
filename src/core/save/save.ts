@@ -25,6 +25,11 @@ export const SAVE_VERSION = 1;
 
 /** localStorage keys of the two slots (GDD 19: current + previous, in case one gets corrupted). */
 export const SAVE_KEYS = { current: 'squirrels-tale.save.current', previous: 'squirrels-tale.save.previous' } as const;
+/** Where unreadable saves are copied before a new game can overwrite them (never deleted automatically). */
+export const UNREADABLE_KEYS = {
+  current: 'squirrels-tale.save.unreadable.current',
+  previous: 'squirrels-tale.save.unreadable.previous',
+} as const;
 
 const num = z.number().finite();
 const int = z.number().int();
@@ -242,6 +247,22 @@ export function loadSave(storage: SaveStorage): LoadResult | null {
     }
   }
   return null;
+}
+
+/**
+ * Safety net: when `loadSave` found no readable save but some slot has text, copies that text to
+ * `UNREADABLE_KEYS` (once - an existing copy is kept) so starting a new game can't destroy it,
+ * e.g. if a bug in a newer version can't read it. Returns how many slots were copied.
+ */
+export function backupUnreadable(storage: SaveStorage): number {
+  let copied = 0;
+  for (const slot of ['current', 'previous'] as const) {
+    const text = storage.getItem(SAVE_KEYS[slot]);
+    if (text === null || isReadable(text) || storage.getItem(UNREADABLE_KEYS[slot]) !== null) continue;
+    storage.setItem(UNREADABLE_KEYS[slot], text);
+    copied++;
+  }
+  return copied;
 }
 
 /** Deletes both slots (debug reset). */

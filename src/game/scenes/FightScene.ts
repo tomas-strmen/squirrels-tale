@@ -421,6 +421,13 @@ export class FightScene extends Phaser.Scene {
 
     // Bottom-left info: game time (follows the simulation speed) and the pity countdown (GDD 9.6).
     this.simElapsedMs = playTimeMs;
+    // Save tools (GDD 19 export/import, debug reset - M8.2): bottom row under Find enemy, clear of
+    // the pity line on the left (it grows with every unlocked rarity).
+    const saveButton = (x: number, label: string, onClick: () => void) =>
+      new Button(this, x, 692, label, onClick, { width: 110, height: 26, fontSize: 13 });
+    saveButton(W / 2 - 120, t('save.export'), () => void this.onExportSave());
+    saveButton(W / 2, t('save.import'), () => this.onImportSave());
+    saveButton(W / 2 + 120, t('save.reset'), () => this.onResetGame());
     this.timeText = this.add.text(10, 640, '', { ...textStyle, fontSize: '16px', color: '#a0a0a0' });
     this.pityText = this.add.text(10, 662, '', { ...textStyle, fontSize: '16px', color: '#a0a0a0' });
     // Wallet (GDD 11.1): the three currencies, top right under the Drop rate row's tile picker.
@@ -584,6 +591,37 @@ export class FightScene extends Phaser.Scene {
       return t('tile.lockedLevel').replace('{level}', String(tile.unlockLevel));
     }
     return t('tile.locked').replace('{kills}', String(kills));
+  }
+
+  /** M8.2: copies the save text to the clipboard (falls back to a box to copy it from by hand). */
+  private async onExportSave(): Promise<void> {
+    const text = this.saves.exportText(this.state, this.simElapsedMs);
+    try {
+      await navigator.clipboard.writeText(text);
+      this.floatingText(W / 2, BUTTON_Y - 60, t('save.exported'), '#a0e0a0', 1500);
+    } catch {
+      window.prompt(t('save.exportPrompt'), text); // e.g. http on the local network: no clipboard API
+    }
+  }
+
+  /** M8.2: replaces the game with a pasted save and reloads. An unreadable save changes nothing. */
+  private onImportSave(): void {
+    const text = window.prompt(t('save.importPrompt'));
+    if (!text) return;
+    try {
+      this.saves.importText(text);
+    } catch (error) {
+      window.alert(t('save.importInvalid').replace('{error}', error instanceof Error ? error.message : String(error)));
+      return;
+    }
+    window.location.reload();
+  }
+
+  /** Debug reset (CLAUDE.md debug tools): deletes the save and starts over. */
+  private onResetGame(): void {
+    if (!window.confirm(t('save.resetConfirm'))) return;
+    this.saves.clear();
+    window.location.reload();
   }
 
   private onToggleStats(): void {

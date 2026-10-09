@@ -28,6 +28,8 @@ import {
   SAVE_KEYS,
   SAVE_VERSION,
   SaveError,
+  UNREADABLE_KEYS,
+  backupUnreadable,
   snapshot,
   writeSave,
   type SaveData,
@@ -178,6 +180,21 @@ describe('save slots (GDD 19: current + previous)', () => {
     writeSave(storage, { ...first, savedAt: 7777 });
     expect(parseSave(storage.map.get(SAVE_KEYS.previous) ?? '').savedAt).toBe(5000);
     expect(loadSave(storage)?.data.savedAt).toBe(7777);
+  });
+
+  it('unreadable saves are copied aside before a new game could overwrite them', () => {
+    const storage = memoryStorage();
+    storage.setItem(SAVE_KEYS.current, '{"version":99}');
+    storage.setItem(SAVE_KEYS.previous, 'garbage');
+    expect(loadSave(storage)).toBeNull();
+    expect(backupUnreadable(storage)).toBe(2);
+    expect(storage.map.get(UNREADABLE_KEYS.current)).toBe('{"version":99}');
+    expect(storage.map.get(UNREADABLE_KEYS.previous)).toBe('garbage');
+    // A second call keeps the first copy; readable saves are never copied.
+    storage.setItem(SAVE_KEYS.current, 'other garbage');
+    writeSave(storage, first);
+    expect(backupUnreadable(storage)).toBe(0);
+    expect(storage.map.get(UNREADABLE_KEYS.current)).toBe('{"version":99}');
   });
 
   it('clearSave deletes both slots', () => {

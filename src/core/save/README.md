@@ -21,6 +21,9 @@ An old save must always load (CLAUDE.md).
 - `writeSave(storage, data)` / `loadSave(storage)` / `clearSave(storage)` – two slots (`SAVE_KEYS.current`,
   `SAVE_KEYS.previous`): a write moves a readable current save to previous; loading falls back to previous
   when current is corrupt. `SaveStorage` = the `getItem/setItem/removeItem` part of `localStorage`.
+- `backupUnreadable(storage)` – if no slot is readable, copies the raw texts to `UNREADABLE_KEYS` (kept,
+  never overwritten) before a new game starts saving over them.
+- Known limit: two open tabs of the game both autosave - the last one wins.
 
 ## Depends on
 `core/encounter` (`createEncounter`, `playerStats`), `core/content` (schemas), `core/inventory`, `core/loot`,

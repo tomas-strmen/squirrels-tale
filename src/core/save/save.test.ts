@@ -140,29 +140,31 @@ describe('parseSave: versions, migrations, corrupt saves', () => {
     expect(() => parseSave(JSON.stringify({ ...JSON.parse(good), stash: { nuts: -1 } }))).toThrow(SaveError);
   });
 
-  it('migrates an old version up step by step (example: a future v3 adds a setting)', () => {
-    const v3Schema = z.object({
-      version: z.literal(3),
+  it('migrates an old version up step by step (example: a future v4 adds a setting)', () => {
+    const v4Schema = z.object({
+      version: z.literal(4),
       settings: z.object({ keepNuts: z.number(), autoEatBelowPct: z.number() }),
     });
     const migrations = {
-      2: (old: Record<string, unknown>) => ({
+      3: (old: Record<string, unknown>) => ({
         ...old,
         settings: { ...(old.settings as object), autoEatBelowPct: 40 },
       }),
     };
-    const v3 = parseSave(good, migrations, 3, v3Schema) as unknown as z.infer<typeof v3Schema>;
-    expect(v3.version).toBe(3);
-    expect(v3.settings).toEqual({ keepNuts: 7, autoEatBelowPct: 40 });
+    const v4 = parseSave(good, migrations, 4, v4Schema) as unknown as z.infer<typeof v4Schema>;
+    expect(v4.version).toBe(4);
+    expect(v4.settings).toEqual({ keepNuts: 7, autoEatBelowPct: 40 });
     // No migration path -> can't read it.
-    expect(() => parseSave(good, {}, 3, v3Schema)).toThrow(/No migration/);
+    expect(() => parseSave(good, {}, 4, v4Schema)).toThrow(/No migration/);
   });
 });
 
 describe('old save formats always load (CLAUDE.md: save must never break)', () => {
-  it('v1 (M8.1) -> v2: everything kept, farming = false (Peace!)', () => {
+  it('v1 (M8.1) -> v3: everything kept, farming = false (Peace!), empty merchant stock', () => {
     const data = parseSave(JSON.stringify(saveV1));
-    expect(data.version).toBe(2);
+    expect(data.version).toBe(3);
+    expect(data.merchant.day).toBe(-1);
+    expect(data.merchant.stock).toEqual([]);
     expect(data.tiles).toEqual({ current: 't2', killsByTile: { t1: 14, t2: 3 }, enemyId: 'pill_bug', enemyLevel: 3, farming: false });
     expect(data.player).toEqual({ level: 4, xp: 1250, hp: 610 });
     expect(data.inventory.bag[0]?.locked).toBe(true);

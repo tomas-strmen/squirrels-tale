@@ -63,6 +63,7 @@ import {
 } from '../loot/loot';
 import type { EnemyLoot } from '../content/schemas';
 import { branch, next, nextInt, type RngState } from '../rng/rng';
+import type { MerchantState } from '../merchant/merchant';
 import { chooseWeaponMode, composeStats, type ComposedStats, type WeaponMode } from '../stats/stats';
 import { ammoDamagePct, createAmmoConfig, nextAmmo, spendAmmo, type AmmoConfig, type AmmoConfigInput, type AmmoKind } from '../ammo/ammo';
 import { secondsToMs, TICK_MS } from '../time/fixedStep';
@@ -221,6 +222,8 @@ export interface EncounterState {
   readonly tileId: string;
   /** Kills so far on each tile ever visited, keyed by tile id (M6.2: unlocks the next tile). */
   readonly killsByTile: Readonly<Record<string, number>>;
+  /** The Magpie's daily stock (GDD 11.2, M10; logic in core/merchant). */
+  readonly merchant: MerchantState;
 }
 
 export type EncounterEvent =
@@ -361,6 +364,7 @@ export function createEncounter(config: EncounterConfig, rng: RngState, tileId: 
     keepNuts: config.ammo.keepNutsDefault,
     tileId,
     killsByTile: {},
+    merchant: { day: -1, stock: [], rng: branch(rng, 'merchant') },
   };
 }
 

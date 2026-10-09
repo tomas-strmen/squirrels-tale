@@ -19,9 +19,10 @@ import type { Wallet } from '../currency/currency';
 import { createEncounter, playerStats, type EncounterConfig, type EncounterState } from '../encounter/encounter';
 import { EQUIP_SLOTS, type Equipment } from '../inventory/inventory';
 import type { Item, LootState } from '../loot/loot';
+import type { MerchantState } from '../merchant/merchant';
 import type { RngState } from '../rng/rng';
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 /** localStorage keys of the two slots (GDD 19: current + previous, in case one gets corrupted). */
 export const SAVE_KEYS = { current: 'squirrels-tale.save.current', previous: 'squirrels-tale.save.previous' } as const;
@@ -60,7 +61,7 @@ const walletSchema = z.object(
 
 /**
  * Save format (GDD 19 field names where they exist). Times are ms since epoch / ms durations.
- * v1 (M8.1). v2 (M9.1): `tiles.farming`.
+ * v1 (M8.1). v2 (M9.1): `tiles.farming`. v3 (M10): `merchant`.
  */
 export const saveSchema = z.object({
   version: z.literal(SAVE_VERSION),
@@ -88,6 +89,8 @@ export const saveSchema = z.object({
   stats: z.object({ playTimeMs: num.min(0) }),
   /** Pity counters + next item uid (GDD 9.6). */
   pity: z.object({ pityCounters: z.record(z.string(), int.min(0)), nextUid: int.min(1) }),
+  /** v3: the Magpie's stock of the day (GDD 11.2). day -1 = roll a new one. */
+  merchant: z.object({ day: int, stock: z.array(itemSchema), rng: rngSchema }),
 });
 
 /** The save format as TypeScript (kept in sync with `saveSchema`; JSON never holds `undefined`). */
@@ -111,6 +114,7 @@ export interface SaveData {
   readonly settings: { readonly keepNuts: number };
   readonly stats: { readonly playTimeMs: number };
   readonly pity: LootState;
+  readonly merchant: MerchantState;
 }
 
 /** One migration: a save of version N (already JSON-parsed) -> the same save in version N + 1. */
@@ -119,6 +123,12 @@ export type Migration = (old: Record<string, unknown>) => Record<string, unknown
 export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   // v1 -> v2 (M9.1): `tiles.farming`. v1 didn't know - start in Peace! (safe: no offline fights).
   1: (old) => ({ ...old, tiles: { ...(old.tiles as Record<string, unknown>), farming: false } }),
+  // v2 -> v3 (M10): no merchant yet - empty stock (rolled on the next check), own Rng from the combat seed.
+  2: (old) => {
+    const rng = old.rngState as { combat?: { seed?: unknown } } | undefined;
+    const seed = typeof rng?.combat?.seed === 'number' ? rng.combat.seed : 0;
+    return { ...old, merchant: { day: -1, stock: [], rng: { seed: (seed ^ 0x2545f491) | 0 } } };
+  },
 };
 
 export class SaveError extends Error {}
@@ -187,6 +197,7 @@ export function snapshot(state: EncounterState, meta: SnapshotMeta): SaveData {
     settings: { keepNuts: state.keepNuts },
     stats: { playTimeMs: meta.playTimeMs },
     pity: { pityCounters: { ...state.loot.pityCounters }, nextUid: state.loot.nextUid },
+    merchant: state.merchant,
   };
 }
 
@@ -216,6 +227,7 @@ export function restore(config: EncounterConfig, data: SaveData): EncounterState
     eatCooldownMs: data.boosts.eatCooldownMs,
     keepNuts: data.settings.keepNuts,
     loot: { pityCounters: data.pity.pityCounters, nextUid: data.pity.nextUid },
+    merchant: data.merchant,
   };
   const maxHp = playerStats(config, restored.progression.level, restored.inventory.equipment).maxHp;
   // Saved at 0 HP (in the hideout after a death): she'd have come back at full HP anyway (GDD 6.3).

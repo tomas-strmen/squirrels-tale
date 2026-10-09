@@ -47,6 +47,25 @@
     "autoEatBelowPct": 40,
     "autoFoodUnlockS": 60.0
   },
+  "merchant": {
+    "unlockTile": "t2",
+    "baseValue": 5,
+    "valueGrowthPct": 50,
+    "minSellPrice": 1,
+    "dailyStock": [
+      { "rarityId": "common", "count": 4 },
+      { "rarityId": "uncommon", "count": 1 }
+    ],
+    "currencyBySlot": {
+      "melee": "pebbles",
+      "ranged": "pebbles",
+      "head": "seeds",
+      "body": "seeds",
+      "legs": "seeds",
+      "ring": "nuts",
+      "amulet": "nuts"
+    }
+  },
   "offline": {
     "capH": 6,
     "clockToleranceMin": 5,

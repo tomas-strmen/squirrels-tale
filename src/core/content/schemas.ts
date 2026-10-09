@@ -271,6 +271,10 @@ export const raritySchema = z.object({
   diceRange: diceRangeSchema,
   /** Face range on the second, gold d20 - only unique/set/legendary (a "20" on the first die). */
   goldDiceRange: diceRangeSchema.nullable(),
+  /** Merchant price, % of the item value V(t) (GDD 11.2: Uncommon x3); null = the merchant never sells it. */
+  buyPct: z.number().int().min(1).nullable(),
+  /** Merchant buy-back, % of V(t) (GDD 11.2: Common 0.2 V ... Legendary 10 V). */
+  sellPct: z.number().int().min(0),
 });
 export type RarityData = z.infer<typeof raritySchema>;
 
@@ -389,6 +393,25 @@ export const balanceSchema = z.object({
     autoEatBelowPct: percentSchema,
     /** One "watch an ad" unlocks auto-food for this long (mock ad, GDD 18.1). */
     autoFoodUnlockS: designSecondsSchema.refine((v) => v > 0, 'must be greater than 0'),
+  }),
+  /** Merchant - the Magpie (GDD 11.2, M10). */
+  merchant: z.object({
+    /** She opens when this tile is unlocked (her home; quest Q2 takes over in M13). */
+    unlockTile: idSchema,
+    /** Item value V(t) = round(baseValue x (1 + valueGrowthPct/100)^(t-1)). */
+    baseValue: z.number().int().min(1),
+    valueGrowthPct: z.number().int().min(0),
+    /** Lowest buy-back price. */
+    minSellPrice: z.number().int().min(0),
+    /** Daily stock: how many items of each rarity (GDD: 4 Common + 1 Uncommon). */
+    dailyStock: z.array(z.object({ rarityId: idSchema, count: z.number().int().min(1) })),
+    /** Currency paid (and paid out) by item slot: weapons pebbles, armor seeds, jewellery nuts. */
+    currencyBySlot: z.object(
+      Object.fromEntries(itemSlotSchema.options.map((slot) => [slot, z.enum(CURRENCY_IDS)])) as Record<
+        z.infer<typeof itemSlotSchema>,
+        z.ZodEnum<{ [K in (typeof CURRENCY_IDS)[number]]: K }>
+      >,
+    ),
   }),
   /** Offline progress (GDD 17, M9). */
   offline: z.object({

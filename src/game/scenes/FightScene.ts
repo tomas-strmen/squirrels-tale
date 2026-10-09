@@ -57,12 +57,14 @@ import { CURRENCY_IDS } from '../../core/currency/currency';
 import { FOOD_IDS, type FoodId } from '../../core/food/food';
 import { createRng } from '../../core/rng/rng';
 import { restore } from '../../core/save/save';
+import { createOfflineConfig, offlineMs, simulateOffline, type OfflineConfig, type OfflineSummary } from '../../core/offline/offline';
+import { SummaryPanel, type SummaryLine } from '../ui/SummaryPanel';
 import { SaveManager } from '../SaveManager';
 import { slotsFor } from '../../core/inventory/inventory';
 import { diceFaces, pityCountdowns, type Item } from '../../core/loot/loot';
 import { consumeFrame, DEFAULT_MAX_STEPS_PER_FRAME, TICK_MS } from '../../core/time/fixedStep';
 import { equipComparisonLines, itemName, rarityName } from '../itemText';
-import { t, tDynamic } from '../text';
+import { t, tDynamic, type TextKey } from '../text';
 import { Button } from '../ui/Button';
 import { DebugPanel } from '../ui/DebugPanel';
 import { Dice } from '../ui/Dice';
@@ -154,6 +156,7 @@ export class FightScene extends Phaser.Scene {
   /** Save game (GDD 19, M8.1): load at start, autosave. */
   private readonly saves = new SaveManager();
   private otherTabText!: Phaser.GameObjects.Text;
+  private offlineConfig!: OfflineConfig;
 
   constructor() {
     super('FightScene');
@@ -181,14 +184,18 @@ export class FightScene extends Phaser.Scene {
       ]),
     );
     // M8.1: continue the saved game, or start a new one (seeded Rng, GDD 5).
+    this.offlineConfig = createOfflineConfig(balance.offline);
     const saved = this.saves.load();
     let playTimeMs = 0;
+    /** M9: time away since the save, caught up once the UI exists (end of create). */
+    let away = { ms: 0, farming: false };
     if (saved) {
       // A tile removed from the data since -> continue on the first tile.
       const tileId = this.tiles.some((t) => t.id === saved.tiles.current) ? saved.tiles.current : firstTile.id;
       this.config = this.configFor(tileId);
       this.state = restore(this.config, { ...saved, tiles: { ...saved.tiles, current: tileId } });
       playTimeMs = saved.stats.playTimeMs;
+      away = { ms: offlineMs(saved.savedAt, saved.maxSeenTime, now(), this.offlineConfig), farming: saved.tiles.farming };
     } else {
       this.config = this.configFor(firstTile.id);
       this.state = createEncounter(this.config, createRng(now()), firstTile.id);
@@ -464,6 +471,87 @@ export class FightScene extends Phaser.Scene {
     };
     new Button(this, 1195, 465, '−', keepStep(-1), { width: 36, height: 32, fontSize: 18 });
     new Button(this, 1240, 465, '+', keepStep(1), { width: 36, height: 32, fontSize: 18 });
+
+    // Debug time skip (CLAUDE.md debug tools, GDD 22 M9 test): as if the game was closed for 1 h / 3 h.
+    this.add.text(W / 2 + 190, 692, t('debug.skip'), { ...textStyle, fontSize: '14px', color: '#909090' }).setOrigin(0, 0.5);
+    for (const [index, hours] of [1, 3].entries()) {
+      new Button(this, W / 2 + 262 + index * 64, 692, `+${hours} h`, () => this.onSkipTime(hours), {
+        width: 58,
+        height: 26,
+        fontSize: 13,
+      });
+    }
+
+    // M9: catch up the time the game was closed, then continue farming if she was.
+    this.catchUp(away.ms, away.farming, false);
+  }
+
+  /**
+   * Offline progress (GDD 17, M9): simulates `awayMs` on the current tile, shows "While You Were
+   * Away" (if long enough, or `alwaysShow` for the debug skip) and resumes the search if she was farming.
+   */
+  private catchUp(awayMs: number, farming: boolean, alwaysShow: boolean): void {
+    const resume = () => {
+      if (farming && this.state.phase === 'idle') this.onFindEnemy();
+    };
+    if (awayMs <= 0) {
+      resume();
+      return;
+    }
+    const result = simulateOffline(this.state, this.config, awayMs, farming);
+    this.state = result.state;
+    this.hideFightGroups();
+    this.findButton.setVisible(true);
+    this.hideoutGroup.setVisible(false);
+    this.saves.requestSave();
+    if (alwaysShow || awayMs >= this.offlineConfig.minSummaryMs) {
+      new SummaryPanel(this, t('away.title'), this.awayLines(result.summary), t('away.ok'), resume);
+    } else {
+      resume();
+    }
+  }
+
+  private onSkipTime(hours: number): void {
+    const farming = this.state.phase === 'searching' || this.state.phase === 'fighting';
+    this.catchUp(Math.min(hours * 3_600_000, this.offlineConfig.capMs), farming, true);
+  }
+
+  /** Text of the "While You Were Away" summary (GDD 17.2 step 6). */
+  private awayLines(s: OfflineSummary): SummaryLine[] {
+    const fill = (key: TextKey, values: Record<string, string | number>) =>
+      Object.entries(values).reduce((text, [k, v]) => text.replace(`{${k}}`, String(v)), t(key));
+    const list = (counts: Readonly<Record<string, number>>) =>
+      Object.entries(counts)
+        .filter(([, n]) => n > 0)
+        .map(([id, n]) => `${tDynamic(`currency.${id}.name`)} ${n}`)
+        .join(' · ');
+    const lines: SummaryLine[] = [{ text: fill('away.time', { time: formatAway(s.awayMs) }) }];
+    if (!s.farming) {
+      lines.push({ text: t('away.resting') });
+      return lines;
+    }
+    if (s.halfPace) lines.push({ text: fill('away.halfPace', { time: formatAway(s.farmedMs) }), color: '#ffb070' });
+    lines.push({ text: fill('away.kills', { n: s.kills }) });
+    lines.push({ text: fill('away.xp', { xp: formatHundredths(s.xpGained) }) });
+    if (s.levelAfter > s.levelBefore) {
+      lines.push({ text: fill('away.level', { from: s.levelBefore, to: s.levelAfter }), color: '#ffe08a' });
+    }
+    const found = list(s.found);
+    if (found) lines.push({ text: fill('away.found', { list: found }), color: '#e8d9a0' });
+    const eaten = list(s.eaten);
+    if (eaten) lines.push({ text: fill('away.eaten', { list: eaten }) });
+    if (s.nutsShot > 0) lines.push({ text: fill('away.nutsShot', { n: s.nutsShot }) });
+    if (s.deaths > 0) {
+      lines.push({ text: fill('away.deaths', { n: s.deaths, time: formatAway(s.hideoutMs) }), color: '#ff8a8a' });
+    }
+    lines.push({ text: fill('away.items', { n: s.items.length }) });
+    const shown = 8;
+    for (const item of s.items.slice(0, shown)) {
+      lines.push({ text: `  ${itemName(item)} [${rarityName(item.rarityId)}]`, color: this.rarityColors.get(item.rarityId) ?? '#dddddd' });
+    }
+    if (s.items.length > shown) lines.push({ text: fill('away.more', { n: s.items.length - shown }) });
+    if (s.itemsLost.length > 0) lines.push({ text: fill('away.itemsLost', { n: s.itemsLost.length }), color: '#ff8a8a' });
+    return lines;
   }
 
   private onEat(food: FoodId): void {
@@ -978,6 +1066,17 @@ export class FightScene extends Phaser.Scene {
 }
 
 /** 3723000 ms -> "01:02:03" */
+/** "3 h 05 min" / "4 min 20 s" / "12 s" for the offline summary. */
+function formatAway(ms: number): string {
+  const total = Math.floor(ms / 1000);
+  const h = Math.floor(total / 3600);
+  const min = Math.floor((total % 3600) / 60);
+  const sec = total % 60;
+  if (h > 0) return `${h} h ${String(min).padStart(2, '0')} min`;
+  if (min > 0) return `${min} min ${String(sec).padStart(2, '0')} s`;
+  return `${sec} s`;
+}
+
 function formatDuration(ms: number): string {
   const total = Math.floor(ms / 1000);
   const pad = (n: number) => String(n).padStart(2, '0');

@@ -6,6 +6,7 @@ import enemiesData from '../../../data/enemies.json';
 import itemsData from '../../../data/items.json';
 import raritiesData from '../../../data/rarities.json';
 import tilesData from '../../../data/tiles.json';
+import saveV1 from './fixtures/save-v1.json';
 import { toEncounterConfigInput } from '../content/encounterInput';
 import { parseAffixes, parseBalance, parseEnemies, parseItems, parseRarities, parseTiles } from '../content/schemas';
 import {
@@ -139,22 +140,43 @@ describe('parseSave: versions, migrations, corrupt saves', () => {
     expect(() => parseSave(JSON.stringify({ ...JSON.parse(good), stash: { nuts: -1 } }))).toThrow(SaveError);
   });
 
-  it('migrates an old version up step by step (example: a future v2 adds a setting)', () => {
-    const v2Schema = z.object({
-      version: z.literal(2),
+  it('migrates an old version up step by step (example: a future v3 adds a setting)', () => {
+    const v3Schema = z.object({
+      version: z.literal(3),
       settings: z.object({ keepNuts: z.number(), autoEatBelowPct: z.number() }),
     });
     const migrations = {
-      1: (old: Record<string, unknown>) => ({
+      2: (old: Record<string, unknown>) => ({
         ...old,
         settings: { ...(old.settings as object), autoEatBelowPct: 40 },
       }),
     };
-    const v2 = parseSave(good, migrations, 2, v2Schema) as unknown as z.infer<typeof v2Schema>;
-    expect(v2.version).toBe(2);
-    expect(v2.settings).toEqual({ keepNuts: 7, autoEatBelowPct: 40 });
+    const v3 = parseSave(good, migrations, 3, v3Schema) as unknown as z.infer<typeof v3Schema>;
+    expect(v3.version).toBe(3);
+    expect(v3.settings).toEqual({ keepNuts: 7, autoEatBelowPct: 40 });
     // No migration path -> can't read it.
-    expect(() => parseSave(good, {}, 2, v2Schema)).toThrow(/No migration/);
+    expect(() => parseSave(good, {}, 3, v3Schema)).toThrow(/No migration/);
+  });
+});
+
+describe('old save formats always load (CLAUDE.md: save must never break)', () => {
+  it('v1 (M8.1) -> v2: everything kept, farming = false (Peace!)', () => {
+    const data = parseSave(JSON.stringify(saveV1));
+    expect(data.version).toBe(2);
+    expect(data.tiles).toEqual({ current: 't2', killsByTile: { t1: 14, t2: 3 }, enemyId: 'pill_bug', enemyLevel: 3, farming: false });
+    expect(data.player).toEqual({ level: 4, xp: 1250, hp: 610 });
+    expect(data.inventory.bag[0]?.locked).toBe(true);
+    expect(data.inventory.equipment.rightPaw?.baseId).toBe('sharp_twig');
+    const back = restore(configOf('t2'), data);
+    expect(back.tileId).toBe('t2');
+    expect(back.wallet).toEqual({ pebbles: 12, seeds: 7, nuts: 9, berries: 2 });
+    expect(back.loot).toEqual({ pityCounters: { rare: 17 }, nextUid: 4 });
+  });
+
+  it('remembers whether she was farming (v2)', () => {
+    const idle = played();
+    expect(snapshot(idle, meta).tiles.farming).toBe(false);
+    expect(snapshot(startSearch(idle).state, meta).tiles.farming).toBe(true);
   });
 });
 

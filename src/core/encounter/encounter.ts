@@ -67,6 +67,12 @@ import { ammoDamagePct, createAmmoConfig, nextAmmo, spendAmmo, type AmmoConfig, 
 import { secondsToMs, TICK_MS } from '../time/fixedStep';
 
 export type EncounterPhase = 'idle' | 'searching' | 'fighting' | 'hideout';
+/**
+ * 'online' = the game is open (GDD 6.3: a death costs XP, the squirrel stays in the hideout
+ * until the player picks a tile). 'offline' = offline catch-up (GDD 6.3/17.2, M9): a death
+ * costs no XP and after the hideout she goes straight back to searching on the same tile.
+ */
+export type TickMode = 'online' | 'offline';
 export type Combatant = 'player' | 'enemy';
 
 /** Enemy stat scaling per level above its tile's base level (GDD 8.4, M6.1). Crit is locked (GDD 6.1). */
@@ -689,8 +695,8 @@ export function switchTile(
  * If both fighters are due to attack in the same step, the player attacks first;
  * if that attack kills the enemy, the enemy does not attack.
  */
-export function tick(state: EncounterState, config: EncounterConfig): EncounterStep {
-  const step = tickPhase(state, config);
+export function tick(state: EncounterState, config: EncounterConfig, mode: TickMode = 'online'): EncounterStep {
+  const step = tickPhase(state, config, mode);
   // GDD 7.4: the eat cooldown and the auto-food unlock run on simulation time.
   const timed = {
     ...step.state,
@@ -747,7 +753,7 @@ function autoEat(state: EncounterState, config: EncounterConfig): { state: Encou
   return food === null ? null : tryEat(state, config, food, true);
 }
 
-function tickPhase(state: EncounterState, config: EncounterConfig): EncounterStep {
+function tickPhase(state: EncounterState, config: EncounterConfig, mode: TickMode): EncounterStep {
   switch (state.phase) {
     case 'idle':
       return { state: applyRegen(state, config), events: [] };
@@ -756,6 +762,14 @@ function tickPhase(state: EncounterState, config: EncounterConfig): EncounterSte
       const hideoutElapsedMs = state.hideoutElapsedMs + TICK_MS;
       if (hideoutElapsedMs < config.hideoutMs) {
         return { state: { ...state, hideoutElapsedMs }, events: [] };
+      }
+      const maxHp = playerStats(config, state.progression.level, state.inventory.equipment).maxHp;
+      if (mode === 'offline') {
+        // GDD 6.3 offline: back at full HP on the same tile, the search starts again by itself.
+        return {
+          state: { ...toIdle({ ...state, hideoutElapsedMs }, maxHp), phase: 'searching' },
+          events: [{ type: 'returnedFromHideout' }, { type: 'searchStarted' }],
+        };
       }
       return {
         state: toIdle(
@@ -786,7 +800,7 @@ function tickPhase(state: EncounterState, config: EncounterConfig): EncounterSte
     }
 
     case 'fighting':
-      return tickFight(applyRegen(state, config), config);
+      return tickFight(applyRegen(state, config), config, mode);
   }
 }
 
@@ -817,7 +831,7 @@ function applyRegen(state: EncounterState, config: EncounterConfig): EncounterSt
   };
 }
 
-function tickFight(state: EncounterState, config: EncounterConfig): EncounterStep {
+function tickFight(state: EncounterState, config: EncounterConfig, mode: TickMode): EncounterStep {
   const events: EncounterEvent[] = [];
   let { rng, playerHp, enemyHp, progression, wallet } = state;
   let playerAttackElapsedMs = state.playerAttackElapsedMs + TICK_MS;
@@ -908,9 +922,10 @@ function tickFight(state: EncounterState, config: EncounterConfig): EncounterSte
     playerHp = Math.max(0, playerHp - attack.result.damage);
     events.push({ type: 'attack', attacker: 'enemy', ...attack.result });
     if (playerHp === 0) {
-      // GDD 6.3 (online death): lose a % of the current level's progress, level never drops.
+      // GDD 6.3 online death: lose a % of the current level's progress, level never drops.
+      // Offline deaths cost no XP.
       const beforeLoss = progression;
-      progression = applyDeathXpLoss(progression, config.deathXpLossPct);
+      if (mode === 'online') progression = applyDeathXpLoss(progression, config.deathXpLossPct);
       const xpLost = beforeLoss.xp - progression.xp;
       events.push({ type: 'playerDefeated', xpLost });
       return {

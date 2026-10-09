@@ -388,6 +388,15 @@ export const balanceSchema = z.object({
     /** One "watch an ad" unlocks auto-food for this long (mock ad, GDD 18.1). */
     autoFoodUnlockS: designSecondsSchema.refine((v) => v > 0, 'must be greater than 0'),
   }),
+  /** Offline progress (GDD 17, M9). */
+  offline: z.object({
+    /** Offline time cap in hours (GDD 17.1: base 6 h). */
+    capH: designValueSchema.refine((v) => v > 0, 'must be greater than 0'),
+    /** Clock more than this many minutes behind the highest time seen -> no offline time (GDD 17.3). */
+    clockToleranceMin: z.number().min(0),
+    /** Absences shorter than this are simulated silently (no "While You Were Away"). */
+    minSummaryS: z.number().min(0),
+  }),
   /** Ranged weapon ammo (GDD 7.3, M7.3b). */
   ammo: z.object({
     /** Nuts spent per shot. */

@@ -54,7 +54,8 @@ regenerates passively over time in `idle`/`searching`/`fighting` (GDD
 - `startSearch(state)` – player pressed **Find enemy** (only from `idle`).
 - `makePeace(state)` – player pressed **Peace!**: from `searching` or `fighting` straight back to
   `idle` (event `peaceMade { from }`; the enemy leaves, no XP/loot, HP and level are kept). Does nothing while `idle`.
-- `tick(state, config)` – advances one 100 ms step, returns new state + events:
+- `tick(state, config, mode?)` – `mode` = `'online'` (default) or `'offline'` (M9: a death costs no XP and after
+  the hideout the search restarts by itself, GDD 6.3). Advances one 100 ms step, returns new state + events:
   `searchStarted`, `enemyFound`, `attack { attacker, hit, damage }`, `enemyDefeated`,
   `leveledUp { level }` (one per level gained), `playerDefeated { xpLost }`,
   `returnedFromHideout`, `peaceMade`.

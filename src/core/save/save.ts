@@ -21,7 +21,7 @@ import { EQUIP_SLOTS, type Equipment } from '../inventory/inventory';
 import type { Item, LootState } from '../loot/loot';
 import type { RngState } from '../rng/rng';
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 /** localStorage keys of the two slots (GDD 19: current + previous, in case one gets corrupted). */
 export const SAVE_KEYS = { current: 'squirrels-tale.save.current', previous: 'squirrels-tale.save.previous' } as const;
@@ -58,7 +58,10 @@ const walletSchema = z.object(
   Object.fromEntries(CURRENCY_IDS.map((id) => [id, int.min(0)])) as Record<(typeof CURRENCY_IDS)[number], z.ZodNumber>,
 );
 
-/** Save format v1 (GDD 19 field names where they exist). Times are ms since epoch / ms durations. */
+/**
+ * Save format (GDD 19 field names where they exist). Times are ms since epoch / ms durations.
+ * v1 (M8.1). v2 (M9.1): `tiles.farming`.
+ */
 export const saveSchema = z.object({
   version: z.literal(SAVE_VERSION),
   createdAt: num,
@@ -77,6 +80,8 @@ export const saveSchema = z.object({
     /** The next enemy (already rolled), so a reload doesn't reroll it. */
     enemyId: z.string(),
     enemyLevel: int.min(1),
+    /** v2: she was searching/fighting (farms offline, GDD 17.2) - false = Peace!, only regenerates. */
+    farming: z.boolean(),
   }),
   boosts: z.object({ autoFoodMsLeft: num.min(0), eatCooldownMs: num.min(0) }),
   settings: z.object({ keepNuts: int.min(0) }),
@@ -85,7 +90,7 @@ export const saveSchema = z.object({
   pity: z.object({ pityCounters: z.record(z.string(), int.min(0)), nextUid: int.min(1) }),
 });
 
-/** Save format v1 as TypeScript (kept in sync with `saveSchema`; JSON never holds `undefined`). */
+/** The save format as TypeScript (kept in sync with `saveSchema`; JSON never holds `undefined`). */
 export interface SaveData {
   readonly version: typeof SAVE_VERSION;
   readonly createdAt: number;
@@ -100,6 +105,7 @@ export interface SaveData {
     readonly killsByTile: Readonly<Record<string, number>>;
     readonly enemyId: string;
     readonly enemyLevel: number;
+    readonly farming: boolean;
   };
   readonly boosts: { readonly autoFoodMsLeft: number; readonly eatCooldownMs: number };
   readonly settings: { readonly keepNuts: number };
@@ -109,8 +115,11 @@ export interface SaveData {
 
 /** One migration: a save of version N (already JSON-parsed) -> the same save in version N + 1. */
 export type Migration = (old: Record<string, unknown>) => Record<string, unknown>;
-/** MIGRATIONS[n] upgrades version n to n + 1. Empty while v1 is the only format. */
-export const MIGRATIONS: Readonly<Record<number, Migration>> = {};
+/** MIGRATIONS[n] upgrades version n to n + 1. */
+export const MIGRATIONS: Readonly<Record<number, Migration>> = {
+  // v1 -> v2 (M9.1): `tiles.farming`. v1 didn't know - start in Peace! (safe: no offline fights).
+  1: (old) => ({ ...old, tiles: { ...(old.tiles as Record<string, unknown>), farming: false } }),
+};
 
 export class SaveError extends Error {}
 
@@ -172,6 +181,7 @@ export function snapshot(state: EncounterState, meta: SnapshotMeta): SaveData {
       killsByTile: { ...state.killsByTile },
       enemyId: state.enemyId,
       enemyLevel: state.enemyLevel,
+      farming: state.phase === 'searching' || state.phase === 'fighting',
     },
     boosts: { autoFoodMsLeft: state.autoFoodMsLeft, eatCooldownMs: state.eatCooldownMs },
     settings: { keepNuts: state.keepNuts },

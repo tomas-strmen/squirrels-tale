@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "createdAt": 1791583948688,
+  "savedAt": 1791584286511,
+  "maxSeenTime": 1791584286511,
+  "rngState": {
+    "combat": { "seed": 582586271 },
+    "loot": { "seed": -425994469 },
+    "currency": { "seed": 1824649583 },
+    "enemyLevel": { "seed": 39470981 }
+  },
+  "player": { "level": 4, "xp": 1250, "hp": 610 },
+  "inventory": {
+    "bag": [
+      {
+        "uid": 3,
+        "baseId": "leaf_cap",
+        "slot": "head",
+        "tier": 1,
+        "rarityId": "uncommon",
+        "weapon": null,
+        "stats": [{ "stat": "armor", "value": 23 }],
+        "affixes": [{ "id": "max_hp", "stat": "maxHp", "value": 31 }],
+        "locked": true
+      }
+    ],
+    "equipment": {
+      "rightPaw": {
+        "uid": 1,
+        "baseId": "sharp_twig",
+        "slot": "melee",
+        "tier": 1,
+        "rarityId": "common",
+        "weapon": { "damageMin": 31, "damageMax": 48, "attackIntervalModMs": -400 },
+        "stats": [],
+        "affixes": []
+      },
+      "leftPaw": null,
+      "ranged": null,
+      "head": null,
+      "body": null,
+      "legs": null,
+      "ring": null,
+      "amulet": null,
+      "tail": null
+    }
+  },
+  "stash": { "pebbles": 12, "seeds": 7, "nuts": 9, "berries": 2 },
+  "tiles": { "current": "t2", "killsByTile": { "t1": 14, "t2": 3 }, "enemyId": "pill_bug", "enemyLevel": 3 },
+  "boosts": { "autoFoodMsLeft": 0, "eatCooldownMs": 0 },
+  "settings": { "keepNuts": 5 },
+  "stats": { "playTimeMs": 412300 },
+  "pity": { "pityCounters": { "rare": 17 }, "nextUid": 4 }
+}

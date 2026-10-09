@@ -46,6 +46,11 @@
     "autoEatBelowPct": 40,
     "autoFoodUnlockS": 60.0
   },
+  "offline": {
+    "capH": 6,
+    "clockToleranceMin": 5,
+    "minSummaryS": 60
+  },
   "ammo": {
     "nutsPerShot": 1,
     "groundAmmoDamagePct": 50,

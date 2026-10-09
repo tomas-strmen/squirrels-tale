@@ -193,6 +193,7 @@ describe('balanceSchema / parseBalance', () => {
     death: { hideoutRegenS: 10.0, xpLossPct: 10 },
     food: { berryHeal: 0.3, seedHeal: 0.5, nutHeal: 1.0, eatCooldownS: 3.0, autoEatBelowPct: 40, autoFoodUnlockS: 60.0 },
     ammo: { nutsPerShot: 1, groundAmmoDamagePct: 50, keepNutsDefault: 5 },
+    offline: { capH: 6, clockToleranceMin: 5, minSummaryS: 60 },
     enemyLeveling: { hpPctPerLevel: 10, damagePctPerLevel: 5, xpPctPerLevel: 10, dodgePctPerLevel: 0.5, maxDodgePct: 40 },
   };
 

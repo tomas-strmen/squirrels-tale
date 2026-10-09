@@ -13,7 +13,10 @@ export interface LootData {
   readonly affixes: readonly AffixData[];
 }
 
-/** `enemies`: every enemy in `data/enemies.json` that `tile.enemyIds` references (GDD 8.2). */
+/**
+ * `enemies`: all of `data/enemies.json`; the tile's spawn table (`tile.spawns`, GDD 8.2 v2.5)
+ * picks which of them can appear on it and with what weight.
+ */
 export function toEncounterConfigInput(
   balance: Balance,
   tile: TileData,
@@ -34,7 +37,11 @@ export function toEncounterConfigInput(
       // Dodge is locked until quest Q7 (GDD 6.1).
       dodgePct: 0,
     },
-    enemies,
+    enemies: tile.spawns.map((spawn) => {
+      const enemy = enemies.find((e) => e.id === spawn.enemyId);
+      if (!enemy) throw new Error(`Tile "${tile.id}" spawns unknown enemy "${spawn.enemyId}"`);
+      return { ...enemy, spawnWeight: spawn.weight };
+    }),
     // GDD 8.4: rolled per encounter within the tile's own range, whichever species spawns.
     enemyLevelMin: tile.enemyLevelMin,
     enemyLevelMax: tile.enemyLevelMax,

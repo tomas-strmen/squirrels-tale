@@ -13,7 +13,7 @@
  *
  * Not yet (later stages): legendary traits, upgrades (M16).
  */
-import type { AffixData, EnemyLoot, ItemData, ItemSlot, RarityData, StatId } from '../content/schemas';
+import type { AffixData, CurrencyId, EnemyLoot, ItemData, ItemSlot, RarityData, StatId } from '../content/schemas';
 import { toHundredths } from '../numbers/numbers';
 import { branch, createRng, next, nextInt, type RngState } from '../rng/rng';
 import { secondsToMs } from '../time/fixedStep';
@@ -55,11 +55,22 @@ export interface EnemyRarityWeightConfig {
   readonly weightAtMax: number;
 }
 
+/** One currency in an enemy's own drop table, resolved to internal units (GDD 11.1 v2.5). */
+export interface EnemyDropCurrencyConfig {
+  readonly currencyId: CurrencyId;
+  /** Drop chance in 0.01 % units (35 % -> 3500), like item drops. */
+  readonly pctBpAtMin: number;
+  readonly pctBpAtMax: number;
+  readonly amountMin: number;
+  readonly amountMax: number;
+}
+
 export interface EnemyLootTable {
   readonly minLevel: number;
   readonly maxLevel: number;
   readonly items: readonly EnemyDropItemConfig[];
   readonly rarities: readonly EnemyRarityWeightConfig[];
+  readonly currencies: readonly EnemyDropCurrencyConfig[];
 }
 
 export function createEnemyLootTable(input: EnemyLoot): EnemyLootTable {
@@ -76,6 +87,13 @@ export function createEnemyLootTable(input: EnemyLoot): EnemyLootTable {
       weightAtMin: r.weightAtMin,
       weightAtMax: r.weightAtMax,
     })),
+    currencies: input.currencies.map((c) => ({
+      currencyId: c.currencyId,
+      pctBpAtMin: toHundredths(c.pctAtMin),
+      pctBpAtMax: toHundredths(c.pctAtMax),
+      amountMin: c.amountMin,
+      amountMax: c.amountMax,
+    })),
   };
 }
 
@@ -83,7 +101,7 @@ export function createEnemyLootTable(input: EnemyLoot): EnemyLootTable {
  * (boss) level range (minLevel === maxLevel) just returns `atMin`. Callers round if needed
  * (rarity weights stay plain floats like the old global ones; item drop chances are rounded
  * to a whole basis-point unit, see rollKillDrop). */
-function interpolate(atMin: number, atMax: number, level: number, minLevel: number, maxLevel: number): number {
+export function interpolate(atMin: number, atMax: number, level: number, minLevel: number, maxLevel: number): number {
   if (maxLevel <= minLevel) return atMin;
   const t = Math.min(1, Math.max(0, (level - minLevel) / (maxLevel - minLevel)));
   return atMin + (atMax - atMin) * t;

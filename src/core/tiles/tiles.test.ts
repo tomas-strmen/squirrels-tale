@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { isTileUnlocked, killsToUnlock, unlockedTileIds } from './tiles';
 
-const t1 = { id: 't1', tier: 1, enemyIds: ['worker_ant'], enemyLevelMin: 1, enemyLevelMax: 2, unlockKills: 0 };
-const t2 = { id: 't2', tier: 2, enemyIds: ['worker_ant', 'pill_bug'], enemyLevelMin: 2, enemyLevelMax: 4, unlockKills: 8 };
+const t1 = { id: 't1', tier: 1, spawns: [{ enemyId: 'worker_ant', weight: 1 }], enemyLevelMin: 1, enemyLevelMax: 2, unlockKills: 0 };
+const t2 = { id: 't2', tier: 2, spawns: [{ enemyId: 'worker_ant', weight: 1 }, { enemyId: 'pill_bug', weight: 1 }], enemyLevelMin: 2, enemyLevelMax: 4, unlockKills: 8 };
 const t3 = {
   id: 't3',
   tier: 3,
-  enemyIds: ['armed_ant', 'worker_ant'],
+  spawns: [{ enemyId: 'armed_ant', weight: 1 }, { enemyId: 'worker_ant', weight: 1 }],
   enemyLevelMin: 4,
   enemyLevelMax: 6,
   unlockKills: 15,
@@ -14,7 +14,7 @@ const t3 = {
 const t4 = {
   id: 't4',
   tier: 4,
-  enemyIds: ['armed_ant'],
+  spawns: [{ enemyId: 'armed_ant', weight: 1 }],
   enemyLevelMin: 6,
   enemyLevelMax: 8,
   unlockKills: 30,

@@ -43,6 +43,7 @@ describe('enemiesSchema / parseEnemies', () => {
       maxLevel: 1,
       items: [{ itemId: 'sharp_twig', pctAtMin: 4, pctAtMax: 4 }],
       rarities: [{ rarityId: 'rare', weightAtMin: 6, weightAtMax: 6 }],
+      currencies: [{ currencyId: 'seeds', pctAtMin: 35, pctAtMax: 35, amountMin: 1, amountMax: 2 }],
     },
   };
   const valid = [ant];
@@ -108,15 +109,24 @@ describe('enemiesSchema / parseEnemies', () => {
       expect(enemiesSchema.safeParse([{ ...ant, loot: bad }]).success).toBe(false);
     });
 
+    it('rejects a currency table with duplicates, an unknown currency or amountMax below amountMin (GDD 11.1 v2.5)', () => {
+      const c = { currencyId: 'seeds', pctAtMin: 35, pctAtMax: 35, amountMin: 1, amountMax: 1 };
+      const withCurrencies = (currencies: unknown[]) => [{ ...ant, loot: { ...ant.loot, currencies } }];
+      expect(enemiesSchema.safeParse(withCurrencies([c, c])).success).toBe(false);
+      expect(enemiesSchema.safeParse(withCurrencies([{ ...c, currencyId: 'gold' }])).success).toBe(false);
+      expect(enemiesSchema.safeParse(withCurrencies([{ ...c, amountMin: 3, amountMax: 2 }])).success).toBe(false);
+      expect(enemiesSchema.safeParse(withCurrencies([c, { ...c, currencyId: 'nuts' }])).success).toBe(true);
+    });
+
     it('an empty drop table (no items, no rarities) is valid - the enemy just never drops anything', () => {
-      expect(enemiesSchema.safeParse([{ ...ant, loot: { minLevel: 1, maxLevel: 1, items: [], rarities: [] } }]).success).toBe(true);
+      expect(enemiesSchema.safeParse([{ ...ant, loot: { minLevel: 1, maxLevel: 1, items: [], rarities: [], currencies: [] } }]).success).toBe(true);
     });
   });
 });
 
 describe('tilesSchema / parseTiles (M6.2)', () => {
-  const t1 = { id: 't1', tier: 1, enemyIds: ['worker_ant'], enemyLevelMin: 1, enemyLevelMax: 2, unlockKills: 0 };
-  const t2 = { id: 't2', tier: 2, enemyIds: ['worker_ant', 'pill_bug'], enemyLevelMin: 2, enemyLevelMax: 4, unlockKills: 8 };
+  const t1 = { id: 't1', tier: 1, spawns: [{ enemyId: 'worker_ant', weight: 1 }], enemyLevelMin: 1, enemyLevelMax: 2, unlockKills: 0 };
+  const t2 = { id: 't2', tier: 2, spawns: [{ enemyId: 'worker_ant', weight: 1 }, { enemyId: 'pill_bug', weight: 1 }], enemyLevelMin: 2, enemyLevelMax: 4, unlockKills: 8 };
 
   it('accepts valid data', () => {
     expect(() => parseTiles([t1, t2])).not.toThrow();
@@ -130,8 +140,14 @@ describe('tilesSchema / parseTiles (M6.2)', () => {
     expect(tilesSchema.safeParse([t1, { ...t2, id: 't1' }]).success).toBe(false);
   });
 
-  it('rejects an empty enemyIds list', () => {
-    expect(tilesSchema.safeParse([{ ...t1, enemyIds: [] }]).success).toBe(false);
+  it('rejects a duplicate enemy or a weight of 0 in the spawn table (GDD 8.2 v2.5)', () => {
+    const w = { enemyId: 'worker_ant', weight: 1 };
+    expect(tilesSchema.safeParse([{ ...t1, spawns: [w, w] }]).success).toBe(false);
+    expect(tilesSchema.safeParse([{ ...t1, spawns: [{ ...w, weight: 0 }] }]).success).toBe(false);
+  });
+
+  it('rejects an empty spawn table', () => {
+    expect(tilesSchema.safeParse([{ ...t1, spawns: [] }]).success).toBe(false);
   });
 
   it('rejects enemyLevelMax below enemyLevelMin', () => {

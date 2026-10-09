@@ -42,6 +42,7 @@ const rules = {
 const squirrelInput = { maxHp: 5.0, damageMin: 0.3, damageMax: 0.4, hitPct: 85, armor: 0, dodgePct: 0 };
 /** A tile's only enemy, base level 1 (so `enemyLevelMin: 1` means "no levels above base"). */
 const antInput: EncounterEnemyInput = {
+  spawnWeight: 1,
   id: 'worker_ant',
   baseLevel: 1,
   maxHp: 1.2,
@@ -53,6 +54,7 @@ const antInput: EncounterEnemyInput = {
   dodgePct: 0,
   xp: 2,
   loot: {
+    currencies: [],
     minLevel: 1,
     maxLevel: 1,
     items: [{ itemId: 'sharp_twig', pctAtMin: 4, pctAtMax: 4 }],
@@ -266,6 +268,24 @@ describe('enemy level rolling (GDD 8.4, M6.1)', () => {
     expect(seenIds).toEqual(new Set(['worker_ant', 'pill_bug']));
   });
 
+  it('spawn weights decide how often each species appears (GDD 8.2 v2.5 spawn table)', () => {
+    const pillBug: EncounterEnemyInput = { ...antInput, id: 'pill_bug', baseLevel: 2, armor: 1.0, spawnWeight: 3 };
+    const cfg = makeConfig({ enemies: [antInput, pillBug], enemyLevelMin: 1, enemyLevelMax: 4 });
+    let state = fresh(cfg);
+    const counts: Record<string, number> = { worker_ant: 0, pill_bug: 0 };
+    for (let i = 0; i < 400; i++) {
+      counts[state.enemyId] = (counts[state.enemyId] ?? 0) + 1;
+      state = run(startSearch(state).state, 10000, cfg).state;
+    }
+    // weight 1 : 3 -> about 25 % ants, 75 % bugs
+    expect((counts.worker_ant ?? 0) / 400).toBeGreaterThan(0.17);
+    expect((counts.worker_ant ?? 0) / 400).toBeLessThan(0.33);
+  });
+
+  it('rejects a spawn weight of 0 or less', () => {
+    expect(() => makeConfig({ enemies: [{ ...antInput, spawnWeight: 0 }] })).toThrow();
+  });
+
   it('a single-species tile never rolls the species (deterministic, unaffected by other tiles)', () => {
     expect(fresh().enemyId).toBe('worker_ant');
   });
@@ -463,6 +483,25 @@ describe('encounter', () => {
     expect(types).toEqual(['attack', 'enemyDefeated', 'itemFound', 'searchStarted']);
     expect(state.inventory.bag).toHaveLength(1);
     expect(state.inventory.bag[0]?.tier).toBe(1);
+  });
+
+  it('kills drop currencies from the enemy own table into the wallet (GDD 11.1 v2.5)', () => {
+    const withCoins = (currencies: EncounterEnemyInput['loot']['currencies']) =>
+      makeConfig({
+        enemies: [{ ...antInput, maxHp: 0.1, hitPct: 0, loot: { ...antInput.loot, items: [], currencies } }],
+      });
+    // Only seeds are listed: exactly 2-2 seeds drop on every kill, no pebbles, no nuts.
+    const seedsOnly = withCoins([{ currencyId: 'seeds', pctAtMin: 100, pctAtMax: 100, amountMin: 2, amountMax: 2 }]);
+    const { state, log } = runUntil(fighting(seedsOnly), seedsOnly, (e) => e.type === 'enemyDefeated');
+    const defeatTick = log.find((l) => l.event.type === 'enemyDefeated')?.tick;
+    const types = log.filter((l) => l.tick === defeatTick).map((l) => l.event.type);
+    expect(types).toEqual(['attack', 'enemyDefeated', 'currencyFound', 'searchStarted']);
+    expect(state.wallet).toEqual({ pebbles: 0, seeds: 2, nuts: 0 });
+    // An empty currency table drops nothing and emits no event.
+    const none = withCoins([]);
+    const after = runUntil(fighting(none), none, (e) => e.type === 'enemyDefeated');
+    expect(after.log.some((l) => l.event.type === 'currencyFound')).toBe(false);
+    expect(after.state.wallet).toEqual({ pebbles: 0, seeds: 0, nuts: 0 });
   });
 
   it('equipping a weapon changes the fight: more damage, shorter interval (GDD 9.1/9.4 v2.3)', () => {

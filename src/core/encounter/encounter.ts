@@ -24,6 +24,7 @@ import {
   type FighterStats,
   type FighterStatsInput,
 } from '../combat/combat';
+import { addToWallet, EMPTY_WALLET, rollCurrencyDrops, type CurrencyDrop, type Wallet } from '../currency/currency';
 import { fromHundredths, toHundredths } from '../numbers/numbers';
 import {
   addToBag,
@@ -59,7 +60,7 @@ import {
   type LootState,
 } from '../loot/loot';
 import type { EnemyLoot } from '../content/schemas';
-import { branch, nextInt, type RngState } from '../rng/rng';
+import { branch, next, nextInt, type RngState } from '../rng/rng';
 import { composeStats, type ComposedStats } from '../stats/stats';
 import { secondsToMs, TICK_MS } from '../time/fixedStep';
 
@@ -86,8 +87,10 @@ export interface EncounterEnemyDef {
   readonly attackIntervalMs: number;
   /** XP granted when defeated at `baseLevel` (hundredths); scaled per level, see enemyXpAt(). */
   readonly xp: number;
-  /** Its own drop table and rarity weights (GDD 9.3/9.6 v2.4). */
+  /** Its own drop table, rarity weights and currencies (GDD 9.3/9.6 v2.4, 11.1 v2.5). */
   readonly loot: EnemyLootTable;
+  /** Relative chance to spawn on this tile (GDD 8.2 v2.5 spawn table); weights need not sum to 100. */
+  readonly spawnWeight: number;
 }
 
 /** Design values for one enemy species, as written in data/enemies.json. */
@@ -98,6 +101,8 @@ export interface EncounterEnemyInput extends FighterStatsInput {
   /** XP granted when defeated at `baseLevel` (design value, GDD 6.2/8.3). */
   readonly xp: number;
   readonly loot: EnemyLoot;
+  /** This tile's spawn weight for the species (GDD 8.2 v2.5), > 0. */
+  readonly spawnWeight: number;
 }
 
 export interface EncounterConfig {
@@ -183,6 +188,10 @@ export interface EncounterState {
   readonly lootRng: RngState;
   /** Found items (bag) and equipped gear (GDD 9.1, 10). */
   readonly inventory: InventoryState;
+  /** Currencies collected so far (GDD 11.1 v2.5). */
+  readonly wallet: Wallet;
+  /** Separate stream for currency drops, so they never change item drops or fights. */
+  readonly currencyRng: RngState;
   /** Id of the tile currently being fought on (GDD 8.1/8.2, M6.2). */
   readonly tileId: string;
   /** Kills so far on each tile ever visited, keyed by tile id (M6.2: unlocks the next tile). */
@@ -202,6 +211,8 @@ export type EncounterEvent =
   | { readonly type: 'enemyDefeated' }
   /** A killed enemy dropped an item (GDD 9.6). `bagFull`: bag was at capacity, item was lost (M5.2a). */
   | { readonly type: 'itemFound'; readonly item: Item; readonly bagFull: boolean }
+  /** A killed enemy dropped currencies (GDD 11.1 v2.5); only emitted when something dropped. */
+  | { readonly type: 'currencyFound'; readonly drops: readonly CurrencyDrop[] }
   /** Player leveled up (GDD 6.2): +1.0 max HP (healed at once), +0.1 max damage, and +0.1 min damage on even levels. */
   | { readonly type: 'leveledUp'; readonly level: number }
   /** Squirrel was defeated (GDD 6.3, online death): fight over, she goes to the hideout. */
@@ -256,6 +267,9 @@ export function createEncounterConfig(input: EncounterConfigInput): EncounterCon
     if (attackIntervalMs < TICK_MS) {
       throw new Error(`Attack intervals must be at least ${TICK_MS / 1000} s`);
     }
+    if (!(enemy.spawnWeight > 0)) {
+      throw new Error(`Spawn weight of "${enemy.id}" must be greater than 0`);
+    }
     return {
       id: enemy.id,
       base: createFighterStats(enemy),
@@ -263,6 +277,7 @@ export function createEncounterConfig(input: EncounterConfigInput): EncounterCon
       attackIntervalMs,
       xp: toHundredths(enemy.xp),
       loot: createEnemyLootTable(enemy.loot),
+      spawnWeight: enemy.spawnWeight,
     };
   });
   return {
@@ -307,6 +322,8 @@ export function createEncounter(config: EncounterConfig, rng: RngState, tileId: 
     loot: createLootState(),
     lootRng: branch(rng, 'loot'),
     inventory: createInventory(),
+    wallet: EMPTY_WALLET,
+    currencyRng: branch(rng, 'currency'),
     tileId,
     killsByTile: {},
   };
@@ -337,9 +354,19 @@ function rollEnemy(
   let nextRng = rng;
   let enemyId = config.enemies[0]?.id;
   if (config.enemies.length > 1) {
-    const pick = nextInt(nextRng, 0, config.enemies.length);
-    enemyId = config.enemies[pick.value]?.id;
-    nextRng = pick.state;
+    // Weighted pick over the tile's spawn table (GDD 8.2 v2.5).
+    const total = config.enemies.reduce((sum, e) => sum + e.spawnWeight, 0);
+    const draw = next(nextRng);
+    nextRng = draw.state;
+    let target = draw.value * total;
+    enemyId = config.enemies[config.enemies.length - 1]?.id; // float edge: last entry
+    for (const e of config.enemies) {
+      if (target < e.spawnWeight) {
+        enemyId = e.id;
+        break;
+      }
+      target -= e.spawnWeight;
+    }
   }
   if (enemyId === undefined) throw new Error('A tile needs at least one enemy species');
   if (config.enemyLevelMin === config.enemyLevelMax) {
@@ -690,6 +717,9 @@ function tickFight(state: EncounterState, config: EncounterConfig): EncounterSte
         inventory = addToBag(inventory, item);
         events.push({ type: 'itemFound', item, bagFull });
       }
+      // GDD 11.1 v2.5: currencies come from the same per-enemy table, own Rng stream.
+      const coins = rollCurrencyDrops(enemyDefOf(config, state.enemyId).loot, state.enemyLevel, state.currencyRng);
+      if (coins.drops.length > 0) events.push({ type: 'currencyFound', drops: coins.drops });
       const gain = gainXp(progression, enemyXpAt(config, state.enemyId, state.enemyLevel));
       progression = gain.state;
       // Every level gained heals by exactly its HP bonus (GDD 6.2) - never a full heal.
@@ -719,6 +749,8 @@ function tickFight(state: EncounterState, config: EncounterConfig): EncounterSte
           loot,
           lootRng,
           inventory,
+          wallet: addToWallet(state.wallet, coins.drops),
+          currencyRng: coins.rng,
           killsByTile,
         },
         events,

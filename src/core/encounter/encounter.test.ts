@@ -5,6 +5,7 @@ import raritiesData from '../../../data/rarities.json';
 import { parseAffixes, parseItems, parseRarities } from '../content/schemas';
 import { createRng } from '../rng/rng';
 import {
+  activeWeaponMode,
   attackProgress,
   classifyEquip,
   compareEquip,
@@ -13,8 +14,10 @@ import {
   enemyStats,
   enemyXpAt,
   hpFraction,
+  fightingPlayer,
   makePeace,
   playerAttackIntervalMs,
+  playerHitMultiplier,
   playerStats,
   eatFood,
   equipItem,
@@ -40,6 +43,7 @@ const rules = {
   minDamage: 0.1,
   hitPctPerLevelDiff: 0.5,
   minAttackIntervalS: 0.5,
+  fistsVsFlyingHitPct: 50,
 };
 const food = { berryHeal: 0.3, seedHeal: 0.5, nutHeal: 1.0, eatCooldownS: 3.0, autoEatBelowPct: 40, autoFoodUnlockS: 60.0 };
 const squirrelInput = { maxHp: 5.0, damageMin: 0.3, damageMax: 0.4, hitPct: 85, armor: 0, dodgePct: 0 };
@@ -274,12 +278,24 @@ describe('enemy level rolling (GDD 8.4, M6.1)', () => {
 
   it('spawn weights decide how often each species appears (GDD 8.2 v2.5 spawn table)', () => {
     const pillBug: EncounterEnemyInput = { ...antInput, id: 'pill_bug', baseLevel: 2, armor: 1.0, spawnWeight: 3 };
-    const cfg = makeConfig({ enemies: [antInput, pillBug], enemyLevelMin: 1, enemyLevelMax: 4 });
-    let state = fresh(cfg);
+    // Unkillable squirrel + auto-search: count every enemy that shows up (was 400 x 10 000 ticks,
+    // which ran close to the 5 s test timeout).
+    const cfg = makeConfig({
+      player: { ...squirrelInput, maxHp: 999.0 },
+      enemies: [antInput, pillBug],
+      enemyLevelMin: 1,
+      enemyLevelMax: 4,
+    });
+    let state = startSearch(fresh(cfg)).state;
     const counts: Record<string, number> = { worker_ant: 0, pill_bug: 0 };
-    for (let i = 0; i < 400; i++) {
-      counts[state.enemyId] = (counts[state.enemyId] ?? 0) + 1;
-      state = run(startSearch(state).state, 10000, cfg).state;
+    let found = 0;
+    while (found < 400) {
+      const r = tick(state, cfg);
+      state = r.state;
+      if (r.events.some((e) => e.type === 'enemyFound')) {
+        counts[state.enemyId] = (counts[state.enemyId] ?? 0) + 1;
+        found++;
+      }
     }
     // weight 1 : 3 -> about 25 % ants, 75 % bugs
     expect((counts.worker_ant ?? 0) / 400).toBeGreaterThan(0.17);
@@ -929,5 +945,90 @@ describe('food and auto-food (GDD 7.4, M7.2)', () => {
     s = run(s, 1, config).state;
     expect(s.autoFoodMsLeft).toBe(0);
     expect(unlockAutoFood(s, config).autoFoodMsLeft).toBe(60000);
+  });
+});
+
+describe('ranged weapon and auto-switching (GDD 7.1, M7.3a)', () => {
+  const club = {
+    uid: 1,
+    baseId: 'pebble_club',
+    slot: 'melee' as const,
+    tier: 1,
+    rarityId: 'common',
+    weapon: { damageMin: 100, damageMax: 100, attackIntervalModMs: 0 },
+    stats: [],
+    affixes: [],
+  };
+  const sling = {
+    uid: 2,
+    baseId: 'twig_slingshot',
+    slot: 'ranged' as const,
+    tier: 3,
+    rarityId: 'common',
+    weapon: { damageMin: 30, damageMax: 50, attackIntervalModMs: -200 },
+    stats: [],
+    affixes: [],
+  };
+  const flyingTanky = makeConfig({
+    player: { ...squirrelInput, maxHp: 999.0 },
+    enemies: [{ ...antInput, maxHp: 999.0, flying: true }],
+    regenAmount: 0,
+  });
+  function wearing(cfg: EncounterConfig, items: { club?: boolean; sling?: boolean }): EncounterState {
+    let s = fresh(cfg);
+    s = { ...s, inventory: { ...s.inventory, bag: [club, sling] } };
+    if (items.club) s = equipItem(s, cfg, 1, 'rightPaw');
+    if (items.sling) s = equipItem(s, cfg, 2, 'ranged');
+    return s;
+  }
+
+  it('enemies are not flying unless the data says so', () => {
+    expect(config.enemies[0]?.flying).toBe(false);
+    expect(flyingTanky.enemies[0]?.flying).toBe(true);
+  });
+
+  it('a ground enemy is fought with the paw weapon even if a slingshot is worn', () => {
+    const s = wearing(tanky, { club: true, sling: true });
+    expect(activeWeaponMode(s, tanky)).toBe('melee');
+    expect(fightingPlayer(s, tanky).fighter.damageMax).toBe(140);
+  });
+
+  it('without a paw weapon the slingshot fights ground enemies too', () => {
+    const s = wearing(tanky, { sling: true });
+    expect(activeWeaponMode(s, tanky)).toBe('ranged');
+    expect(fightingPlayer(s, tanky).attackIntervalMs).toBe(1800); // 2.0 s - 0.2
+  });
+
+  it('a flying enemy switches to the slingshot: its damage and interval, paws idle', () => {
+    const s = wearing(flyingTanky, { club: true, sling: true });
+    expect(activeWeaponMode(s, flyingTanky)).toBe('ranged');
+    expect(fightingPlayer(s, flyingTanky).fighter.damageMax).toBe(90);
+    expect(playerHitMultiplier(s, flyingTanky)).toBe(1);
+    // The attack bar follows the slingshot interval (1.8 s).
+    const fight = run(startSearch(s).state, 10, flyingTanky).state;
+    const hits = attacks(run(fight, 36, flyingTanky).log, 'player');
+    expect(hits.map((h) => h.tick)).toEqual([18, 36]);
+  });
+
+  it('a flying enemy without a slingshot: fists, half the hit chance', () => {
+    const s = wearing(flyingTanky, { club: true });
+    expect(activeWeaponMode(s, flyingTanky)).toBe('fists');
+    expect(fightingPlayer(s, flyingTanky).fighter.damageMax).toBe(40);
+    expect(playerHitMultiplier(s, flyingTanky)).toBe(0.5);
+    // 85 % -> 42.5 %: over many swings clearly fewer hits than with the slingshot.
+    const hitRate = (start: EncounterState) => {
+      const log = attacks(run(run(startSearch(start).state, 10, flyingTanky).state, 8000, flyingTanky).log, 'player');
+      return log.filter((l) => l.event.type === 'attack' && l.event.hit).length / log.length;
+    };
+    expect(hitRate(s)).toBeGreaterThan(0.3);
+    expect(hitRate(s)).toBeLessThan(0.55);
+    expect(hitRate(wearing(flyingTanky, { club: true, sling: true }))).toBeGreaterThan(0.75);
+  });
+
+  it('compareEquip shows a slingshot as it shoots (ranged slot)', () => {
+    const s = wearing(tanky, { club: true });
+    const diff = compareEquip(tanky, 1, s.inventory.equipment, sling, 'ranged');
+    expect(diff.damageMax).toBe(50);
+    expect(diff.attackIntervalMs).toBe(-200);
   });
 });

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { FighterStats } from '../combat/combat';
 import { EMPTY_EQUIPMENT, type Equipment } from '../inventory/inventory';
 import type { Item, ItemStat } from '../loot/loot';
-import { composeStats, type ComposeInput } from './stats';
+import { chooseWeaponMode, composeStats, type ComposeInput } from './stats';
 
 const character: FighterStats = { maxHp: 500, damageMin: 30, damageMax: 40, hitPct: 85, armor: 0, dodgePct: 0 };
 
@@ -95,5 +95,45 @@ describe('composeStats (GDD 6.1 v1.8, 9.1 v2.3)', () => {
   it('a ranged weapon does not add melee damage (GDD 7.1, flying enemies only)', () => {
     const bow = item('ranged', { weapon: { damageMin: 100, damageMax: 150, attackIntervalModMs: 0 } });
     expect(compose({ ranged: bow }).fighter.damageMax).toBe(40);
+  });
+});
+
+describe('weapon mode (GDD 7.1, M7.3a)', () => {
+  const sling = item('ranged', { weapon: { damageMin: 30, damageMax: 50, attackIntervalModMs: -200 } });
+  const club = weapon(100, 200, 700);
+  const blade = weapon(80, 80, 0);
+
+  it('ranged: character + ranged weapon damage, ranged interval shift; both paws add nothing', () => {
+    const c = compose({ rightPaw: club, leftPaw: blade, ranged: sling }, { weaponMode: 'ranged' });
+    expect(c.fighter.damageMin).toBe(60);
+    expect(c.fighter.damageMax).toBe(90);
+    expect(c.attackIntervalMs).toBe(3800);
+  });
+
+  it('fists: no weapon damage and the plain character interval', () => {
+    const c = compose({ rightPaw: club, ranged: sling }, { weaponMode: 'fists' });
+    expect(c.fighter.damageMax).toBe(40);
+    expect(c.attackIntervalMs).toBe(4000);
+  });
+
+  it('stats and affixes of all gear count in every mode', () => {
+    const pawArmor = item('melee', { weapon: club.weapon, stats: [{ stat: 'armor', value: 30 }] });
+    const slingHp = { ...sling, affixes: [{ id: 'hp', stat: 'maxHp' as const, value: 20 }] };
+    for (const weaponMode of ['melee', 'ranged', 'fists'] as const) {
+      const c = compose({ rightPaw: pawArmor, ranged: slingHp }, { weaponMode });
+      expect(c.fighter.armor).toBe(30);
+      expect(c.fighter.maxHp).toBe(520);
+    }
+  });
+
+  it('chooses: flying -> ranged, or fists without one; otherwise melee -> ranged -> fists', () => {
+    const eq = (e: Partial<Equipment>) => ({ ...EMPTY_EQUIPMENT, ...e });
+    expect(chooseWeaponMode(eq({ rightPaw: club, ranged: sling }), true)).toBe('ranged');
+    expect(chooseWeaponMode(eq({ rightPaw: club }), true)).toBe('fists');
+    expect(chooseWeaponMode(eq({ rightPaw: club, ranged: sling }), false)).toBe('melee');
+    expect(chooseWeaponMode(eq({ leftPaw: blade, ranged: sling }), false)).toBe('melee');
+    expect(chooseWeaponMode(eq({ ranged: sling }), false)).toBe('ranged');
+    expect(chooseWeaponMode(eq({}), false)).toBe('fists');
+    expect(chooseWeaponMode(eq({}), true)).toBe('fists');
   });
 });

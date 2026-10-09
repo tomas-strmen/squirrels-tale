@@ -62,7 +62,7 @@ import {
 } from '../loot/loot';
 import type { EnemyLoot } from '../content/schemas';
 import { branch, next, nextInt, type RngState } from '../rng/rng';
-import { composeStats, type ComposedStats } from '../stats/stats';
+import { chooseWeaponMode, composeStats, type ComposedStats, type WeaponMode } from '../stats/stats';
 import { secondsToMs, TICK_MS } from '../time/fixedStep';
 
 export type EncounterPhase = 'idle' | 'searching' | 'fighting' | 'hideout';
@@ -92,6 +92,8 @@ export interface EncounterEnemyDef {
   readonly loot: EnemyLootTable;
   /** Relative chance to spawn on this tile (GDD 8.2 v2.5 spawn table); weights need not sum to 100. */
   readonly spawnWeight: number;
+  /** Flying: fought with the ranged weapon only (GDD 7.1, M7.3a). */
+  readonly flying: boolean;
 }
 
 /** Design values for one enemy species, as written in data/enemies.json. */
@@ -104,6 +106,8 @@ export interface EncounterEnemyInput extends FighterStatsInput {
   readonly loot: EnemyLoot;
   /** This tile's spawn weight for the species (GDD 8.2 v2.5), > 0. */
   readonly spawnWeight: number;
+  /** GDD 7.1 (M7.3a); omitted = false. */
+  readonly flying?: boolean;
 }
 
 export interface EncounterConfig {
@@ -288,6 +292,7 @@ export function createEncounterConfig(input: EncounterConfigInput): EncounterCon
       xp: toHundredths(enemy.xp),
       loot: createEnemyLootTable(enemy.loot),
       spawnWeight: enemy.spawnWeight,
+      flying: enemy.flying ?? false,
     };
   });
   return {
@@ -426,11 +431,15 @@ export function characterStats(config: EncounterConfig, level: number): FighterS
   });
 }
 
-/** Character + gear (core/stats, GDD 6.1 v1.8): what the squirrel fights with. */
+/**
+ * Character + gear (core/stats, GDD 6.1 v1.8): what the squirrel fights with.
+ * `weaponMode` picks which weapons count (GDD 7.1, M7.3a); see activeWeaponMode().
+ */
 export function composedPlayer(
   config: EncounterConfig,
   level: number,
   equipment: Equipment = EMPTY_EQUIPMENT,
+  weaponMode: WeaponMode = 'melee',
 ): ComposedStats {
   return composeStats({
     character: characterStats(config, level),
@@ -439,7 +448,31 @@ export function composedPlayer(
     minAttackIntervalMs: config.rules.minAttackIntervalMs,
     equipment,
     offHandDamagePct: config.offHandDamagePct,
+    weaponMode,
   });
+}
+
+/**
+ * Which weapons fight the current (or next, while searching) enemy - switched
+ * automatically (GDD 7.1, M7.3a): flying -> ranged (none -> fists), otherwise
+ * paws -> ranged -> fists.
+ */
+export function activeWeaponMode(state: EncounterState, config: EncounterConfig): WeaponMode {
+  return chooseWeaponMode(state.inventory.equipment, enemyDefOf(config, state.enemyId).flying);
+}
+
+/** The squirrel's stats and interval against the current enemy, with the auto-switched weapon. */
+export function fightingPlayer(state: EncounterState, config: EncounterConfig): ComposedStats {
+  return composedPlayer(config, state.progression.level, state.inventory.equipment, activeWeaponMode(state, config));
+}
+
+/**
+ * Multiplier of the squirrel's hit chance vs the current enemy (GDD 7.1 v2.7):
+ * bare fists against a flying enemy hit only `fistsVsFlyingHitPct` % as often.
+ */
+export function playerHitMultiplier(state: EncounterState, config: EncounterConfig): number {
+  const flying = enemyDefOf(config, state.enemyId).flying;
+  return flying && activeWeaponMode(state, config) === 'fists' ? config.rules.fistsVsFlyingHitPct / 100 : 1;
 }
 
 /** The squirrel's effective combat stats at `level` with `equipment` (default: none). */
@@ -459,8 +492,9 @@ export function playerAttackIntervalMs(
   config: EncounterConfig,
   level: number,
   equipment: Equipment = EMPTY_EQUIPMENT,
+  weaponMode: WeaponMode = 'melee',
 ): number {
-  return composedPlayer(config, level, equipment).attackIntervalMs;
+  return composedPlayer(config, level, equipment, weaponMode).attackIntervalMs;
 }
 
 /** Stat deltas from putting `item` into `slot`, vs the current `equipment` (M5.2b1). */
@@ -514,8 +548,10 @@ export function compareEquip(
   item: Item,
   slot: EquipSlot,
 ): EquipComparison {
-  const before = composedPlayer(config, level, equipment);
-  const after = composedPlayer(config, level, { ...equipment, [slot]: item });
+  // A ranged weapon is compared as it shoots (M7.3a); paw weapons as they fight in melee.
+  const mode: WeaponMode = slot === 'ranged' ? 'ranged' : 'melee';
+  const before = composedPlayer(config, level, equipment, mode);
+  const after = composedPlayer(config, level, { ...equipment, [slot]: item }, mode);
   return {
     maxHp: after.fighter.maxHp - before.fighter.maxHp,
     damageMin: after.fighter.damageMin - before.fighter.damageMin,
@@ -754,7 +790,8 @@ function tickFight(state: EncounterState, config: EncounterConfig): EncounterSte
   let { rng, playerHp, enemyHp, progression } = state;
   let playerAttackElapsedMs = state.playerAttackElapsedMs + TICK_MS;
   let enemyAttackElapsedMs = state.enemyAttackElapsedMs + TICK_MS;
-  const composed = composedPlayer(config, progression.level, state.inventory.equipment);
+  // GDD 7.1 (M7.3a): weapons switch automatically by enemy (flying -> ranged).
+  const composed = fightingPlayer(state, config);
   const player = composed.fighter;
   const playerIntervalMs = composed.attackIntervalMs;
   const enemy = enemyStats(config, state.enemyId, state.enemyLevel);
@@ -764,7 +801,7 @@ function tickFight(state: EncounterState, config: EncounterConfig): EncounterSte
 
   if (playerAttackElapsedMs >= playerIntervalMs) {
     playerAttackElapsedMs -= playerIntervalMs;
-    const attack = resolveAttack(player, enemy, config.rules, rng, levelDiff);
+    const attack = resolveAttack(player, enemy, config.rules, rng, levelDiff, playerHitMultiplier(state, config));
     rng = attack.rng;
     enemyHp = Math.max(0, enemyHp - attack.result.damage);
     events.push({ type: 'attack', attacker: 'player', ...attack.result });
@@ -917,10 +954,7 @@ export function attackProgress(
 ): number {
   if (state.phase !== 'fighting') return 0;
   return who === 'player'
-    ? clamp01(
-        (state.playerAttackElapsedMs + extraMs) /
-          playerAttackIntervalMs(config, state.progression.level, state.inventory.equipment),
-      )
+    ? clamp01((state.playerAttackElapsedMs + extraMs) / fightingPlayer(state, config).attackIntervalMs)
     : clamp01((state.enemyAttackElapsedMs + extraMs) / enemyDefOf(config, state.enemyId).attackIntervalMs);
 }
 

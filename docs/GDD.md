@@ -1,7 +1,7 @@
-# Veverička – Game Design Document (GDD) v2.6
+# Veverička – Game Design Document (GDD) v2.7
 
 > **Pracovný názov hry:** *Squirrel's Tale* (dočasný – finálny názov vybrať pred vydaním; nesmie pripomínať „Hero Tale“).
-> **Stav:** v2.6, 9. 10. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
+> **Stav:** v2.7, 9. 10. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
 > **Súvisiace:** `claude/ROADMAP.md` (technológia, architektúra, etapy vydania), `claude/PROMPT-vyvoj.md` (ako má AI pracovať).
 
 ---
@@ -172,6 +172,8 @@
 - Každý bojovník má časovač útoku (interval). Keď dobehne → útok.
 - **Hľadanie nepriateľa:** po príchode na nové políčko hráč stlačí *Find enemy*; potom sa hľadá automaticky – po každom porazenom nepriateľovi beží bar hľadania 1.0 s. Tlačidlo *Peace!* hľadanie zastaví: veverička zostane na políčku a len regeneruje, kým hráč znova nestlačí *Find enemy*. *Peace!* počas boja boj **hneď ukončí** – nepriateľ odíde, **bez XP a lootu**.
 - **Automatické prepínanie zbraní:** nepriateľ s `flying: true` → len diaľková zbraň; inak zbraň na blízko (ak nie je, diaľková; ak nie je ani tá, bojuje len postava – päste, kap. 6.1).
+  - **(v2.7, Tomas)** Diaľková zbraň zaberá **obe labky**: pri streľbe sa poškodenie zbraní v pravej aj ľavej labke nepočíta (poškodenie = postava + diaľková zbraň, interval = postava + posun diaľkovej zbrane). Štatistiky a afixy všetkej nasadenej výbavy platia vždy.
+  - **(v2.7, Tomas)** Letiaci nepriateľ a veverička **nemá diaľkovú zbraň** → bojuje päsťami s **polovičnou šancou na zásah** (výsledná šanca z 7.2 × 50 %, `balance.json` `fistsVsFlyingHitPct`).
 
 ### 7.2 Vzorec úderu
 ```
@@ -716,4 +718,5 @@ tools/sim/         # headless simulácia tempa (npm run sim) → tabuľka čas/l
 | 2.3 | 2026-09-27 | 9.1: 9 slotov (pravá/ľavá labka, ranged, head, body, legs, ring, amulet, tail); ľavá labka = štít alebo druhá zbraň (50 % poškodenia, interval nemení). 9.4/7.2: zbraň posúva interval postavy o pevné sekundy (posun = pôvodný interval − 2.4 s). 24: otázka intervalu uzavretá. |
 | 2.4 | 2026-09-29 | 9.3/9.5/9.6: drop predmetov aj vzácnosti sú teraz vlastné pre každého nepriateľa (drop tabuľka + tabuľka váh vzácnosti, obe s vlastným `minLevel`/`maxLevel` nepriateľa), nie podľa políčka. Každá položka v drop tabuľke sa hodí samostatne – z jedného zabitia môže padnúť aj viac predmetov naraz. Unikátne/set predmety sú vlastný riadok s pevnou vzácnosťou (fallback na Rare už netreba). Pity garantuje aspoň jeden predmet danej vzácnosti aj mimo tabuliek. Nahrádza „drop tabuľku políčka" a globálne váhy vzácnosti z 9.3/9.6. |
 | 2.5 | 2026-10-09 | 8.2: spawn tabuľka políčka (nepriateľ + váha) v `data/tiles.json`. 11.1: drop mien je súčasťou vlastnej drop tabuľky každého nepriateľa (mena, šanca podľa levelu, počet kusov), nie jeden vzorec podľa tieru políčka. |
+| 2.7 | 2026-10-09 | 7.1: diaľková zbraň zaberá obe labky (zbrane v labkách sa pri streľbe nepočítajú, afixy výbavy áno); proti letiacemu bez diaľkovej zbrane päste s polovičnou šancou na zásah. |
 | 2.6 | 2026-10-09 | 7.4: auto-jedlo je zamknuté, kým hráč nepozrie (mock) reklamu – odomkne ho na 1 minútu (bar, potom zámok, opäť tlačidlom); ručné jedenie zadarmo, 3 rýchle tlačidlá, jedlo sa nezje pri plnom HP; bobuľa je počítadlo v peňaženke a padá z drop tabuľky nepriateľa. 24: otázka Premium vs. auto-jedlo. |

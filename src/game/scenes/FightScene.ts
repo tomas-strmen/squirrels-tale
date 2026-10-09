@@ -18,16 +18,18 @@ import {
   type TileData,
 } from '../../core/content/schemas';
 import {
+  activeWeaponMode,
   attackProgress,
   classifyEquip,
   compareEquip,
   createEncounter,
   createEncounterConfig,
   equipItem,
+  fightingPlayer,
   hideoutProgress,
   hpFraction,
   makePeace,
-  playerAttackIntervalMs,
+  playerHitMultiplier,
   playerStats,
   searchProgress,
   startSearch,
@@ -90,6 +92,8 @@ export class FightScene extends Phaser.Scene {
   private accumulatorMs = 0;
   private speedIndex = 0;
   private dropRateIndex = 0;
+  /** Debug tool (M7.3a): treat every enemy as flying, to test weapon auto-switching before T5. */
+  private debugFlying = false;
 
   private tiles: TileData[] = [];
   /** Unmodified per-tile configs (M6.2); `this.config` may additionally have the debug drop rate applied. */
@@ -117,6 +121,8 @@ export class FightScene extends Phaser.Scene {
   private textStyle = { fontFamily: 'Arial, sans-serif', color: '#e0e0e0' };
   private speedButtons: Button[] = [];
   private dropRateButtons: Button[] = [];
+  private flyingButton!: Button;
+  private weaponText!: Phaser.GameObjects.Text;
   private levelText!: Phaser.GameObjects.Text;
   private statsButton!: Button;
   private statsPanel!: StatsPanel;
@@ -176,6 +182,11 @@ export class FightScene extends Phaser.Scene {
     this.add
       .text(PLAYER_X, FIGHTER_Y + 90, t('player.name'), { ...textStyle, fontSize: '26px' })
       .setOrigin(0.5);
+    // Auto-switched weapon vs the current enemy (GDD 7.1, M7.3a), right of the squirrel
+    // (below her name it would hide behind the open Stats panel), clear of her attack lunge.
+    this.weaponText = this.add
+      .text(PLAYER_X + FIGHTER_SIZE / 2 + LUNGE_PX + 12, FIGHTER_Y + 40, '', { ...textStyle, fontSize: '15px', color: '#b0b0b0' })
+      .setOrigin(0, 0.5);
     const playerAttackLabel = this.add
       .text(PLAYER_X, FIGHTER_Y + 130, t('fight.attack'), { ...textStyle, fontSize: '18px' })
       .setOrigin(0.5);
@@ -298,6 +309,13 @@ export class FightScene extends Phaser.Scene {
       }),
     );
     this.refreshDropRateButtons();
+    // Debug tool (M7.3a): every enemy counts as flying -> squirrel switches to the slingshot.
+    this.flyingButton = new Button(this, W - 320 + 3 * 88, 90, '', () => this.onToggleFlying(), {
+      width: 80,
+      height: 40,
+      fontSize: 14,
+    });
+    this.refreshFlyingButton();
 
     // Tile picker (GDD 8.1, M6.2): one button per tile, locked ones show kills still needed.
     this.tileButtons = this.tiles.map((tile, index) =>
@@ -436,18 +454,31 @@ export class FightScene extends Phaser.Scene {
     this.dropRateButtons.forEach((button, index) => button.setSelected(index === this.dropRateIndex));
   }
 
+  private onToggleFlying(): void {
+    this.debugFlying = !this.debugFlying;
+    this.config = this.configFor(this.state.tileId);
+    this.refreshFlyingButton();
+  }
+
+  private refreshFlyingButton(): void {
+    this.flyingButton.setLabel(`${t('debug.flying')}\n${this.debugFlying ? 'ON' : 'off'}`);
+    this.flyingButton.setSelected(this.debugFlying);
+  }
+
   /**
-   * `tileId`'s base config (M6.2) with the debug drop rate override (Tomas) applied: scales
-   * every enemy's per-item drop chance (GDD 9.3 v2.4) by the selected multiplier, capped at 100 %.
+   * `tileId`'s base config (M6.2) with the debug overrides applied: drop rate (Tomas) scales
+   * every enemy's per-item drop chance (GDD 9.3 v2.4) by the selected multiplier, capped at
+   * 100 %; Flying (M7.3a) makes every enemy flying.
    */
   private configFor(tileId: string): EncounterConfig {
     const base = this.baseConfigByTileId.get(tileId);
     if (!base) throw new Error(`No config for tile "${tileId}"`);
     const multiplier = DROP_RATE_OPTIONS[this.dropRateIndex] ?? 1;
-    if (multiplier === 1) return base;
+    if (multiplier === 1 && !this.debugFlying) return base;
     const scale = (bp: number) => (multiplier === 100 ? 10000 : Math.min(10000, bp * multiplier));
     const enemies = base.enemies.map((enemy) => ({
       ...enemy,
+      flying: enemy.flying || this.debugFlying,
       loot: {
         ...enemy.loot,
         items: enemy.loot.items.map((item) => ({
@@ -502,9 +533,23 @@ export class FightScene extends Phaser.Scene {
     this.statsPanel.setVisible(!this.statsPanel.visible);
   }
 
-  private refreshStatsPanel(): void {
+  /** "Twig Slingshot (Ranged)" / "Fists" (+ hit penalty vs flying), GDD 7.1 M7.3a. */
+  private weaponLabel(): string {
+    const mode = activeWeaponMode(this.state, this.config);
     const gear = this.state.inventory.equipment;
-    const stats = playerStats(this.config, this.state.progression.level, gear);
+    const item = mode === 'ranged' ? gear.ranged : mode === 'melee' ? (gear.rightPaw ?? gear.leftPaw) : null;
+    const modeName = tDynamic(`weapon.mode.${mode}`);
+    const label = item ? `${itemName(item)} (${modeName})` : modeName;
+    const hitMult = playerHitMultiplier(this.state, this.config);
+    if (hitMult === 1) return label;
+    return `${label}\n${t('weapon.fistsVsFlying').replace('{pct}', String(Math.round(hitMult * 100)))}`;
+  }
+
+  private refreshStatsPanel(): void {
+    // Damage, interval, DPS and hit chance: with the weapon auto-switched for the current enemy (M7.3a).
+    const composed = fightingPlayer(this.state, this.config);
+    const stats = composed.fighter;
+    const intervalS = composed.attackIntervalMs / 1000;
     const { level, xp } = this.state.progression;
     const needed = xpToNextLevelHundredths(level);
     this.statsPanel.setLines([
@@ -512,18 +557,19 @@ export class FightScene extends Phaser.Scene {
       `${t('stats.level')}: ${level}`,
       `${t('stats.xp')}: ${formatHundredths(xp)} / ${formatHundredths(needed)}`,
       `${t('stats.maxHp')}: ${formatHundredths(stats.maxHp)}`,
+      `${t('stats.weapon')}: ${this.weaponLabel().replace('\n', ' - ')}`,
       `${t('stats.damage')}: ${formatHundredths(stats.damageMin)} - ${formatHundredths(stats.damageMax)}`,
       // Explicit 2 decimals here (not the usual floor-to-0.1) so small per-level changes show up.
-      `${t('stats.attackInterval')}: ${(playerAttackIntervalMs(this.config, level, gear) / 1000).toFixed(2)} s`,
+      `${t('stats.attackInterval')}: ${intervalS.toFixed(2)} s`,
       // DPS = damage / attack interval (no crit yet, GDD 5 range display).
-      `${t('stats.dps')}: ${(fromHundredths(stats.damageMin) / (playerAttackIntervalMs(this.config, level, gear) / 1000)).toFixed(1)} - ${(
-        fromHundredths(stats.damageMax) / (playerAttackIntervalMs(this.config, level, gear) / 1000)
+      `${t('stats.dps')}: ${(fromHundredths(stats.damageMin) / intervalS).toFixed(1)} - ${(
+        fromHundredths(stats.damageMax) / intervalS
       ).toFixed(1)}`,
       `${t('stats.regen')}: ${formatHundredths(
         regenAmountHundredths(fromHundredths(this.config.regenAmount), level, this.config.regenGrowthPctPerLevel),
       )} / ${(this.config.regenIntervalMs / 1000).toFixed(1)} s`,
       // Against the current enemy (level difference, GDD 7.2 v1.7); floor to 0.1 for display.
-      `${t('stats.hitChance')}: ${(Math.floor(hitChancePct(stats, enemyStats(this.config, this.state.enemyId, this.state.enemyLevel), this.config.rules, level - this.state.enemyLevel) * 10) / 10).toFixed(1)} %`,
+      `${t('stats.hitChance')}: ${(Math.floor(hitChancePct(stats, enemyStats(this.config, this.state.enemyId, this.state.enemyLevel), this.config.rules, level - this.state.enemyLevel, playerHitMultiplier(this.state, this.config)) * 10) / 10).toFixed(1)} %`,
       `${t('stats.armor')}: ${formatHundredths(stats.armor)}`,
     ]);
   }
@@ -564,6 +610,7 @@ export class FightScene extends Phaser.Scene {
     const playerMaxHp = playerStats(this.config, this.state.progression.level, this.state.inventory.equipment).maxHp;
     this.playerHpText.setText(`${formatHpHundredths(this.state.playerHp)} / ${formatHundredths(playerMaxHp)}`);
     this.levelText.setText(`${t('stats.level')} ${this.state.progression.level}`);
+    this.weaponText.setText(`${t('stats.weapon')}: ${this.weaponLabel()}`);
     if (this.statsPanel.visible) this.refreshStatsPanel();
     if (this.lootPanel.visible) this.refreshLootPanel();
     this.refreshTileButtons();

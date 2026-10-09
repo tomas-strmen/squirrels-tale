@@ -27,6 +27,8 @@ export interface CombatRules {
   readonly hitPctPerLevelDiff: number;
   /** Attack interval never goes below this (ms). */
   readonly minAttackIntervalMs: number;
+  /** Hit chance multiplier (%) for bare fists against a flying enemy (GDD 7.1 v2.7). */
+  readonly fistsVsFlyingHitPct: number;
 }
 
 /** One fighter's combat stats (internal units). */
@@ -54,6 +56,7 @@ export interface CombatRulesInput {
   readonly minDamage: number;
   readonly hitPctPerLevelDiff: number;
   readonly minAttackIntervalS: number;
+  readonly fistsVsFlyingHitPct: number;
 }
 
 export interface FighterStatsInput {
@@ -74,6 +77,7 @@ export function createCombatRules(input: CombatRulesInput): CombatRules {
     minDamage: toHundredths(input.minDamage),
     hitPctPerLevelDiff: input.hitPctPerLevelDiff,
     minAttackIntervalMs: secondsToMs(input.minAttackIntervalS),
+    fistsVsFlyingHitPct: input.fistsVsFlyingHitPct,
   };
 }
 
@@ -94,15 +98,17 @@ export function createFighterStats(input: FighterStatsInput): FighterStats {
 /**
  * hitChance = clamp(attacker hit + perLevel x levelDiff - defender dodge, min, max) in %
  * (GDD 7.2 v1.7). `levelDiff` = attacker level - defender level (0 = same level).
+ * `hitMultiplier` scales the clamped result (e.g. 0.5 for fists vs a flying enemy, GDD 7.1 v2.7).
  */
 export function hitChancePct(
   attacker: FighterStats,
   defender: FighterStats,
   rules: CombatRules,
   levelDiff = 0,
+  hitMultiplier = 1,
 ): number {
   const raw = attacker.hitPct + levelDiff * rules.hitPctPerLevelDiff - defender.dodgePct;
-  return clamp(raw, rules.minHitPct, rules.maxHitPct);
+  return clamp(raw, rules.minHitPct, rules.maxHitPct) * hitMultiplier;
 }
 
 /** DR = armor / (armor + K), capped at maxDamageReductionPct. Returns a fraction 0..1. */
@@ -123,7 +129,7 @@ export function finalDamage(raw: number, defenderArmor: number, rules: CombatRul
 /**
  * Resolves one attack: hit roll (in 0.01 % steps), then damage roll uniformly
  * in 0.01 steps between damageMin and damageMax (both inclusive), then armor.
- * `levelDiff` = attacker level - defender level (GDD 7.2 v1.7).
+ * `levelDiff` = attacker level - defender level (GDD 7.2 v1.7); `hitMultiplier`: see hitChancePct.
  */
 export function resolveAttack(
   attacker: FighterStats,
@@ -131,9 +137,10 @@ export function resolveAttack(
   rules: CombatRules,
   rng: RngState,
   levelDiff = 0,
+  hitMultiplier = 1,
 ): { readonly result: AttackResult; readonly rng: RngState } {
   const hitRoll = nextInt(rng, 0, 10000);
-  const chanceBasisPoints = Math.round(hitChancePct(attacker, defender, rules, levelDiff) * 100);
+  const chanceBasisPoints = Math.round(hitChancePct(attacker, defender, rules, levelDiff, hitMultiplier) * 100);
   if (hitRoll.value >= chanceBasisPoints) {
     return { result: { hit: false, damage: 0 }, rng: hitRoll.state };
   }

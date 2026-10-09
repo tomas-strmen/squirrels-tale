@@ -22,7 +22,8 @@
     "maxDamageReductionPct": 75,
     "minDamage": 0.1,
     "hitPctPerLevelDiff": 0.5,
-    "minAttackIntervalS": 0.5
+    "minAttackIntervalS": 0.5,
+    "fistsVsFlyingHitPct": 50
   },
   "loot": {
     "pity": [

@@ -3,7 +3,9 @@
 ## Aktuálne
 - **Etapa:** M7 Meny, jedlo, diaľkový boj (GDD kap. 22) – M5 hotová ✅, M6 uzavretá (zvyšok čaká na M7/M13/M14)
 - **Posledný krok:** M7.2 – jedlo + auto-jedlo zamknuté reklamou (GDD v2.6) – otestované a zmergnuté (PR #28). Pred ním M7.1 meny + spawn tabuľka (PR #27).
-- **Rozpracované:** nič (main je čistý, všetko zmergnuté)
+- **Rozpracované:** M7.3a – prak v boji + auto-prepínanie zbraní (GDD v2.7), vetva `m7.3a-ranged-weapon`, čaká na test Tomasa.
+  Plán M7.3: a) prak + prepínanie (teraz), b) munícia (oriešky, kamienky 50 %, „keep at least N nuts“),
+  c) lietajúci nepriatelia Moth/Dragonfly/Wasp + ako sa dostať na T5 pred bossom (M14).
 - **Ďalší krok:** M7.3 diaľkový boj – diaľkové zbrane (slot ranged), munícia + náhradné kamienky, lietajúci nepriatelia (Moth/Dragonfly/Wasp na T5+), auto-prepínanie zbraní (GDD 7.1, 8.3, 9.4; rozdeliť na malé kroky a navrhnúť prvý). Odporúčaný model: Opus. Potom M8 Save (Opus, save sa nesmie rozbiť), neskôr loot krok 3 (čísla v tabuľkách) a 4 (editor tabuliek).
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model: podľa náročnosti kroku (poviem vopred). Od teraz: AI pripraví vetvu/commit/push a dá Tomasovi presné príkazy/odkaz na PR, test a merge robí Tomas sám (šetrí tokeny oproti ovládaniu prehliadača).
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.

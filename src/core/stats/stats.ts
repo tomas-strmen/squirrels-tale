@@ -10,13 +10,30 @@
  *   / attack speed factors, never below the minimum. A left-paw weapon does
  *   not change it (GDD 9.1 v2.3).
  *
- * Values are hundredths (percent stats too: 3 % -> 300). Ranged weapons only
- * fight flying enemies (GDD 7.1, M7), so their damage isn't used here yet;
- * their other stats and affixes still count.
+ * Values are hundredths (percent stats too: 3 % -> 300).
+ *
+ * Weapon mode (GDD 7.1, M7.3a): only one weapon set fights at a time - see
+ * chooseWeaponMode(). 'melee' = both paws, 'ranged' = the ranged weapon alone
+ * (it takes both paws, so a left-paw weapon adds nothing), 'fists' = no weapon
+ * damage. Stats and affixes of all worn gear count in every mode.
  */
 import type { FighterStats } from '../combat/combat';
 import type { StatId } from '../content/schemas';
 import { equippedItems, type Equipment } from '../inventory/inventory';
+
+export type WeaponMode = 'melee' | 'ranged' | 'fists';
+
+/**
+ * GDD 7.1: a flying enemy -> ranged weapon only (none -> fists); otherwise the
+ * paw weapons (none -> ranged weapon; none either -> fists).
+ */
+export function chooseWeaponMode(equipment: Equipment, enemyFlying: boolean): WeaponMode {
+  const hasRanged = equipment.ranged?.weapon != null;
+  if (enemyFlying) return hasRanged ? 'ranged' : 'fists';
+  const hasMelee = equipment.rightPaw?.weapon != null || equipment.leftPaw?.weapon != null;
+  if (hasMelee) return 'melee';
+  return hasRanged ? 'ranged' : 'fists';
+}
 
 export interface ComposeInput {
   /** Character stats at the current level, without gear (hundredths). */
@@ -29,6 +46,8 @@ export interface ComposeInput {
   readonly equipment: Equipment;
   /** Left-paw weapon damage in % of its own (50). */
   readonly offHandDamagePct: number;
+  /** Which weapons fight (default 'melee' = both paws). */
+  readonly weaponMode?: WeaponMode;
 }
 
 export interface ComposedStats {
@@ -52,8 +71,11 @@ export function composeStats(input: ComposeInput): ComposedStats {
       1,
     );
 
-  const right = input.equipment.rightPaw?.weapon ?? null;
-  const left = input.equipment.leftPaw?.weapon ?? null;
+  const mode = input.weaponMode ?? 'melee';
+  // 'ranged': the ranged weapon takes the main-weapon role (damage + interval shift), both paws idle.
+  const right = mode === 'melee' ? (input.equipment.rightPaw?.weapon ?? null)
+    : mode === 'ranged' ? (input.equipment.ranged?.weapon ?? null) : null;
+  const left = mode === 'melee' ? (input.equipment.leftPaw?.weapon ?? null) : null;
   const offHand = input.offHandDamagePct / 100;
   const damageFactor = factor('damagePct');
   const rawMin = input.character.damageMin + (right?.damageMin ?? 0) + (left?.damageMin ?? 0) * offHand;

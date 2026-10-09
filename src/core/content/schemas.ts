@@ -211,6 +211,40 @@ export const statIdSchema = z.enum([
 export type StatId = z.infer<typeof statIdSchema>;
 
 export const itemSlotSchema = z.enum(['melee', 'ranged', 'head', 'body', 'legs', 'ring', 'amulet']);
+
+/** Skill tree (GDD 13.1, M11): 3 branches; a node can be bought once the previous one in its branch is. */
+export const treeBranchSchema = z.enum(['thorn', 'bark', 'acorn']);
+export const treeNodeSchema = z.object({
+  id: idSchema,
+  branch: treeBranchSchema,
+  /** normal = 1 skill point, keystone = 1 special point (every 5th level). */
+  kind: z.enum(['normal', 'keystone']),
+  effect: z.discriminatedUnion('type', [
+    /** Like an item stat, design units (5 = +5 %, 0.5 = +0.5 HP). */
+    z.object({ type: z.literal('stat'), stat: statIdSchema, value: designValueSchema }),
+    z.object({ type: z.literal('xpPct'), value: percentSchema }),
+    /** Chance a shot doesn't use up its nut (GDD 7.3). */
+    z.object({ type: z.literal('nutSavePct'), value: percentSchema }),
+    /** Offline time cap + minutes (GDD 17.1). */
+    z.object({ type: z.literal('offlineCapMin'), value: z.number().int().min(1) }),
+    z.object({ type: z.literal('keystone'), keystone: z.enum(['wildSquirrel', 'thickBark', 'goldenAcorn']) }),
+  ]),
+  /** Quest that unlocks this node (its stat is locked until then, GDD 6.1); null = always. */
+  unlockedBy: idSchema.nullable(),
+});
+export type TreeNodeData = z.infer<typeof treeNodeSchema>;
+export const treeSchema = z
+  .object({
+    /** Reset costs this many pebbles x player level (GDD 13.1). */
+    resetCostPebblesPerLevel: z.number().int().min(0),
+    nodes: z.array(treeNodeSchema).min(1),
+  })
+  .refine((t) => new Set(t.nodes.map((n) => n.id)).size === t.nodes.length, { message: 'duplicate tree node id' });
+export type TreeData = z.infer<typeof treeSchema>;
+
+export function parseTree(data: unknown): TreeData {
+  return treeSchema.parse(data);
+}
 export type ItemSlot = z.infer<typeof itemSlotSchema>;
 
 /** A d20 face range, both ends inclusive within 1-20 (GDD 9.6 dice roll). */

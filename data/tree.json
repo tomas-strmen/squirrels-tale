@@ -1,0 +1,37 @@
+{
+  "resetCostPebblesPerLevel": 10,
+  "nodes": [
+    { "id": "thorn_1", "branch": "thorn", "kind": "normal", "effect": { "type": "stat", "stat": "damagePct", "value": 5 }, "unlockedBy": null },
+    { "id": "thorn_2", "branch": "thorn", "kind": "normal", "effect": { "type": "stat", "stat": "attackSpeedPct", "value": 3 }, "unlockedBy": null },
+    { "id": "thorn_3", "branch": "thorn", "kind": "normal", "effect": { "type": "stat", "stat": "damagePct", "value": 5 }, "unlockedBy": null },
+    { "id": "thorn_4", "branch": "thorn", "kind": "normal", "effect": { "type": "stat", "stat": "attackSpeedPct", "value": 3 }, "unlockedBy": null },
+    { "id": "thorn_5", "branch": "thorn", "kind": "normal", "effect": { "type": "stat", "stat": "damagePct", "value": 5 }, "unlockedBy": null },
+    { "id": "thorn_6", "branch": "thorn", "kind": "normal", "effect": { "type": "stat", "stat": "critChancePct", "value": 2 }, "unlockedBy": "q3" },
+    { "id": "thorn_7", "branch": "thorn", "kind": "normal", "effect": { "type": "stat", "stat": "critChancePct", "value": 2 }, "unlockedBy": "q3" },
+    { "id": "thorn_8", "branch": "thorn", "kind": "normal", "effect": { "type": "stat", "stat": "critDamagePct", "value": 10 }, "unlockedBy": "q3" },
+    { "id": "thorn_9", "branch": "thorn", "kind": "normal", "effect": { "type": "stat", "stat": "stunChancePct", "value": 2 }, "unlockedBy": "q8" },
+    { "id": "wild_squirrel", "branch": "thorn", "kind": "keystone", "effect": { "type": "keystone", "keystone": "wildSquirrel" }, "unlockedBy": null },
+
+    { "id": "bark_1", "branch": "bark", "kind": "normal", "effect": { "type": "stat", "stat": "maxHp", "value": 0.5 }, "unlockedBy": null },
+    { "id": "bark_2", "branch": "bark", "kind": "normal", "effect": { "type": "stat", "stat": "armor", "value": 0.2 }, "unlockedBy": null },
+    { "id": "bark_3", "branch": "bark", "kind": "normal", "effect": { "type": "stat", "stat": "regenPct", "value": 10 }, "unlockedBy": null },
+    { "id": "bark_4", "branch": "bark", "kind": "normal", "effect": { "type": "stat", "stat": "maxHp", "value": 0.5 }, "unlockedBy": null },
+    { "id": "bark_5", "branch": "bark", "kind": "normal", "effect": { "type": "stat", "stat": "armor", "value": 0.2 }, "unlockedBy": null },
+    { "id": "bark_6", "branch": "bark", "kind": "normal", "effect": { "type": "stat", "stat": "regenPct", "value": 10 }, "unlockedBy": null },
+    { "id": "bark_7", "branch": "bark", "kind": "normal", "effect": { "type": "stat", "stat": "maxHp", "value": 0.5 }, "unlockedBy": null },
+    { "id": "bark_8", "branch": "bark", "kind": "normal", "effect": { "type": "stat", "stat": "dodgePct", "value": 2 }, "unlockedBy": "q7" },
+    { "id": "bark_9", "branch": "bark", "kind": "normal", "effect": { "type": "stat", "stat": "dodgePct", "value": 2 }, "unlockedBy": "q7" },
+    { "id": "thick_bark", "branch": "bark", "kind": "keystone", "effect": { "type": "keystone", "keystone": "thickBark" }, "unlockedBy": null },
+
+    { "id": "acorn_1", "branch": "acorn", "kind": "normal", "effect": { "type": "stat", "stat": "currencyFindPct", "value": 5 }, "unlockedBy": null },
+    { "id": "acorn_2", "branch": "acorn", "kind": "normal", "effect": { "type": "xpPct", "value": 5 }, "unlockedBy": null },
+    { "id": "acorn_3", "branch": "acorn", "kind": "normal", "effect": { "type": "stat", "stat": "currencyFindPct", "value": 5 }, "unlockedBy": null },
+    { "id": "acorn_4", "branch": "acorn", "kind": "normal", "effect": { "type": "xpPct", "value": 5 }, "unlockedBy": null },
+    { "id": "acorn_5", "branch": "acorn", "kind": "normal", "effect": { "type": "nutSavePct", "value": 10 }, "unlockedBy": null },
+    { "id": "acorn_6", "branch": "acorn", "kind": "normal", "effect": { "type": "offlineCapMin", "value": 30 }, "unlockedBy": null },
+    { "id": "acorn_7", "branch": "acorn", "kind": "normal", "effect": { "type": "stat", "stat": "magicFindPct", "value": 5 }, "unlockedBy": "q4" },
+    { "id": "acorn_8", "branch": "acorn", "kind": "normal", "effect": { "type": "stat", "stat": "magicFindPct", "value": 5 }, "unlockedBy": "q4" },
+    { "id": "acorn_9", "branch": "acorn", "kind": "normal", "effect": { "type": "stat", "stat": "magicFindPct", "value": 5 }, "unlockedBy": "q4" },
+    { "id": "golden_acorn", "branch": "acorn", "kind": "keystone", "effect": { "type": "keystone", "keystone": "goldenAcorn" }, "unlockedBy": null }
+  ]
+}

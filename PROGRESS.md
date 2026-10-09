@@ -1,17 +1,26 @@
 # PROGRESS – stav vývoja
 
 ## Aktuálne
-- **Etapa:** M7 Meny, jedlo, diaľkový boj (GDD kap. 22) – M5 hotová ✅, M6 uzavretá (zvyšok čaká na M7/M13/M14)
-- **Posledný krok:** M7.3b – munícia (GDD v2.8) – otestované a zmergnuté (PR #31). Pred ním M7.3a prak (PR #30).
-- **Rozpracované:** vetva `m7.3c-t5-moth` (autonómny beh 10. 10. v noci, všetko na jednej vetve, čaká na test Tomasa):
-  M7.3c políčko T5 s lietajúcou Morou (GDD v2.9) → **M7 hotová**; M8.1 save/load + autosave (GDD v2.10); M8.2 export/import/reset + záloha nečitateľného save; M8.3 ukladá len najnovšia karta; M9.1–9.2 offline
-  progres (simulácia, save v2 + migrácia) + „While You Were Away“ + debug Skip +1 h/+3 h (GDD v2.11); M9.3 Rare+
-  sa pri plnom batohu nestratí + dopočítanie času v pozadí (GDD v2.12). Pravidlá triedenia/„Keep only upgrades“/
-  tutoriál prvého návratu presunuté k M10/M16; M10.1–10.2 obchodníčka Straka (ceny, denný tovar, kúpa/predaj,
-  save v3, GDD v2.13).
-- **Ďalší krok:** **M8 Save** (model Opus – save sa nesmie rozbiť: verzie, migrácie, autosave, 2 sloty,
-  export/import, ochrana hodín; uloží aj „Keep nuts“). Neskôr loot krok 3 (čísla v tabuľkách + predmety T5:
-  Reed Slingshot, Acorn Cap/Helmet…) a 4 (editor tabuliek). Dragonfly (T6) a Wasp (T8) prídu s ich políčkami.
+- **Etapa:** M11 Strom schopností (GDD kap. 22) – M7, M8, M9, M10 hotové na vetve (čakajú na test Tomasa)
+- **Posledný krok:** M7.3b – munícia (GDD v2.8) – otestované a zmergnuté (PR #31).
+- **Rozpracované:** vetva `m7.3c-t5-moth` (autonómny beh 10. 10. v noci, všetko na jednej vetve, čaká na test + merge):
+  - M7.3c políčko T5 s lietajúcou Morou (GDD v2.9) → **M7 hotová**
+  - M8.1 save/load + autosave, M8.2 export/import/reset + záloha nečitateľného save, M8.3 ukladá len najnovšia karta
+    (GDD v2.10) → **M8 hotová**
+  - M9.1–9.2 offline progres (simulácia skutočným bojom, save v2) + „While You Were Away“ + debug Skip +1 h/+3 h
+    (GDD v2.11); M9.3 Rare+ sa pri plnom batohu nestratí + dopočítanie času v pozadí (GDD v2.12) → **M9 hotová**
+    (pravidlá triedenia, „Keep only upgrades“, tutoriál prvého návratu presunuté k M10/M16)
+  - M10.1–10.2 obchodníčka Straka: ceny, denný tovar, kúpa/predaj, save v3 (GDD v2.13) → **M10 hotová** (bez Q2)
+  - M11.1 strom schopností – len dáta + logika + testy (`data/tree.json`, `core/tree`), **v hre ešte nič nerobí**
+- **Rozhodnutia z nočného behu (dajú sa zvrátiť):** offline sa simuluje skutočným bojom namiesto odhadu TTK; smrť
+  offline = farmí sa polovica času; súhrn až od 60 s; po načítaní veverička farmí ďalej, ak farmila (v Peace! stojí);
+  Straka sa odomkne s T2 (Q2 až v M13), tovar o polnoci UTC; v strome sú uzly zamknuté questom na konci vetiev,
+  percentá v strome sa sčítajú, keystony „coming soon“ do M13.
+- **Ďalší krok:** M11.2 napojiť strom do hry (štatistiky, XP %, currency find % aj z afixov, šanca ušetriť oriešok,
+  offline strop) + save v4; M11.3 panel stromu (kúpa uzlov, reset za 10 × level kamienkov). Model: Opus.
+  Neskôr loot krok 3 (čísla v tabuľkách + predmety T5: Reed Slingshot, Acorn Cap/Helmet…) a 4 (editor tabuliek).
+  Dragonfly (T6) a Wasp (T8) prídu s ich políčkami.
+- **Známe:** Lv10 bez výbavy na T1 pomaly umiera (regen < prijaté poškodenie) – balans pre M20.
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model: podľa náročnosti kroku (poviem vopred). Od teraz: AI pripraví vetvu/commit/push a dá Tomasovi presné príkazy/odkaz na PR, test a merge robí Tomas sám (šetrí tokeny oproti ovládaniu prehliadača).
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.

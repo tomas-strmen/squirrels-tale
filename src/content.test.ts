@@ -62,6 +62,13 @@ describe('data + strings', () => {
     }
   });
 
+  it('T5 has a flying enemy, so the slingshot gets used there (GDD 22 M7 goal, M7.3c)', () => {
+    const flying = new Set(parseEnemies(enemies).filter((e) => e.flying).map((e) => e.id));
+    expect(flying.has('moth')).toBe(true);
+    const t5 = parseTiles(tilesData).find((tile) => tile.id === 't5');
+    expect(t5?.spawns.some((s) => flying.has(s.enemyId))).toBe(true);
+  });
+
   it('every tile builds a valid encounter config with the balance values (M6.2)', () => {
     const validBalance = parseBalance(balance);
     const allEnemies = parseEnemies(enemies);

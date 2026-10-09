@@ -128,5 +128,71 @@
         { "currencyId": "nuts", "pctAtMin": 20.0, "pctAtMax": 20.0, "amountMin": 1, "amountMax": 1 }
       ]
     }
+  },
+  {
+    "id": "beetle",
+    "baseLevel": 9,
+    "maxHp": 4.5,
+    "damageMin": 0.5,
+    "damageMax": 0.7,
+    "attackIntervalS": 2.8,
+    "hitPct": 72,
+    "armor": 1.0,
+    "dodgePct": 5,
+    "xp": 8,
+    "loot": {
+      "minLevel": 9,
+      "maxLevel": 11,
+      "items": [
+        { "itemId": "pebble_club", "pctAtMin": 2.0, "pctAtMax": 3.0 },
+        { "itemId": "leaf_vest", "pctAtMin": 2.0, "pctAtMax": 3.5 },
+        { "itemId": "leaf_cap", "pctAtMin": 2.0, "pctAtMax": 3.0 },
+        { "itemId": "pebble_pendant", "pctAtMin": 1.5, "pctAtMax": 2.5 }
+      ],
+      "rarities": [
+        { "rarityId": "uncommon", "weightAtMin": 25.0, "weightAtMax": 32.0 },
+        { "rarityId": "rare", "weightAtMin": 8.0, "weightAtMax": 14.0 },
+        { "rarityId": "legendary", "weightAtMin": 0.5, "weightAtMax": 1.2 }
+      ],
+      "currencies": [
+        { "currencyId": "berries", "pctAtMin": 10.0, "pctAtMax": 10.0, "amountMin": 1, "amountMax": 1 },
+        { "currencyId": "pebbles", "pctAtMin": 35.0, "pctAtMax": 35.0, "amountMin": 2, "amountMax": 3 },
+        { "currencyId": "seeds", "pctAtMin": 35.0, "pctAtMax": 35.0, "amountMin": 2, "amountMax": 3 },
+        { "currencyId": "nuts", "pctAtMin": 20.0, "pctAtMax": 20.0, "amountMin": 1, "amountMax": 2 }
+      ]
+    }
+  },
+  {
+    "id": "moth",
+    "baseLevel": 9,
+    "maxHp": 3.0,
+    "damageMin": 0.3,
+    "damageMax": 0.5,
+    "attackIntervalS": 2.6,
+    "hitPct": 72,
+    "armor": 0,
+    "dodgePct": 10,
+    "xp": 7,
+    "flying": true,
+    "loot": {
+      "minLevel": 9,
+      "maxLevel": 11,
+      "items": [
+        { "itemId": "twig_slingshot", "pctAtMin": 2.0, "pctAtMax": 3.0 },
+        { "itemId": "sharp_twig", "pctAtMin": 2.0, "pctAtMax": 3.0 },
+        { "itemId": "leaf_cap", "pctAtMin": 1.5, "pctAtMax": 2.5 }
+      ],
+      "rarities": [
+        { "rarityId": "uncommon", "weightAtMin": 25.0, "weightAtMax": 32.0 },
+        { "rarityId": "rare", "weightAtMin": 8.0, "weightAtMax": 14.0 },
+        { "rarityId": "legendary", "weightAtMin": 0.5, "weightAtMax": 1.2 }
+      ],
+      "currencies": [
+        { "currencyId": "berries", "pctAtMin": 10.0, "pctAtMax": 10.0, "amountMin": 1, "amountMax": 1 },
+        { "currencyId": "pebbles", "pctAtMin": 35.0, "pctAtMax": 35.0, "amountMin": 2, "amountMax": 3 },
+        { "currencyId": "seeds", "pctAtMin": 35.0, "pctAtMax": 35.0, "amountMin": 2, "amountMax": 3 },
+        { "currencyId": "nuts", "pctAtMin": 20.0, "pctAtMax": 20.0, "amountMin": 1, "amountMax": 2 }
+      ]
+    }
   }
 ]

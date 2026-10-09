@@ -1,7 +1,7 @@
-# Veverička – Game Design Document (GDD) v2.8
+# Veverička – Game Design Document (GDD) v2.9
 
 > **Pracovný názov hry:** *Squirrel's Tale* (dočasný – finálny názov vybrať pred vydaním; nesmie pripomínať „Hero Tale“).
-> **Stav:** v2.8, 9. 10. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
+> **Stav:** v2.9, 10. 10. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
 > **Súvisiace:** `claude/ROADMAP.md` (technológia, architektúra, etapy vydania), `claude/PROMPT-vyvoj.md` (ako má AI pracovať).
 
 ---
@@ -249,6 +249,7 @@ ak stun (šanca stun%) → cieľ má ďalší útok oneskorený o 1.5 s (boss 0.
 | T9 | Snake Hollow (Hadia jama) | Shrew, Wasp | 360 zabití → **boss Grass Snake** | koniec MVP |
 
 - **Spawn tabuľka (v2.5, Tomas):** stĺpec „Nepriatelia“ je len prehľad. Skutočná definícia je v `data/tiles.json` (`spawns`): pre každé políčko zoznam *nepriateľ + váha*. Pri každom novom nepriateľovi sa vyberie jeden záznam podľa váh (relatívne – 70/30 aj 7/3 je to isté; ak dáš súčet 100, váhy sú rovno percentá). Nepriateľ, ktorý v tabuľke políčka nie je, tam nikdy nespawnne. Počiatočné váhy sú rovnaké pre všetkých na políčku (zachované doterajšie správanie); ladí sa v M20.
+- **Dočasne (v2.9, Tomas, M7.3c):** kým nie je boss Ant Captain (M14), T5 sa odomkne po **60 zabitiach na T4** (počet, po ktorom sa boss objaví). V M14 to nahradí porazenie bossa.
 
 ### 8.3 Nepriatelia [MVP: 12 + 2 bossovia]
 | ID | Meno | Tile | HP | Úder | Interval | Hit | Armor | Dodge | XP | Pozn. |
@@ -257,7 +258,7 @@ ak stun (šanca stun%) → cieľ má ďalší útok oneskorený o 1.5 s (boss 0.
 | pill_bug | Pill Bug (Žižiavka) | 2 | 2.0 | 0.2–0.3 | 3.0 s | 65 % | 1.0 | 0 | 3 | tanky |
 | armed_ant | Armed Ant (Ozbrojený mravec) | 3–4 | 2.5 | 0.3–0.5 | 2.8 s | 70 % | 0 | 0 | 4 | |
 | ant_soldier | Ant Soldier (Mravec vojak) | 4 | 3.5 | 0.4–0.6 | 2.5 s | 70 % | 0.5 | 0 | 5.5 | |
-| beetle | Beetle (Chrobák) | 5 | 4.5 | 0.5–0.7 | 2.8 s | 72 % | 1.0 | 5 % | 8 | padá Acorn Cap 20 % |
+| beetle | Beetle (Chrobák) | 5 | 4.5 | 0.5–0.7 | 2.8 s | 72 % | 1.0 | 5 % | 8 | padá Acorn Cap 20 % (v2.9: predmet zatiaľ neexistuje – doplní sa s predmetmi T5 v loot kroku 3) |
 | moth | Moth (Mora) | 5 | 3.0 | 0.3–0.5 | 2.6 s | 72 % | 0 | 10 % | 7 | **letí** |
 | dragonfly | Dragonfly (Vážka) | 6 | 4.0 | 0.4–0.6 | 1.8 s | 72 % | 0 | 15 % | 11 | **letí**, rýchla |
 | frog | Frog (Žaba) | 6 | 6.0 | 0.6–0.9 | 3.0 s | 72 % | 0.5 | 0 | 11 | |
@@ -719,6 +720,7 @@ tools/sim/         # headless simulácia tempa (npm run sim) → tabuľka čas/l
 | 2.3 | 2026-09-27 | 9.1: 9 slotov (pravá/ľavá labka, ranged, head, body, legs, ring, amulet, tail); ľavá labka = štít alebo druhá zbraň (50 % poškodenia, interval nemení). 9.4/7.2: zbraň posúva interval postavy o pevné sekundy (posun = pôvodný interval − 2.4 s). 24: otázka intervalu uzavretá. |
 | 2.4 | 2026-09-29 | 9.3/9.5/9.6: drop predmetov aj vzácnosti sú teraz vlastné pre každého nepriateľa (drop tabuľka + tabuľka váh vzácnosti, obe s vlastným `minLevel`/`maxLevel` nepriateľa), nie podľa políčka. Každá položka v drop tabuľke sa hodí samostatne – z jedného zabitia môže padnúť aj viac predmetov naraz. Unikátne/set predmety sú vlastný riadok s pevnou vzácnosťou (fallback na Rare už netreba). Pity garantuje aspoň jeden predmet danej vzácnosti aj mimo tabuliek. Nahrádza „drop tabuľku políčka" a globálne váhy vzácnosti z 9.3/9.6. |
 | 2.5 | 2026-10-09 | 8.2: spawn tabuľka políčka (nepriateľ + váha) v `data/tiles.json`. 11.1: drop mien je súčasťou vlastnej drop tabuľky každého nepriateľa (mena, šanca podľa levelu, počet kusov), nie jeden vzorec podľa tieru políčka. |
+| 2.9 | 2026-10-10 | 8.2: T5 Berry Bushes (Beetle + Moth, letí) – dočasne sa odomkne po 60 zabitiach na T4, kým nie je boss (M14). 8.3: Acorn Cap z Beetle čaká na predmety T5. |
 | 2.8 | 2026-10-09 | 7.3: rezerva orieškov predvolene 5, neobmedzuje jedenie; oriešok na každý výstrel (aj minutie, aj prak proti nelietajúcemu); kamienky zo zeme nemenia peňaženku. |
 | 2.7 | 2026-10-09 | 7.1: diaľková zbraň zaberá obe labky (zbrane v labkách sa pri streľbe nepočítajú, afixy výbavy áno); proti letiacemu bez diaľkovej zbrane päste s polovičnou šancou na zásah. |
 | 2.6 | 2026-10-09 | 7.4: auto-jedlo je zamknuté, kým hráč nepozrie (mock) reklamu – odomkne ho na 1 minútu (bar, potom zámok, opäť tlačidlom); ručné jedenie zadarmo, 3 rýchle tlačidlá, jedlo sa nezje pri plnom HP; bobuľa je počítadlo v peňaženke a padá z drop tabuľky nepriateľa. 24: otázka Premium vs. auto-jedlo. |

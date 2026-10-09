@@ -2,17 +2,25 @@
 
 ## Aktuálne
 - **Etapa:** M7 Meny, jedlo, diaľkový boj (GDD kap. 22) – M5 hotová ✅, M6 uzavretá (zvyšok čaká na M7/M13/M14)
-- **Posledný krok:** M7.3a – prak v boji + auto-prepínanie zbraní (GDD v2.7) – Tomas otestoval („všetko funguje“), merge cez PR robí Tomas. Pred ním M7.2 jedlo (PR #28).
-- **Rozpracované:** M7.3b – munícia (GDD v2.8), vetva `m7.3b-ammo`, čaká na test Tomasa.
-- **Ďalší krok:** M7.3b munícia – 1 oriešok na výstrel, po minutí kamienky zo zeme s 50 % poškodenia (nekonečné),
-  nastavenie „keep at least N nuts“ (GDD 7.3). Potom M7.3c lietajúci nepriatelia Moth/Dragonfly/Wasp + ako sa dostať
-  na T5 pred bossom (M14). Odporúčaný model: Opus. Potom M8 Save (Opus, save sa nesmie rozbiť), neskôr loot krok 3
-  (čísla v tabuľkách) a 4 (editor tabuliek).
+- **Posledný krok:** M7.3b – munícia (GDD v2.8) – otestované a zmergnuté (PR #31). Pred ním M7.3a prak (PR #30).
+- **Rozpracované:** M7.3c – políčko T5 s lietajúcou Morou (GDD v2.9), vetva `m7.3c-t5-moth`, čaká na test Tomasa.
+  Po ňom je **M7 hotová**.
+- **Ďalší krok:** **M8 Save** (model Opus – save sa nesmie rozbiť: verzie, migrácie, autosave, 2 sloty,
+  export/import, ochrana hodín; uloží aj „Keep nuts“). Neskôr loot krok 3 (čísla v tabuľkách + predmety T5:
+  Reed Slingshot, Acorn Cap/Helmet…) a 4 (editor tabuliek). Dragonfly (T6) a Wasp (T8) prídu s ich políčkami.
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model: podľa náročnosti kroku (poviem vopred). Od teraz: AI pripraví vetvu/commit/push a dá Tomasovi presné príkazy/odkaz na PR, test a merge robí Tomas sám (šetrí tokeny oproti ovládaniu prehliadača).
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.
 
 ## Hotové
+### M7.3b – munícia (2026-10-09, GDD v2.8)
+- Každý výstrel praku (aj minutie, aj prak proti nelietajúcemu bez zbrane v labke) minie 1 oriešok, kým v peňaženke
+  ostáva aspoň „Keep nuts“ (predvolene 5, −/+ pri jedle). Inak kamienky zo zeme: zadarmo, 50 % poškodenia
+  (nie mena Pebbles). Jedenie rezervu ignoruje.
+- Nový `core/ammo` (README, testy), `core/encounter`: `state.keepNuts`, `setKeepNuts`, `currentAmmo`, munícia
+  v `fightingPlayer`, `attack` event má `ammo`. UI: riadok „Ammo: …“ pod zbraňou, „Keep nuts: N“.
+- 304 testov zelených. Tomas otestoval a zmergoval (PR #31). „Keep nuts“ sa zatiaľ neukladá (M8).
+
 ### M7.3a – prak + auto-prepínanie zbraní (2026-10-09, GDD v2.7)
 - Nový predmet **Twig Slingshot** (ranged, 0.3–0.5, interval −0.2 s), padá z Armed Ant (T3). Slot „Ranged“ vo výbave
   existoval už od M5 (hromadné zahadzovanie berie len batoh, nasadený prak je v bezpečí).

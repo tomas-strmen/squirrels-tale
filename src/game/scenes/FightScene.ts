@@ -78,6 +78,8 @@ const LUNGE_PX = 40;
 const PEACE_X = 1080;
 const BUTTON_Y = 620;
 const HP_BAR_Y = FIGHTER_Y - 95;
+/** Left edge of the tile picker row (right of the "Found items" button). */
+const TILE_ROW_LEFT = 430;
 const SPEED_OPTIONS = [1, 4, 20, 50] as const;
 // Debug tool (Tomas): faster item drops for testing, not real game balance.
 const DROP_RATE_OPTIONS = [1, 10, 100] as const;
@@ -105,6 +107,8 @@ export class FightScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Rectangle;
   private enemy!: Phaser.GameObjects.Rectangle;
   private enemyNameText!: Phaser.GameObjects.Text;
+  /** "(flying)" left of the enemy, clear of its lunge and the wallet line (M7.3c). */
+  private enemyFlyingText!: Phaser.GameObjects.Text;
   private enemyGroup!: Phaser.GameObjects.Container;
   private playerBar!: ProgressBar;
   private playerAttackGroup!: Phaser.GameObjects.Container;
@@ -221,7 +225,7 @@ export class FightScene extends Phaser.Scene {
       .setStrokeStyle(3, 0x4a4a4a);
     // GDD 8.4: level shown next to the name ("Worker Ant Lv1"), rerolled per enemy - see onEvent('enemyFound').
     this.enemyNameText = this.add
-      .text(ENEMY_X, FIGHTER_Y + 90, `${tDynamic(`enemy.${this.state.enemyId}.name`)} ${t('fight.levelShort')}${this.state.enemyLevel}`, {
+      .text(ENEMY_X, FIGHTER_Y + 90, this.enemyLabel(), {
         ...textStyle,
         fontSize: '26px',
       })
@@ -242,9 +246,17 @@ export class FightScene extends Phaser.Scene {
       height: 16,
       fillColor: 0xbf8f8f,
     });
+    this.enemyFlyingText = this.add
+      .text(ENEMY_X - FIGHTER_SIZE / 2 - LUNGE_PX - 12, FIGHTER_Y - 40, t('enemy.flying'), {
+        ...textStyle,
+        fontSize: '16px',
+        color: '#a8d8ff',
+      })
+      .setOrigin(1, 0.5);
     this.enemyGroup = this.add.container(0, 0, [
       this.enemy,
       this.enemyNameText,
+      this.enemyFlyingText,
       enemyAttackLabel,
       this.enemyBar,
       this.enemyHpText,
@@ -321,9 +333,11 @@ export class FightScene extends Phaser.Scene {
     this.refreshFlyingButton();
 
     // Tile picker (GDD 8.1, M6.2): one button per tile, locked ones show kills still needed.
+    // Fits all tiles in one row between "Found items" and the right edge (M7.3c: 5 tiles).
+    const tileSlot = Math.min(170, (W - 10 - TILE_ROW_LEFT) / this.tiles.length);
     this.tileButtons = this.tiles.map((tile, index) =>
-      new Button(this, 540 + index * 170, 140, '', () => this.onSelectTile(tile.id), {
-        width: 160,
+      new Button(this, TILE_ROW_LEFT + tileSlot * (index + 0.5), 140, '', () => this.onSelectTile(tile.id), {
+        width: tileSlot - 8,
         height: 60,
         fontSize: 14,
       }),
@@ -550,6 +564,15 @@ export class FightScene extends Phaser.Scene {
     this.statsPanel.setVisible(!this.statsPanel.visible);
   }
 
+  /** "Moth Lv10" - GDD 8.4 level next to the name. */
+  private enemyLabel(): string {
+    return `${tDynamic(`enemy.${this.state.enemyId}.name`)} ${t('fight.levelShort')}${this.state.enemyLevel}`;
+  }
+
+  private isEnemyFlying(): boolean {
+    return this.config.enemies.find((e) => e.id === this.state.enemyId)?.flying ?? false;
+  }
+
   /** "Twig Slingshot (Ranged)" / "Fists", plus a hit penalty vs flying (M7.3a) or the ammo (M7.3b) line. */
   private weaponLines(): string[] {
     const mode = activeWeaponMode(this.state, this.config);
@@ -682,7 +705,8 @@ export class FightScene extends Phaser.Scene {
         break;
       case 'enemyFound':
         // GDD 8.4: level rolled per encounter within the enemy's range.
-        this.enemyNameText.setText(`${tDynamic(`enemy.${this.state.enemyId}.name`)} ${t('fight.levelShort')}${this.state.enemyLevel}`);
+        this.enemyNameText.setText(this.enemyLabel());
+        this.enemyFlyingText.setVisible(this.isEnemyFlying());
         this.searchGroup.setVisible(false);
         this.tweens.killTweensOf(this.enemyGroup);
         this.enemy.setAlpha(1);

@@ -31,5 +31,13 @@
     "enemyLevelMax": 8,
     "unlockKills": 30,
     "unlockLevel": 5
+  },
+  {
+    "id": "t5",
+    "tier": 5,
+    "spawns": [{ "enemyId": "beetle", "weight": 50 }, { "enemyId": "moth", "weight": 50 }],
+    "enemyLevelMin": 9,
+    "enemyLevelMax": 11,
+    "unlockKills": 60
   }
 ]

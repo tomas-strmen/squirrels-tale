@@ -76,7 +76,29 @@ export const enemyRarityWeightSchema = z.object({
 });
 export type EnemyRarityWeight = z.infer<typeof enemyRarityWeightSchema>;
 
-/** An enemy's whole loot setup (GDD 9.3/9.6 v2.4): its own drop table and rarity weights. */
+/** Currencies (GDD 11.1). Time Needles come later (M17). */
+export const CURRENCY_IDS = ['pebbles', 'seeds', 'nuts'] as const;
+export const currencyIdSchema = z.enum(CURRENCY_IDS);
+export type CurrencyId = z.infer<typeof currencyIdSchema>;
+
+/**
+ * One currency in an enemy's own drop table (GDD 11.1 v2.5): rolled independently on each
+ * kill. `pctAtMin`/`pctAtMax` is the chance (in %) to drop, interpolated over the enemy's own
+ * `minLevel`/`maxLevel` like items; when it drops, `amountMin`..`amountMax` pieces fall (whole,
+ * uniform). A currency not listed never drops from this enemy.
+ */
+export const enemyDropCurrencySchema = z
+  .object({
+    currencyId: currencyIdSchema,
+    pctAtMin: designValueSchema,
+    pctAtMax: designValueSchema,
+    amountMin: z.number().int().min(1),
+    amountMax: z.number().int().min(1),
+  })
+  .refine((c) => c.amountMax >= c.amountMin, { message: 'amountMax must not be less than amountMin' });
+export type EnemyDropCurrency = z.infer<typeof enemyDropCurrencySchema>;
+
+/** An enemy's whole loot setup (GDD 9.3/9.6 v2.4, 11.1 v2.5): drop table, rarity weights, currencies. */
 export const enemyLootSchema = z
   .object({
     /** Anchor levels for interpolation (own to this enemy, independent of the tile). */
@@ -84,6 +106,7 @@ export const enemyLootSchema = z
     maxLevel: z.number().int().min(1),
     items: z.array(enemyDropItemSchema),
     rarities: z.array(enemyRarityWeightSchema),
+    currencies: z.array(enemyDropCurrencySchema),
   })
   .refine((l) => l.maxLevel >= l.minLevel, { message: 'maxLevel must not be less than minLevel' })
   .refine((l) => new Set(l.items.map((i) => i.itemId)).size === l.items.length, {
@@ -91,6 +114,9 @@ export const enemyLootSchema = z
   })
   .refine((l) => new Set(l.rarities.map((r) => r.rarityId)).size === l.rarities.length, {
     message: 'duplicate rarityId in an enemy loot table',
+  })
+  .refine((l) => new Set(l.currencies.map((c) => c.currencyId)).size === l.currencies.length, {
+    message: 'duplicate currencyId in an enemy loot table',
   });
 export type EnemyLoot = z.infer<typeof enemyLootSchema>;
 
@@ -132,7 +158,13 @@ export const tileSchema = z
     id: idSchema,
     /** Tier used by loot (GDD 9.3/9.6 `minTileTier`) - the tile's own "T" number. */
     tier: z.number().int().min(1),
-    enemyIds: z.array(idSchema).min(1),
+    /**
+     * Spawn table (GDD 8.2 v2.5): which enemy species can appear here and how likely, as relative
+     * weights (e.g. 70/30, or 50/25/25 - need not sum to 100). Each new enemy rolls one entry.
+     */
+    spawns: z
+      .array(z.object({ enemyId: idSchema, weight: designValueSchema.refine((w) => w > 0, 'must be greater than 0') }))
+      .min(1),
     /** Level range enemies roll into on this tile (GDD 8.4). */
     enemyLevelMin: z.number().int().min(1),
     enemyLevelMax: z.number().int().min(1),
@@ -143,6 +175,9 @@ export const tileSchema = z
   })
   .refine((t) => t.enemyLevelMax >= t.enemyLevelMin, {
     message: 'enemyLevelMax must not be less than enemyLevelMin',
+  })
+  .refine((t) => new Set(t.spawns.map((s) => s.enemyId)).size === t.spawns.length, {
+    message: 'duplicate enemyId in a tile spawn table',
   });
 export type TileData = z.infer<typeof tileSchema>;
 

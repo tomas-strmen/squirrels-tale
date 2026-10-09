@@ -2,14 +2,27 @@
 
 ## Aktuálne
 - **Etapa:** M6 Mapa (GDD kap. 8, 22) – M5 Inventár a výbava hotová ✅
-- **Posledný krok:** Loot v2.4 – drop tabuľky a vzácnosť per nepriateľ (GDD 9.3/9.5/9.6, mimo poradia M6) – otestované a zmergnuté
-- **Rozpracované:** M6.2c – políčko T4 (Anthill, Ant Soldier, `unlockLevel` 30 zabití + Lv 5) + oprava pádu lootu na T4 – hotové na vetve `m6.2c-tile4`, čaká na Tomasov test/merge (vetva je ešte založená na starom `main`, treba merge/rebase cez lootom pridané zmeny)
-- **Ďalší krok:** po zmergovaní M6.2c: loot krok 3 (doladenie čísel v drop tabuľkách) a krok 4 (editor drop tabuliek); v M6 zvyšné políčka T5-T9 vrátane bossov a odomykania questom
+- **Posledný krok:** M6.2c – políčko T4 (Anthill) – otestované a zmergnuté (PR #26). M6 ďalej čaká na M7 (lietajúci nepriatelia, diaľkový boj) a M14 (boss Ant Captain odomyká T5), preto M6 zatiaľ uzatvárame.
+- **Rozpracované:** M7.1 – meny v drop tabuľke nepriateľa + spawn tabuľka políčka (GDD v2.5) – hotové na vetve `m7.1-currency-spawn-tables`, čaká na Tomasov test/merge
+- **Ďalší krok:** M7.2 jedlo (bobuľa 10 % drop, auto-jedlo, rýchle tlačidlá), potom diaľkový boj/lietajúci (M7.3+, Opus); neskôr loot krok 3 (doladenie čísel v drop tabuľkách) a krok 4 (editor tabuliek - dnes `data/enemies.json` + `data/tiles.json`)
 - **Pracovný režim:** Claude desktop → **Code** (Local, D:\Strmienka\HRA-vevericka). Model: podľa náročnosti kroku (poviem vopred). Od teraz: AI pripraví vetvu/commit/push a dá Tomasovi presné príkazy/odkaz na PR, test a merge robí Tomas sám (šetrí tokeny oproti ovládaniu prehliadača).
 - **Git:** repozitár https://github.com/tomas-strmen/squirrels-tale (**verejný** – pred vydaním prepnúť na súkromný, GDD/ROADMAP etapa 6–7), vetva `main`, autor Tomas Strmen `<174743142+tomas-strmen@users.noreply.github.com>`. GitHub účet: **tomas-strmen** (súkromný, e-mail skrytý, blokovanie pushov s e-mailom zapnuté). CI (GitHub Actions) beží pri každom pushi/PR a je zelené. Od M0.3 zmeny cez Pull Request.
 - **Hra online:** https://tomas-strmen.github.io/squirrels-tale/ – automaticky sa aktualizuje po každom merge do `main`.
 
 ## Hotové
+### M7.1 – meny a spawn tabuľka (2026-10-09, GDD v2.5)
+- **Meny v drop tabuľke nepriateľa** (`data/enemies.json` `loot.currencies`): záznam = mena (pebbles/seeds/nuts) +
+  šanca na `minLevel`/`maxLevel` nepriateľa (interpolácia ako pri predmetoch) + počet kusov od–do. Mena,
+  ktorá v tabuľke nie je, z nepriateľa nepadá. Štart: Worker Ant všetky tri, Pill Bug semienka+oriešky,
+  Armed Ant kamienky+oriešky, Ant Soldier všetky tri (2/2/1 ks) - čísla na doladenie.
+- Nový `core/currency` (peňaženka, `rollCurrencyDrops`, `addToWallet`, README, testy); vlastný Rng stream
+  `currencyRng` (mince nemenia drop predmetov ani boj); event `currencyFound`; `state.wallet`.
+- **Spawn tabuľka** v `data/tiles.json` (`spawns`: nepriateľ + váha) nahradila `enemyIds`; výber je vážený,
+  počiatočné váhy rovnaké (50/50) = doterajšie správanie. Vložiť/odobrať nepriateľa z políčka = jeden riadok.
+- UI: riadok „Pebbles x · Seeds y · Nuts z“ vpravo pod výberom políčok; popup „+2 Seeds“ nad nepriateľom.
+- GDD 8.2 + 11.1 + changelog 2.5. 274 testov zelených. V prehliadači overené len rozloženie HUD.
+- Pozn.: debug „Drop rate“ škáluje len predmety, mince nie (padajú 20-40 % tak či tak).
+
 ### Loot v2.4 – drop tabuľky per nepriateľ (2026-09-29)
 - GDD 9.3/9.5/9.6: nahradené spoločné pravidlá (výber predmetu z tabuľky políčka, globálne váhy
   vzácnosti) za vlastnú drop tabuľku a tabuľku váh vzácnosti pre **každého nepriateľa**, obe

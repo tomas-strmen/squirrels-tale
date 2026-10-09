@@ -47,6 +47,7 @@ import { hitChancePct } from '../../core/combat/combat';
 import { killsToUnlock, unlockedTileIds } from '../../core/tiles/tiles';
 import { formatHpHundredths, formatHundredths, fromHundredths } from '../../core/numbers/numbers';
 import { regenAmountHundredths, xpToNextLevelHundredths } from '../../core/progression/progression';
+import { CURRENCY_IDS } from '../../core/currency/currency';
 import { createRng } from '../../core/rng/rng';
 import { slotsFor } from '../../core/inventory/inventory';
 import { diceFaces, pityCountdowns, type Item } from '../../core/loot/loot';
@@ -128,6 +129,7 @@ export class FightScene extends Phaser.Scene {
   private simElapsedMs = 0;
   private timeText!: Phaser.GameObjects.Text;
   private pityText!: Phaser.GameObjects.Text;
+  private walletText!: Phaser.GameObjects.Text;
 
   constructor() {
     super('FightScene');
@@ -150,12 +152,7 @@ export class FightScene extends Phaser.Scene {
       this.tiles.map((tile) => [
         tile.id,
         createEncounterConfig(
-          toEncounterConfigInput(
-            balance,
-            tile,
-            enemies.filter((e) => tile.enemyIds.includes(e.id)),
-            lootData,
-          ),
+          toEncounterConfigInput(balance, tile, enemies, lootData),
         ),
       ]),
     );
@@ -361,6 +358,10 @@ export class FightScene extends Phaser.Scene {
     this.simElapsedMs = 0;
     this.timeText = this.add.text(10, 640, '', { ...textStyle, fontSize: '16px', color: '#a0a0a0' });
     this.pityText = this.add.text(10, 662, '', { ...textStyle, fontSize: '16px', color: '#a0a0a0' });
+    // Wallet (GDD 11.1): the three currencies, top right under the Drop rate row's tile picker.
+    this.walletText = this.add
+      .text(W - 20, 190, '', { ...textStyle, fontSize: '20px', color: '#e8d9a0' })
+      .setOrigin(1, 0.5);
   }
 
   private onToggleLoot(): void {
@@ -533,6 +534,9 @@ export class FightScene extends Phaser.Scene {
       enemyLootOf(this.config, this.state.enemyId),
       { magicFindPct: 0, unlocked: new Set() },
     );
+    this.walletText.setText(
+      CURRENCY_IDS.map((id) => `${tDynamic(`currency.${id}.name`)} ${this.state.wallet[id]}`).join(' · '),
+    );
     this.pityText.setText(
       `${t('loot.luckyAcorn')}: ` +
         countdowns
@@ -592,6 +596,18 @@ export class FightScene extends Phaser.Scene {
           duration: 400,
           onComplete: () => this.enemyGroup.setVisible(false),
         });
+        break;
+      case 'currencyFound':
+        // GDD 11.1: "+2 Pebbles" style popups above the defeated enemy, one line per currency.
+        event.drops.forEach((drop, i) =>
+          this.floatingText(
+            ENEMY_X,
+            FIGHTER_Y - 150 - i * 32,
+            `+${drop.amount} ${tDynamic(`currency.${drop.currencyId}.name`)}`,
+            '#e8d9a0',
+            1400,
+          ),
+        );
         break;
       case 'leveledUp':
         this.floatingText(PLAYER_X, FIGHTER_Y - 100, t('fight.leveledUp'), '#ffe08a', 1200);

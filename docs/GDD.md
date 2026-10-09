@@ -1,7 +1,7 @@
-# Veverička – Game Design Document (GDD) v2.3
+# Veverička – Game Design Document (GDD) v2.5
 
 > **Pracovný názov hry:** *Squirrel's Tale* (dočasný – finálny názov vybrať pred vydaním; nesmie pripomínať „Hero Tale“).
-> **Stav:** v2.3, 26. 9. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
+> **Stav:** v2.5, 9. 10. 2026. Zdroj: odpovede Tomasa v `docs/archiv/GDD-odpovede.md` (archív – pri rozpore platí tento dokument). Toto je jediná udržiavaná kópia GDD.
 > **Súvisiace:** `claude/ROADMAP.md` (technológia, architektúra, etapy vydania), `claude/PROMPT-vyvoj.md` (ako má AI pracovať).
 
 ---
@@ -245,6 +245,8 @@ ak stun (šanca stun%) → cieľ má ďalší útok oneskorený o 1.5 s (boss 0.
 | T8 | Thorn Thicket (Tŕnie) | Wasp (letí), Shrew | 300 zabití | |
 | T9 | Snake Hollow (Hadia jama) | Shrew, Wasp | 360 zabití → **boss Grass Snake** | koniec MVP |
 
+- **Spawn tabuľka (v2.5, Tomas):** stĺpec „Nepriatelia“ je len prehľad. Skutočná definícia je v `data/tiles.json` (`spawns`): pre každé políčko zoznam *nepriateľ + váha*. Pri každom novom nepriateľovi sa vyberie jeden záznam podľa váh (relatívne – 70/30 aj 7/3 je to isté; ak dáš súčet 100, váhy sú rovno percentá). Nepriateľ, ktorý v tabuľke políčka nie je, tam nikdy nespawnne. Počiatočné váhy sú rovnaké pre všetkých na políčku (zachované doterajšie správanie); ladí sa v M20.
+
 ### 8.3 Nepriatelia [MVP: 12 + 2 bossovia]
 | ID | Meno | Tile | HP | Úder | Interval | Hit | Armor | Dodge | XP | Pozn. |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -397,7 +399,7 @@ ak stun (šanca stun%) → cieľ má ďalší útok oneskorený o 1.5 s (boss 0.
 | Nuts (oriešky) | nákup/vylepšenie **prsteňov a amuletov**, **munícia**, **jedlo** | drop, predaj šperkov, mravce |
 | Time Needles (ihličie času) ✦ | vrátenie v čase (kap. 16) – prémiová mena | bossovia, denné úlohy, login, vzácny drop |
 
-**Drop mien za zabitie (políčko t):** kamienky 35 % × ceil(t/2); semienka 35 % × ceil(t/2); oriešky 20 % × 1; bobuľa 10 %. Boss: 10 × t z každej. Ihličie: 0.03 % za zabitie (~1 za 8 h), Kapitán 3, Užovka 5.
+**Drop mien za zabitie (v2.5, Tomas):** mince sú súčasťou **vlastnej drop tabuľky každého nepriateľa** (`data/enemies.json`, `loot.currencies`), vedľa predmetov. Každý záznam = *mena + šanca (na `minLevel`/`maxLevel` nepriateľa, lineárne ako pri predmetoch) + počet kusov od–do*; hádže sa nezávisle pri každom zabití. Mena, ktorá v tabuľke nie je, z daného nepriateľa nepadá (jeden môže dávať len semienka, iný kamienky a oriešky, iný nič). Pôvodný vzorec (kamienky/semienka 35 % × ceil(t/2), oriešky 20 %) je len východisko pre počiatočné čísla: Worker Ant všetky tri (1 ks), Pill Bug semienka 40 % + oriešky 20 %, Armed Ant kamienky 35 % (2 ks) + oriešky 20 %, Ant Soldier všetky tri (2/2/1 ks) – doladí sa v M20. Bobuľa (jedlo, 10 %) príde v M7.2. Boss: 10 × t z každej. Ihličie: 0.03 % za zabitie (~1 za 8 h), Kapitán 3, Užovka 5 (M17).
 
 ### 11.2 Obchodník – Straka [MVP]
 - Odomkne sa questom Q2. Tovar: **5 predmetov denne** (4 Common + 1 Uncommon) z odomknutých políčok.
@@ -712,3 +714,4 @@ tools/sim/         # headless simulácia tempa (npm run sim) → tabuľka čas/l
 | 2.2 | 2026-09-26 | 9.6: pity samostatne pre Rare 1000 / Unique 5000 / Legendary 20 000 zabití; drop vynuluje počítadlá svojej a nižších vzácností. |
 | 2.3 | 2026-09-27 | 9.1: 9 slotov (pravá/ľavá labka, ranged, head, body, legs, ring, amulet, tail); ľavá labka = štít alebo druhá zbraň (50 % poškodenia, interval nemení). 9.4/7.2: zbraň posúva interval postavy o pevné sekundy (posun = pôvodný interval − 2.4 s). 24: otázka intervalu uzavretá. |
 | 2.4 | 2026-09-29 | 9.3/9.5/9.6: drop predmetov aj vzácnosti sú teraz vlastné pre každého nepriateľa (drop tabuľka + tabuľka váh vzácnosti, obe s vlastným `minLevel`/`maxLevel` nepriateľa), nie podľa políčka. Každá položka v drop tabuľke sa hodí samostatne – z jedného zabitia môže padnúť aj viac predmetov naraz. Unikátne/set predmety sú vlastný riadok s pevnou vzácnosťou (fallback na Rare už netreba). Pity garantuje aspoň jeden predmet danej vzácnosti aj mimo tabuliek. Nahrádza „drop tabuľku políčka" a globálne váhy vzácnosti z 9.3/9.6. |
+| 2.5 | 2026-10-09 | 8.2: spawn tabuľka políčka (nepriateľ + váha) v `data/tiles.json`. 11.1: drop mien je súčasťou vlastnej drop tabuľky každého nepriateľa (mena, šanca podľa levelu, počet kusov), nie jeden vzorec podľa tieru políčka. |

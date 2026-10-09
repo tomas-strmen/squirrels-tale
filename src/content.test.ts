@@ -21,6 +21,7 @@ import {
   statIdSchema,
 } from './core/content/schemas';
 import { createEncounterConfig } from './core/encounter/encounter';
+import { CURRENCY_IDS } from './core/currency/currency';
 import { EQUIP_SLOTS } from './core/inventory/inventory';
 import { createEnemyLootTable, createLootConfig, createLootState, rollKillDrop } from './core/loot/loot';
 import { createRng } from './core/rng/rng';
@@ -42,14 +43,20 @@ describe('data + strings', () => {
     }
   });
 
+  it('every currency has a display name text (GDD 11.1)', () => {
+    for (const id of CURRENCY_IDS) {
+      expect(strings[`currency.${id}.name`], `missing text currency.${id}.name`).toBeTruthy();
+    }
+  });
+
   it('data/tiles.json matches its schema', () => {
     expect(() => parseTiles(tilesData)).not.toThrow();
   });
 
-  it("every tile's enemyIds reference a known enemy (M6.2)", () => {
+  it("every tile's spawn table references a known enemy (M6.2, v2.5)", () => {
     const enemyIds = new Set(parseEnemies(enemies).map((e) => e.id));
     for (const tile of parseTiles(tilesData)) {
-      for (const enemyId of tile.enemyIds) {
+      for (const { enemyId } of tile.spawns) {
         expect(enemyIds.has(enemyId), `tile ${tile.id} references unknown enemy ${enemyId}`).toBe(true);
       }
     }
@@ -64,9 +71,8 @@ describe('data + strings', () => {
       affixes: parseAffixes(affixesData),
     };
     for (const tile of parseTiles(tilesData)) {
-      const tileEnemies = allEnemies.filter((e) => tile.enemyIds.includes(e.id));
       expect(() =>
-        createEncounterConfig(toEncounterConfigInput(validBalance, tile, tileEnemies, lootData)),
+        createEncounterConfig(toEncounterConfigInput(validBalance, tile, allEnemies, lootData)),
       ).not.toThrow();
     }
   });

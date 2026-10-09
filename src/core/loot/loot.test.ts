@@ -44,6 +44,7 @@ const weightOf = (ws: ReturnType<typeof rarityWeights>, id: string) =>
 
 /** A flat (no level scaling) drop table, close to the game's real T1 numbers. */
 const workerAntLoot = createEnemyLootTable({
+  currencies: [],
   minLevel: 1,
   maxLevel: 1,
   items: [{ itemId: 'leaf_cap', pctAtMin: 4, pctAtMax: 4 }],
@@ -57,6 +58,7 @@ const workerAntLoot = createEnemyLootTable({
 describe('rarityWeights (GDD 9.6 v2.4)', () => {
   const legendaryUnlocked = new Set(['legendary_quest']);
   const loot = createEnemyLootTable({
+    currencies: [],
     minLevel: 1,
     maxLevel: 5,
     items: [],
@@ -255,6 +257,7 @@ describe('rollKillDrop (GDD 9.6)', () => {
 
   it('rolls each drop-table entry independently - a kill can drop more than one item (v2.4)', () => {
     const twoItemLoot = createEnemyLootTable({
+      currencies: [],
       minLevel: 1,
       maxLevel: 1,
       items: [
@@ -277,6 +280,7 @@ describe('rollKillDrop (GDD 9.6)', () => {
 
   it('a higher enemy level drops noticeably more often, per its own minLevel/maxLevel (v2.4)', () => {
     const scalingLoot = createEnemyLootTable({
+      currencies: [],
       minLevel: 1,
       maxLevel: 5,
       items: [{ itemId: 'leaf_cap', pctAtMin: 2, pctAtMax: 20 }],
@@ -369,6 +373,7 @@ describe('unique/set items always drop as themselves (GDD 9.5 v2.4)', () => {
   };
   const configWithUnique = createLootConfig({ items: [...items, uniqueItem], rarities, affixes, balance });
   const bossLoot = createEnemyLootTable({
+    currencies: [],
     minLevel: 4,
     maxLevel: 4,
     items: [{ itemId: 'test_unique_pike', pctAtMin: 100, pctAtMax: 100 }],
